@@ -2,42 +2,24 @@
 
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('dashboard', ['activeView' => 'dashboard']);
-});
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+| All workspace routes resolve to the single dashboard SPA shell.
+| Navigation between workspace panels is handled client-side via
+| the switchWorkspace() JavaScript router in dashboard.blade.php.
+|--------------------------------------------------------------------------
+*/
 
-Route::get('/customers', function () {
-    return view('dashboard', ['activeView' => 'customers']);
-});
+// Named workspace slugs served by the SPA shell
+$workspaces = [
+    'dashboard', 'customers', 'fleet', 'sites', 'prompts', 'topics',
+    'pipeline', 'scheduler', 'providers', 'media', 'seo', 'analytics',
+    'notifications', 'roles', 'billing', 'settings', 'audit', 'design',
+];
 
-Route::get('/fleet', function () {
-    return view('dashboard', ['activeView' => 'fleet']);
-});
-
-Route::get('/sites', function () {
-    return view('dashboard', ['activeView' => 'sites']);
-});
-
-Route::get('/prompts', function () {
-    return view('dashboard', ['activeView' => 'prompts']);
-});
-
-Route::get('/topics', function () {
-    return view('dashboard', ['activeView' => 'topics']);
-});
-
-Route::get('/pipeline', function () {
-    return view('dashboard', ['activeView' => 'pipeline']);
-});
-
-Route::get('/scheduler', function () {
-    return view('dashboard', ['activeView' => 'scheduler']);
-});
-
-Route::get('/providers', function () {
-    return view('dashboard', ['activeView' => 'providers']);
-});
-
-Route::get('/media', function () {
-    return view('dashboard', ['activeView' => 'media']);
-});
+foreach ($workspaces as $workspace) {
+    $path = $workspace === 'dashboard' ? '/' : "/{$workspace}";
+    Route::get($path, fn () => view('dashboard'))->name($workspace);
+}

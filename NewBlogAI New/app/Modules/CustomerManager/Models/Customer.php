@@ -74,7 +74,7 @@ class Customer extends Model
      */
     public function subscription(): HasOne
     {
-        return $this->hasOne('App\Modules\SubscriptionManager\Models\Subscription', 'customer_id');
+        return $this->hasOne(\App\Modules\SubscriptionManager\Models\Subscription::class, 'customer_id');
     }
 
     /**
@@ -82,38 +82,6 @@ class Customer extends Model
      */
     public function sites(): HasMany
     {
-        return $this->hasMany('App\Modules\SiteManager\Models\Site', 'customer_id');
-    }
-
-    /**
-     * Relationship: Customer has many Topics (Placeholder).
-     */
-    public function topics(): HasMany
-    {
-        return $this->hasMany('App\Models\Topic', 'customer_id');
-    }
-
-    /**
-     * Relationship: Customer has many API Keys (Placeholder).
-     */
-    public function apiKeys(): HasMany
-    {
-        return $this->hasMany('App\Models\keys', 'customer_id');
-    }
-
-    /**
-     * Relationship: Customer has many Publishing Schedules (Placeholder).
-     */
-    public function publishingSchedules(): HasMany
-    {
-        return $this->hasMany('App\Models\PublishingSchedule', 'customer_id');
-    }
-
-    /**
-     * Relationship: Customer has one Analytics dashboard (Placeholder).
-     */
-    public function analytics(): HasOne
-    {
-        return $this->hasOne('App\Models\Analytics', 'customer_id');
+        return $this->hasMany(\App\Modules\SiteManager\Models\Site::class, 'customer_id');
     }
 }

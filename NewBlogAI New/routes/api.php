@@ -10,7 +10,7 @@ Route::get('/user', function (Request $request) {
 Route::prefix('v1')->group(function () {
     Route::apiResource('sites', \App\Modules\SiteManager\Controllers\SiteController::class);
     Route::post('sites/{id}/sync', [\App\Modules\SiteManager\Controllers\SiteController::class, 'sync']);
-    Route::apiResource('prompts', \App\Http\Controllers\Api\PromtController::class);
+    Route::apiResource('prompts', \App\Modules\PromptManager\Controllers\PromptController::class);
     
     // Customer Management Module
     Route::apiResource('customers', \App\Modules\CustomerManager\Controllers\CustomerController::class);

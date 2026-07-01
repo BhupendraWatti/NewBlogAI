@@ -2,8 +2,9 @@
 
 namespace App\Modules\SubscriptionManager\Services;
 
-use App\Modules\CustomerManager\Models\Customer;
 use App\Modules\CustomerManager\Models\CustomerActivity;
+use App\Modules\CustomerManager\Models\Customer;
+use App\Modules\SubscriptionManager\Contracts\PaymentGatewayInterface;
 use App\Modules\SubscriptionManager\Models\Plan;
 use App\Modules\SubscriptionManager\Models\Subscription;
 use App\Modules\SubscriptionManager\Models\SubscriptionHistory;
@@ -12,6 +13,10 @@ use Illuminate\Support\Facades\Log;
 
 class SubscriptionService
 {
+    public function __construct(
+        protected PaymentGatewayInterface $gateway
+    ) {}
+
     /**
      * Subscribe a customer to a plan.
      */
@@ -31,8 +36,8 @@ class SubscriptionService
 
         try {
             return DB::transaction(function () use ($customer, $plan, $billingPeriod, $price, $paymentToken) {
-                // 2. Charge payment stub
-                PaymentGatewayStub::charge($customer->email, $price, $paymentToken);
+                // 2. Charge via injected gateway adapter
+                $this->gateway->charge($customer->email, $price, $paymentToken);
 
                 // 3. Create active subscription and snapshot limits
                 $subscription = Subscription::create([
@@ -42,10 +47,10 @@ class SubscriptionService
                     'billing_period' => $billingPeriod,
                     'starts_at'      => now(),
                     'ends_at'        => $billingPeriod === 'yearly' ? now()->addYear() : now()->addMonth(),
-                    'limits'         => $plan->toArray() // Deep Snapshot
+                    'limits'         => $plan->toArray()
                 ]);
 
-                // 4. Log history
+                // 4. Log subscription history
                 SubscriptionHistory::create([
                     'customer_id'    => $customer->id,
                     'plan_id'        => $plan->id,
@@ -54,6 +59,7 @@ class SubscriptionService
                     'amount_paid'    => $price
                 ]);
 
+                // 5. Record customer activity
                 CustomerActivity::create([
                     'customer_id' => $customer->id,
                     'event_type'  => 'subscription_created',
@@ -82,8 +88,7 @@ class SubscriptionService
 
         try {
             return DB::transaction(function () use ($subscription, $newPlan, $billingPeriod, $price, $paymentToken) {
-                // Charge full price for upgrade (prorated calculation stubbed here)
-                PaymentGatewayStub::charge($subscription->customer->email, $price, $paymentToken);
+                $this->gateway->charge($subscription->customer->email, $price, $paymentToken);
 
                 $subscription->update([
                     'plan_id'        => $newPlan->id,
@@ -91,7 +96,7 @@ class SubscriptionService
                     'billing_period' => $billingPeriod,
                     'starts_at'      => now(),
                     'ends_at'        => $billingPeriod === 'yearly' ? now()->addYear() : now()->addMonth(),
-                    'limits'         => $newPlan->toArray() // Updated Snapshot
+                    'limits'         => $newPlan->toArray()
                 ]);
 
                 SubscriptionHistory::create([
@@ -128,7 +133,6 @@ class SubscriptionService
 
         try {
             return DB::transaction(function () use ($subscription, $newPlan, $billingPeriod) {
-                // Downgrade applies immediately to limits
                 $subscription->update([
                     'plan_id'        => $newPlan->id,
                     'billing_period' => $billingPeriod,
@@ -140,7 +144,7 @@ class SubscriptionService
                     'plan_id'        => $newPlan->id,
                     'event_type'     => 'downgraded',
                     'billing_period' => $billingPeriod,
-                    'amount_paid'    => 0.00 // No charge for downgrades
+                    'amount_paid'    => 0.00
                 ]);
 
                 CustomerActivity::create([
@@ -202,7 +206,7 @@ class SubscriptionService
             'cancelled_at' => now()
         ]);
 
-        PaymentGatewayStub::cancelSubscription($subscription->id);
+        $this->gateway->cancelSubscription($subscription->id);
 
         CustomerActivity::create([
             'customer_id' => $subscription->customer_id,
