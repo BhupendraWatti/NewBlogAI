@@ -7,10 +7,26 @@ use Illuminate\Database\Eloquent\Model;
 class Prompt extends Model
 {
     /**
-     * The table is named 'promts' for backward compatibility
-     * with the existing migration. A future migration can rename it to 'prompts'.
+     * The table is named 'promts' for backward compatibility.
      */
     protected $table = 'promts';
 
-    protected $fillable = ['name', 'promt'];
+    protected $fillable = [
+        'name',
+        'promt', // the raw prompt text
+        'category',
+        'variables', // json list of variables, e.g. ["topic", "keyword", "tone"]
+        'version',
+        'status', // active, inactive
+    ];
+
+    /**
+     * Get the attributes that should be cast.
+     */
+    protected function casts(): array
+    {
+        return [
+            'variables' => 'array',
+        ];
+    }
 }

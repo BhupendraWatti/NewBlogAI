@@ -23,7 +23,12 @@ class SubscriptionResource extends JsonResource
             'limits'         => $this->limits ?? [],
             'created_at'     => $this->created_at?->toIso8601String(),
             'updated_at'     => $this->updated_at?->toIso8601String(),
-            'plan'           => new PlanResource($this->whenLoaded('plan'))
+            'plan'           => new PlanResource($this->whenLoaded('plan')),
+            'customer'       => $this->relationLoaded('customer') ? [
+                'id' => $this->customer?->id,
+                'company_name' => $this->customer?->company_name,
+                'email' => $this->customer?->email,
+            ] : null,
         ];
     }
 }

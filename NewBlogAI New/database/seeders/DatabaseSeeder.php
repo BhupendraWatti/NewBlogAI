@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -15,10 +16,17 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        // Super Admin — deterministic credentials for development login
+        // role: 1 = Super Admin, 2 = Admin, 3 = Support
+        User::firstOrCreate(
+            ['email' => 'admin@newsblogify.com'],
+            [
+                'name'     => 'Super Admin',
+                'email'    => 'admin@newsblogify.com',
+                'password' => Hash::make('admin123'),
+                'role'     => 1,
+            ]
+        );
 
         // Seed Prompts
         $prompt1 = \App\Models\Promt::create([

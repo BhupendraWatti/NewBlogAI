@@ -29,7 +29,7 @@ class SubscriptionController extends Controller
     {
         Gate::authorize('viewAny', Subscription::class);
 
-        $subscriptions = Subscription::with('plan')->latest()->paginate(15);
+        $subscriptions = Subscription::with(['plan', 'customer'])->latest()->paginate(15);
 
         return SubscriptionResource::collection($subscriptions);
     }

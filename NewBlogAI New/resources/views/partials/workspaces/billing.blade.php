@@ -6,10 +6,10 @@
                             <p class="text-xs text-muted">Audit customer usage transactions, define custom pricing plans, and inspect OpenAI/Anthropic API balances.</p>
                         </div>
                         <div class="flex gap-2">
-                            <button onclick="triggerBillingLockSimulation()" class="bg-surface hover:bg-surface/80 border border-border text-text font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5" disabled>
+                            <button onclick="triggerBillingLockSimulation()" class="bg-surface hover:bg-surface/80 border border-border text-text font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5">
                                 <span class="material-symbols-outlined text-sm">lock_open</span> Verify Billing Locks
                             </button>
-                            <button onclick="triggerInvoiceSyncSimulation()" class="bg-accent hover:bg-accent/80 text-background font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 cyber-glow-emerald" disabled>
+                            <button onclick="triggerInvoiceSyncSimulation()" class="bg-accent hover:bg-accent/80 text-background font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 cyber-glow-emerald">
                                 <span class="material-symbols-outlined text-sm font-bold">sync</span> Manual Invoice Sync
                             </button>
                         </div>
@@ -29,12 +29,12 @@
                         </div>
                         <div class="glass-surface rounded-2xl p-5 relative overflow-hidden group transition hover:border-accent">
                             <p class="text-[10px] font-mono text-muted uppercase tracking-widest mb-1">Monthly API Cost (MTD)</p>
-                            <h3 class="text-3xl font-display font-bold text-muted">—</h3>
+                            <h3 class="text-3xl font-display font-bold text-accent" id="billing-api-cost">—</h3>
                             <div class="mt-2 text-[10px] font-mono text-muted">Cost calculations dynamic</div>
                         </div>
                         <div class="glass-surface rounded-2xl p-5 relative overflow-hidden group transition hover:border-accent">
                             <p class="text-[10px] font-mono text-muted uppercase tracking-widest mb-1">Overage Alerts</p>
-                            <h3 class="text-3xl font-display font-bold text-muted">—</h3>
+                            <h3 class="text-3xl font-display font-bold text-accent" id="billing-overage-alerts">—</h3>
                             <div class="mt-2 text-[10px] font-mono text-muted">No threshold breaches</div>
                         </div>
                     </div>

@@ -1,4 +1,4 @@
-﻿                <!-- 15. NOTIFICATION HUB WORKSPACE -->
+                <!-- 15. NOTIFICATION HUB WORKSPACE -->
                 <div id="node-notifications" class="workspace-pane space-y-6 hidden">
                     <div class="flex justify-between items-center">
                         <div>
@@ -45,42 +45,8 @@
                     <div class="glass-surface rounded-2xl p-6 border border-border space-y-6">
                         <h4 class="text-xs font-mono uppercase tracking-widest text-muted">System Log Timeline (Active Stream)</h4>
                         
-                        <div class="space-y-4 relative pl-6 border-l border-border font-mono text-xs">
-                            <!-- Timeline Event 1 -->
-                            <div class="relative" id="event-row-1">
-                                <span class="absolute -left-[31px] top-0 w-4 h-4 rounded-full bg-success/20 border border-success/40 flex items-center justify-center text-[8px] text-success">✓</span>
-                                <div class="p-3 bg-white/5 border border-border rounded-xl space-y-1">
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-text font-bold">WordPress Publish Sync Complete</span>
-                                        <span class="text-[10px] text-muted">Just now</span>
-                                    </div>
-                                    <p class="text-[10px] text-muted">Post "Quantum Computing Breakthrough" synced successfully to techcrunch.com via API.</p>
-                                </div>
-                            </div>
-
-                            <!-- Timeline Event 2 -->
-                            <div class="relative" id="event-row-2">
-                                <span class="absolute -left-[31px] top-0 w-4 h-4 rounded-full bg-danger/20 border border-danger/40 flex items-center justify-center text-[8px] text-danger">!</span>
-                                <div class="p-3 bg-white/5 border border-border rounded-xl space-y-1">
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-text font-bold">LLM Pipeline Request Timeout</span>
-                                        <span class="text-[10px] text-muted">12 mins ago</span>
-                                    </div>
-                                    <p class="text-[10px] text-muted">GPT-4o text generation failed on engadget.com. Error: REST Gateway connection timeout.</p>
-                                </div>
-                            </div>
-
-                            <!-- Timeline Event 3 -->
-                            <div class="relative" id="event-row-3">
-                                <span class="absolute -left-[31px] top-0 w-4 h-4 rounded-full bg-warning/20 border border-warning/40 flex items-center justify-center text-[8px] text-warning">?</span>
-                                <div class="p-3 bg-white/5 border border-border rounded-xl space-y-1">
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-text font-bold">SSL Certificate Expiration Warning</span>
-                                        <span class="text-[10px] text-muted">1 hour ago</span>
-                                    </div>
-                                    <p class="text-[10px] text-muted">Domain mashable.com SSL is active but expiring soon. Automated renewal scheduled.</p>
-                                </div>
-                            </div>
+                        <div class="space-y-4 relative pl-6 border-l border-border font-mono text-xs" id="operations-timeline-stream">
+                            <!-- Populated dynamically from GET /api/v1/operations/audit -->
                         </div>
                     </div>
                 </div>

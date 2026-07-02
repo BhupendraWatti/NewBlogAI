@@ -22,3 +22,10 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# TestSprite files
+/testsprite_tests/
+
+# Local databases
+/newsblogify
+*.sqlite

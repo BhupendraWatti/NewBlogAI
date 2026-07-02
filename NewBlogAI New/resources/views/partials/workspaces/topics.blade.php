@@ -1,4 +1,4 @@
-﻿                <!-- TOPIC MANAGEMENT WORKSPACE -->
+                <!-- TOPIC MANAGEMENT WORKSPACE -->
                 <div id="node-topics" class="workspace-pane space-y-6 hidden">
                     <div class="flex justify-between items-center">
                         <div>
@@ -15,7 +15,7 @@
                                     <span class="material-symbols-outlined text-sm">grid_view</span>
                                 </button>
                             </div>
-                            <button onclick="launchCreationWizard('topic')" class="bg-accent hover:bg-accent/80 text-background font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 cyber-glow-emerald">
+                            <button onclick="openTopicAddModal()" class="bg-accent hover:bg-accent/80 text-background font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 cyber-glow-emerald">
                                 <span class="material-symbols-outlined text-sm font-bold">add</span> Add Topic
                             </button>
                         </div>
@@ -73,7 +73,7 @@
                             <span class="material-symbols-outlined text-4xl text-muted mb-3">topic</span>
                             <h3 class="font-display font-bold text-base mb-1">No Topics Found</h3>
                             <p class="text-xs text-muted max-w-xs">No topics have been created yet. Add your first topic to start generating content automatically.</p>
-                            <button onclick="launchCreationWizard('topic')" class="mt-4 bg-accent hover:bg-accent/80 text-background font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5">
+                            <button onclick="openTopicAddModal()" class="mt-4 bg-accent hover:bg-accent/80 text-background font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5">
                                 <span class="material-symbols-outlined text-sm">add</span> Add First Topic
                             </button>
                         </div>
@@ -87,5 +87,74 @@
                             <h3 class="font-display font-bold text-base mb-1">No Topics Found</h3>
                             <p class="text-xs text-muted max-w-xs">Topics you create will appear here as cards.</p>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Add/Edit Topic Modal -->
+                <div class="modal-overlay" id="topic-modal">
+                    <div class="modal-container">
+                        <div class="flex justify-between items-center mb-6 border-b border-outline-variant pb-3">
+                            <h3 class="text-lg font-semibold font-headline-md text-primary" id="topic-modal-title">Add Content Topic</h3>
+                            <button class="text-outline hover:text-on-surface text-xl" onclick="closeTopicModal()">&times;</button>
+                        </div>
+                        <form id="topic-form" onsubmit="saveTopic(event)">
+                            <input type="hidden" id="topic-id">
+                            
+                            <div class="mb-4">
+                                <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="topic-name">Topic Name</label>
+                                <input type="text" id="topic-name" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="e.g. Quantum Computing Innovations" required>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="topic-category">Category</label>
+                                    <input type="text" id="topic-category" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="e.g. Technology" required>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="topic-language">Language</label>
+                                    <input type="text" id="topic-language" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="e.g. English" required>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-3 gap-4 mb-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="topic-priority">Priority</label>
+                                    <select id="topic-priority" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary">
+                                        <option value="low">Low</option>
+                                        <option value="medium" selected>Medium</option>
+                                        <option value="high">High</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="topic-status">Status</label>
+                                    <select id="topic-status" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary">
+                                        <option value="active" selected>Active</option>
+                                        <option value="inactive">Inactive</option>
+                                        <option value="draft">Draft</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="topic-frequency">Frequency</label>
+                                    <input type="text" id="topic-frequency" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="e.g. daily" required>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="topic-prompt-id">Associated Prompt</label>
+                                <select id="topic-prompt-id" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary">
+                                    <!-- Populated dynamically -->
+                                </select>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="topic-tags">Tags (Comma-separated)</label>
+                                <input type="text" id="topic-tags" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="e.g. tech, quantum, ai">
+                            </div>
+
+                            <div class="flex justify-end gap-3 mt-6 border-t border-outline-variant pt-4">
+                                <button type="button" class="border border-outline-variant text-outline hover:text-on-surface hover:bg-surface-container-high px-4 py-2.5 rounded-lg font-medium" onclick="closeTopicModal()">Cancel</button>
+                                <button type="submit" class="bg-primary text-on-primary hover:bg-primary-fixed px-5 py-2.5 rounded-lg font-semibold transition-colors">Save Topic</button>
+                            </div>
+                        </form>
                     </div>
                 </div>

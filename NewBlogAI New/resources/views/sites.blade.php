@@ -581,6 +581,13 @@
             fetchSites();
         }
 
+        window.showWarning = window.showWarning || function(title, message) { alert(title + '\n' + message); };
+        window.showSuccess = window.showSuccess || function(title, message) { alert(title + '\n' + message); };
+        window.showError = window.showError || function(title, message) { alert(title + '\n' + message); };
+        window.showLoading = window.showLoading || function(message) { return { close() {} }; };
+        window.showSuccessHtml = window.showSuccessHtml || function(title, htmlContent) { alert(title + '\n' + htmlContent); };
+        window.showConfirmation = window.showConfirmation || function(title, message, onConfirm) { if (confirm(title + '\n' + message)) { onConfirm?.(); } };
+
         async function triggerSync(id, element) {
             element.classList.add('animate-spin');
             try {
@@ -588,11 +595,13 @@
                 const result = await response.json();
                 if (response.ok) {
                     fetchSites();
+                    showSuccess("Sync Successful", "WordPress configurations synchronized.");
                 } else {
-                    alert("Sync failed: " + result.message);
+                    showError("Sync Failed", result.message);
                 }
             } catch (err) {
                 console.error("Error triggering sync:", err);
+                showError("System Error", "Could not trigger remote sync.");
             } finally {
                 element.classList.remove('animate-spin');
             }
@@ -649,6 +658,32 @@
             if (api_key) payload.api_key = api_key;
             if (promt_id) payload.promt_id = parseInt(promt_id);
 
+            // Lock submission button
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.disabled = true;
+
+            // Trigger multi-step loading popup
+            let stepIndex = 0;
+            const steps = [
+                "⏳ Connecting...",
+                "⏳ Validating license...",
+                "⏳ Verifying WordPress...",
+                "⏳ Saving..."
+            ];
+            
+            const loadingSwal = showLoading("Registering website...");
+            
+            const loadingInterval = setInterval(() => {
+                if (stepIndex < steps.length) {
+                    Swal.update({
+                        html: `<div class="font-mono text-xs text-left space-y-1 py-2">${steps.slice(0, stepIndex + 1).join('<br>')}</div>`
+                    });
+                    stepIndex++;
+                } else {
+                    clearInterval(loadingInterval);
+                }
+            }, 500);
+
             try {
                 let response;
                 if (id) {
@@ -665,32 +700,66 @@
                     });
                 }
 
+                clearInterval(loadingInterval);
+
                 if (response.ok) {
                     closeModal();
-                    fetchSites();
+                    
+                    // Reactive UI Refreshes
+                    await fetchSites();
+                    if (window.refreshDashboardStats) {
+                        await window.refreshDashboardStats();
+                    }
+
+                    const cleanDomain = domain_url.replace(/https?:\/\/(www\.)?/, '');
+                    const responseMessage = result?.message || 'Connected successfully.';
+                    showSuccessHtml(
+                        "✅ Website Connected",
+                        `<div class="font-sans text-xs space-y-3 py-2">
+                            <p class="text-accent text-sm font-semibold">${cleanDomain}</p>
+                            <p class="text-muted text-[11px]">${responseMessage}</p>
+                         </div>`,
+                        3000
+                    );
                 } else {
                     const result = await response.json();
-                    alert("Error: " + JSON.stringify(result.errors || result.message));
+                    showError("Registration Failed", result.message || JSON.stringify(result.errors));
                 }
             } catch (err) {
+                clearInterval(loadingInterval);
                 console.error("Error saving site:", err);
+                showError("System Error", "Could not communicate with server endpoints.");
+            } finally {
+                if (submitBtn) submitBtn.disabled = false;
             }
         }
 
         async function deleteSite(id) {
-            if (!confirm("Are you sure you want to disconnect this WordPress site?")) return;
-
-            try {
-                const response = await fetch(`/api/v1/sites/${id}`, { method: 'DELETE' });
-                if (response.ok) {
-                    if (selectedSite && selectedSite.id === id) selectedSite = null;
-                    fetchSites();
-                } else {
-                    alert("Error deleting site.");
+            showConfirmation(
+                "Disconnect Website",
+                "Are you sure you want to disconnect this WordPress site?",
+                async () => {
+                    try {
+                        const response = await fetch(`/api/v1/sites/${id}`, { method: 'DELETE' });
+                        if (response.ok) {
+                            if (selectedSite && selectedSite.id === id) {
+                                selectedSite = null;
+                                document.getElementById('inspector-content').innerHTML = '<div class="text-center text-outline py-12">Select a site to view details</div>';
+                            }
+                            await fetchSites();
+                            if (window.refreshDashboardStats) {
+                                await window.refreshDashboardStats();
+                            }
+                            showSuccess("Site Disconnected", "WordPress site has been disconnected.");
+                        } else {
+                            showError("Deletion Failed", "Error deleting site.");
+                        }
+                    } catch (err) {
+                        console.error("Error deleting site:", err);
+                        showError("System Error", "Could not complete deletion request.");
+                    }
                 }
-            } catch (err) {
-                console.error("Error deleting site:", err);
-            }
+            );
         }
     </script>
 </body>

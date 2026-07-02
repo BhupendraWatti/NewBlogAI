@@ -1,11 +1,11 @@
-﻿                <!-- 16. USER & ROLE MANAGEMENT WORKSPACE -->
+                <!-- 16. USER & ROLE MANAGEMENT WORKSPACE -->
                 <div id="node-roles" class="workspace-pane space-y-6 hidden">
                     <div class="flex justify-between items-center">
                         <div>
                             <h2 class="font-display font-bold text-2xl">Identity &amp; Access Manager</h2>
                             <p class="text-xs text-muted">Assign user access privileges, configure security permissions, and audit system credentials.</p>
                         </div>
-                        <button onclick="triggerOperatorInviteSimulation()" class="bg-accent hover:bg-accent/80 text-background font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 cyber-glow-emerald">
+                        <button onclick="openUserAddModal()" class="bg-accent hover:bg-accent/80 text-background font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 cyber-glow-emerald">
                             <span class="material-symbols-outlined text-sm font-bold">person_add</span> Invite Platform Operator
                         </button>
                     </div>
@@ -16,18 +16,18 @@
                             <p class="text-[10px] font-mono text-muted uppercase tracking-widest mb-1">Total Users</p>
                             <h3 class="text-3xl font-display font-bold text-accent" id="roles-total-users">24</h3>
                             <div class="mt-2 text-[10px] font-mono text-accent flex items-center gap-1">
-                                <span class="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span> Active Sessions: 4
+                                <span class="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span> Identity Access Online
                             </div>
                         </div>
                         <div class="glass-surface rounded-2xl p-5 relative overflow-hidden group transition hover:border-accent">
                             <p class="text-[10px] font-mono text-muted uppercase tracking-widest mb-1">Active Roles</p>
                             <h3 class="text-3xl font-display font-bold">5 Scopes</h3>
-                            <div class="mt-2 text-[10px] font-mono text-muted">Super, Editor, SEO, Support, Custom</div>
+                            <div class="mt-2 text-[10px] font-mono text-muted">Super, Admin, Editor, SEO, Support</div>
                         </div>
                         <div class="glass-surface rounded-2xl p-5 relative overflow-hidden group transition hover:border-accent">
                             <p class="text-[10px] font-mono text-muted uppercase tracking-widest mb-1">SAML SSO Integration</p>
-                            <h3 class="text-3xl font-display font-bold text-accent">Enabled</h3>
-                            <div class="mt-2 text-[10px] font-mono text-muted">Azure AD Directory sync active</div>
+                            <h3 class="text-3xl font-display font-bold text-accent">Active</h3>
+                            <div class="mt-2 text-[10px] font-mono text-muted">Local AD Directory sync active</div>
                         </div>
                         <div class="glass-surface rounded-2xl p-5 relative overflow-hidden group transition hover:border-accent">
                             <p class="text-[10px] font-mono text-muted uppercase tracking-widest mb-1">Security Exceptions</p>
@@ -43,44 +43,61 @@
                                 <tr class="bg-surface/50 border-b border-border text-muted font-mono text-[10px] uppercase">
                                     <th class="p-3 pl-5 w-8"><input type="checkbox" class="rounded bg-background border-border text-accent focus:ring-accent/20"/></th>
                                     <th class="p-3">Operator Name</th>
+                                    <th class="p-3">Email Address</th>
                                     <th class="p-3">Assigned Role</th>
-                                    <th class="p-3">SSO Status</th>
                                     <th class="p-3">Two-Factor Auth</th>
-                                    <th class="p-3">Status</th>
                                     <th class="p-3 text-right pr-5">Operations</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-border text-xs font-mono" id="roles-directory-body">
-                                <tr onclick="inspectElement('user', 'Bhupendra Watti', 'online', 'Super Admin (Level 1)', 'Full Scopes')" class="hover:bg-white/5 transition cursor-pointer">
-                                    <td class="p-3 pl-5"><input type="checkbox" class="rounded bg-background border-border text-accent focus:ring-accent/20" onclick="event.stopPropagation()"/></td>
-                                    <td class="p-3 text-text font-medium flex items-center gap-2">
-                                        <div class="w-6 h-6 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center text-[10px] text-accent font-bold">BW</div>
-                                        <span>Bhupendra Watti</span>
-                                    </td>
-                                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-accent/20 text-accent border border-accent/30 text-[9px]">Super Admin</span></td>
-                                    <td class="p-3 text-muted">Local / Azure AD</td>
-                                    <td class="p-3 text-accent font-bold">Enabled</td>
-                                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-success/20 text-success border border-success/30 text-[9px]">online</span></td>
-                                    <td class="p-3 text-right pr-5">
-                                        <button class="text-secondary hover:underline">Inspect</button>
-                                    </td>
-                                </tr>
-                                <tr onclick="inspectElement('user', 'John Doe', 'offline', 'SEO Specialist (Level 3)', 'Topics Read/Write')" class="hover:bg-white/5 transition cursor-pointer">
-                                    <td class="p-3 pl-5"><input type="checkbox" class="rounded bg-background border-border text-accent focus:ring-accent/20" onclick="event.stopPropagation()"/></td>
-                                    <td class="p-3 text-text font-medium flex items-center gap-2">
-                                        <div class="w-6 h-6 rounded-full bg-secondary/20 border border-secondary/40 flex items-center justify-center text-[10px] text-secondary font-bold">JD</div>
-                                        <span>John Doe</span>
-                                    </td>
-                                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-secondary/20 text-secondary border border-secondary/30 text-[9px]">SEO Specialist</span></td>
-                                    <td class="p-3 text-muted">Azure AD Only</td>
-                                    <td class="p-3 text-accent font-bold">Enabled</td>
-                                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-danger/20 text-danger border border-danger/30 text-[9px]">offline</span></td>
-                                    <td class="p-3 text-right pr-5">
-                                        <button class="text-secondary hover:underline">Inspect</button>
-                                    </td>
-                                </tr>
+                                <!-- Populated dynamically from GET /api/v1/users -->
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                <!-- Add/Edit User Modal -->
+                <div class="modal-overlay" id="user-modal">
+                    <div class="modal-container">
+                        <div class="flex justify-between items-center mb-6 border-b border-outline-variant pb-3">
+                            <h3 class="text-lg font-semibold font-headline-md text-primary" id="user-modal-title">Invite Platform Operator</h3>
+                            <button class="text-outline hover:text-on-surface text-xl" onclick="closeUserModal()">&times;</button>
+                        </div>
+                        <form id="user-form" onsubmit="saveUser(event)">
+                            <input type="hidden" id="user-id">
+                            
+                            <div class="mb-4">
+                                <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="user-name">Full Name</label>
+                                <input type="text" id="user-name" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="e.g. Alice Smith" required>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="user-email">Email Address</label>
+                                <input type="email" id="user-email" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="e.g. alice@company.com" required>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="user-role-select">Assigned Role</label>
+                                    <select id="user-role-select" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary">
+                                        <option value="1">Super Admin</option>
+                                        <option value="2">Admin</option>
+                                        <option value="3" selected>Editor</option>
+                                        <option value="4">SEO Specialist</option>
+                                        <option value="5">Support</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="user-password">Password</label>
+                                    <input type="password" id="user-password" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="Set secure password">
+                                </div>
+                            </div>
+
+                            <div class="flex justify-end gap-3 mt-6 border-t border-outline-variant pt-4">
+                                <button type="button" class="border border-outline-variant text-outline hover:text-on-surface hover:bg-surface-container-high px-4 py-2.5 rounded-lg font-medium" onclick="closeUserModal()">Cancel</button>
+                                <button type="submit" class="bg-primary text-on-primary hover:bg-primary-fixed px-5 py-2.5 rounded-lg font-semibold transition-colors">Save Operator</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
 

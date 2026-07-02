@@ -1,4 +1,4 @@
-﻿                <!-- 19. AUDIT LOGS & OBSERVABILITY WORKSPACE -->
+                <!-- 19. AUDIT LOGS & OBSERVABILITY WORKSPACE -->
                 <div id="node-audit" class="workspace-pane space-y-6 hidden">
                     <div class="flex justify-between items-center">
                         <div>
@@ -54,34 +54,7 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-border text-xs font-mono" id="audit-directory-body">
-                                <tr onclick="inspectElement('audit', 'UPDATE customer_subscriptions', 'info', 'Bhupendra Watti', '192.168.1.42')" class="hover:bg-white/5 transition cursor-pointer">
-                                    <td class="p-3 pl-5 text-muted">2026-07-01 17:53:02</td>
-                                    <td class="p-3 text-text font-medium flex items-center gap-2">
-                                        <div class="w-5 h-5 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center text-[9px] text-accent font-bold">BW</div>
-                                        <span>Bhupendra Watti</span>
-                                    </td>
-                                    <td class="p-3 text-muted">customer_subscriptions</td>
-                                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-accent/20 text-accent border border-accent/30 text-[9px]">UPDATE</span></td>
-                                    <td class="p-3 text-muted">192.168.1.42</td>
-                                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-success/20 text-success border border-success/30 text-[9px]">info</span></td>
-                                    <td class="p-3 text-right pr-5">
-                                        <button class="text-secondary hover:underline">Inspect</button>
-                                    </td>
-                                </tr>
-                                <tr onclick="inspectElement('audit', 'DELETE customer_sites', 'warning', 'John Doe', '192.168.1.100')" class="hover:bg-white/5 transition cursor-pointer">
-                                    <td class="p-3 pl-5 text-muted">2026-07-01 17:48:12</td>
-                                    <td class="p-3 text-text font-medium flex items-center gap-2">
-                                        <div class="w-5 h-5 rounded-full bg-secondary/20 border border-secondary/40 flex items-center justify-center text-[9px] text-secondary font-bold">JD</div>
-                                        <span>John Doe</span>
-                                    </td>
-                                    <td class="p-3 text-muted">customer_sites</td>
-                                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-danger/20 text-danger border border-danger/30 text-[9px]">DELETE</span></td>
-                                    <td class="p-3 text-muted">192.168.1.100</td>
-                                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-warning/20 text-warning border border-warning/30 text-[9px]">warning</span></td>
-                                    <td class="p-3 text-right pr-5">
-                                        <button class="text-secondary hover:underline">Inspect</button>
-                                    </td>
-                                </tr>
+                                <!-- Populated dynamically from GET /api/v1/operations/audit -->
                             </tbody>
                         </table>
                     </div>

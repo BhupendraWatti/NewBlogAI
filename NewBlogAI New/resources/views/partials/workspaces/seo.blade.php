@@ -1,4 +1,4 @@
-﻿                <!-- 13. SEO INTELLIGENCE WORKSPACE -->
+                <!-- 13. SEO INTELLIGENCE WORKSPACE -->
                 <div id="node-seo" class="workspace-pane space-y-6 hidden">
                     <div class="flex justify-between items-center">
                         <div>
@@ -49,27 +49,8 @@
                                     <th class="p-3 text-right pr-5">Operations</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-border text-xs font-mono">
-                                <tr onclick="inspectElement('seo', 'Quantum Leap in Computing', 'online', 'Score: 98', 'quantum leap')" class="hover:bg-white/5 transition cursor-pointer">
-                                    <td class="p-3 pl-5 text-text font-medium">https://techcrunch.com/quantum-leap-computing</td>
-                                    <td class="p-3 text-muted">quantum leap</td>
-                                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-success/20 text-success border border-success/30 text-[9px]">98 / 100</span></td>
-                                    <td class="p-3 text-muted">4 / 4 verified</td>
-                                    <td class="p-3 text-accent font-bold">Valid Canonical</td>
-                                    <td class="p-3 text-right pr-5">
-                                        <button class="text-secondary hover:underline">Inspect</button>
-                                    </td>
-                                </tr>
-                                <tr onclick="inspectElement('seo', 'Vite vs Webpack benchmarks', 'online', 'Score: 92', 'vite vs webpack')" class="hover:bg-white/5 transition cursor-pointer">
-                                    <td class="p-3 pl-5 text-text font-medium">https://mashable.com/vite-vs-webpack-benchmarks</td>
-                                    <td class="p-3 text-muted">vite vs webpack</td>
-                                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-success/20 text-success border border-success/30 text-[9px]">92 / 100</span></td>
-                                    <td class="p-3 text-danger font-bold" id="seo-alt-tech-row">2 / 4 missing alts</td>
-                                    <td class="p-3 text-accent font-bold">Valid Canonical</td>
-                                    <td class="p-3 text-right pr-5">
-                                        <button class="text-secondary hover:underline">Inspect</button>
-                                    </td>
-                                </tr>
+                            <tbody class="divide-y divide-border text-xs font-mono" id="seo-table-body">
+                                <!-- Populated dynamically from GET /api/v1/articles -->
                             </tbody>
                         </table>
                     </div>

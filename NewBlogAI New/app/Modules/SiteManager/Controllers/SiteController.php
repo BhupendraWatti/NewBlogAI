@@ -6,23 +6,28 @@ use App\Http\Controllers\Controller;
 use App\Modules\SiteManager\Models\Site;
 use App\Modules\SiteManager\Requests\StoreSiteRequest;
 use App\Modules\SiteManager\Requests\UpdateSiteRequest;
+use App\Modules\SiteManager\Resources\SiteResource;
+use App\Modules\SiteManager\Services\SiteService;
 use App\Modules\SiteManager\Jobs\SyncSiteDataJob;
 use App\Modules\SiteManager\Events\SiteCreated;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class SiteController extends Controller
 {
+    public function __construct(
+        protected SiteService $siteService
+    ) {}
+
     /**
      * Display a listing of client sites.
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request): AnonymousResourceCollection
     {
         $limit = $request->get('limit', 15);
         $search = $request->get('search');
+        $status = $request->get('status');
 
         $query = Site::with('promt')->latest();
 
@@ -30,111 +35,84 @@ class SiteController extends Controller
             $query->where('domain_url', 'like', '%' . $search . '%');
         }
 
+        if (!empty($status)) {
+            $query->where('status', $status);
+        }
+
         $sites = $query->paginate($limit);
 
-        return response()->json($sites);
+        return SiteResource::collection($sites);
     }
 
     /**
      * Store a newly created site configuration.
-     *
-     * @param StoreSiteRequest $request
-     * @return JsonResponse
      */
     public function store(StoreSiteRequest $request): JsonResponse
     {
         $validated = $request->validated();
-        
-        // Ensure trailing slash is trimmed
         $validated['domain_url'] = rtrim($validated['domain_url'], '/');
 
-        $site = Site::create($validated);
+        $site = $this->siteService->createSite($validated);
 
         event(new SiteCreated($site));
 
-        return response()->json([
-            'message' => 'WordPress site configuration saved successfully.',
-            'data' => $site
-        ], 201);
+        return (new SiteResource($site->load('promt')))
+            ->response()
+            ->setStatusCode(201);
     }
 
     /**
      * Display the specified site details.
-     *
-     * @param int $id
-     * @return JsonResponse
      */
-    public function show(int $id): JsonResponse
+    public function show(string $id): SiteResource
     {
-        $site = Site::with('promt')->find($id);
-
-        if (!$site) {
-            return response()->json(['message' => 'Site not found.'], 404);
-        }
-
-        return response()->json(['data' => $site]);
+        $site = Site::with('promt')->findOrFail($id);
+        return new SiteResource($site);
     }
 
     /**
      * Update the specified site configuration.
-     *
-     * @param UpdateSiteRequest $request
-     * @param int $id
-     * @return JsonResponse
      */
-    public function update(UpdateSiteRequest $request, int $id): JsonResponse
+    public function update(UpdateSiteRequest $request, string $id): SiteResource
     {
-        $site = Site::find($id);
-
-        if (!$site) {
-            return response()->json(['message' => 'Site not found.'], 404);
-        }
-
+        $site = Site::findOrFail($id);
         $validated = $request->validated();
+
         if (isset($validated['domain_url'])) {
             $validated['domain_url'] = rtrim($validated['domain_url'], '/');
         }
 
-        $site->update($validated);
+        $updated = $this->siteService->updateSite($site, $validated);
 
-        return response()->json([
-            'message' => 'WordPress site configuration updated successfully.',
-            'data' => $site
-        ]);
+        return new SiteResource($updated->load('promt'));
     }
 
     /**
      * Remove the specified site configuration.
-     *
-     * @param int $id
-     * @return JsonResponse
      */
-    public function destroy(int $id): JsonResponse
+    public function destroy(string $id): JsonResponse
     {
-        $site = Site::find($id);
+        $site = Site::findOrFail($id);
 
-        if (!$site) {
-            return response()->json(['message' => 'Site not found.'], 404);
+        if ($site->is_default) {
+            return response()->json([
+                'message' => 'Cannot delete default site. Set another website as default first.'
+            ], 422);
         }
 
-        $site->delete();
+        $this->siteService->deleteSite($site);
 
-        return response()->json(['message' => 'Site configuration deleted successfully.']);
+        return response()->json([
+            'message' => 'Site configuration deleted successfully.'
+        ]);
     }
 
     /**
      * Trigger manual sync job for the site.
-     *
-     * @param int $id
-     * @return JsonResponse
      */
-    public function sync(int $id): JsonResponse
+    public function sync(string $id): JsonResponse
     {
-        $site = Site::find($id);
-
-        if (!$site) {
-            return response()->json(['message' => 'Site not found.'], 404);
-        }
+        $site = Site::findOrFail($id);
 
         // Dispatch background job to Horizon queue
         SyncSiteDataJob::dispatch($site);
@@ -143,5 +121,41 @@ class SiteController extends Controller
             'message' => 'Synchronization queued successfully.',
             'status' => 'syncing'
         ], 202);
+    }
+
+    /**
+     * Test the connection to the WordPress site.
+     */
+    public function validateConnection(string $id): JsonResponse
+    {
+        $site = Site::findOrFail($id);
+        $connected = $this->siteService->validateConnection($site);
+
+        if ($connected) {
+            return response()->json([
+                'message' => 'Connection test successful! Website verified.',
+                'status' => 'connected',
+                'plugin_version' => $site->plugin_version,
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Connection test failed. Verify website domain, API key and plugin status.',
+            'status' => 'error',
+            'error_log' => $site->error_log,
+        ], 502);
+    }
+
+    /**
+     * Set a website configuration as default.
+     */
+    public function setDefault(string $id): JsonResponse
+    {
+        $site = Site::findOrFail($id);
+        $this->siteService->setDefault($site);
+
+        return response()->json([
+            'message' => 'Website is now set as the default destination.'
+        ]);
     }
 }

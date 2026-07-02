@@ -1,4 +1,4 @@
-﻿                <!-- 10. PUBLISHING SCHEDULER WORKSPACE -->
+                <!-- 10. PUBLISHING SCHEDULER WORKSPACE -->
                 <div id="node-scheduler" class="workspace-pane space-y-6 hidden">
                     <div class="flex justify-between items-center">
                         <div>
@@ -61,27 +61,8 @@
                                     <th class="p-3 text-right pr-5">Operations</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-border text-xs font-mono">
-                                <tr onclick="inspectElement('job', 'job_00294', 'scheduled', '2026-07-02 08:00 UTC', 'techcrunch.com')" class="hover:bg-white/5 transition cursor-pointer">
-                                    <td class="p-3 pl-5 text-text">job_00294</td>
-                                    <td class="p-3 text-muted">https://techcrunch.com</td>
-                                    <td class="p-3 text-muted">Artificial Intelligence</td>
-                                    <td class="p-3 text-text" id="scheduler-job-time">2026-07-02 08:00 UTC</td>
-                                    <td class="p-3"><span id="scheduler-job-status" class="px-2 py-0.5 rounded bg-warning/20 text-warning border border-warning/30 text-[9px]">scheduled</span></td>
-                                    <td class="p-3 text-right pr-5">
-                                        <button class="text-secondary hover:underline">Inspect</button>
-                                    </td>
-                                </tr>
-                                <tr onclick="inspectElement('job', 'job_00293', 'scheduled', '2026-07-02 14:30 UTC', 'mashable.com')" class="hover:bg-white/5 transition cursor-pointer">
-                                    <td class="p-3 pl-5 text-text">job_00293</td>
-                                    <td class="p-3 text-muted">https://mashable.com</td>
-                                    <td class="p-3 text-muted">SaaS Automations</td>
-                                    <td class="p-3 text-text">2026-07-02 14:30 UTC</td>
-                                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-warning/20 text-warning border border-warning/30 text-[9px]">scheduled</span></td>
-                                    <td class="p-3 text-right pr-5">
-                                        <button class="text-secondary hover:underline">Inspect</button>
-                                    </td>
-                                </tr>
+                            <tbody class="divide-y divide-border text-xs font-mono" id="scheduler-jobs-table-body">
+                                <!-- Populated dynamically -->
                             </tbody>
                         </table>
                     </div>

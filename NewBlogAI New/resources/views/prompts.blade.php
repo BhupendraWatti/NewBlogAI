@@ -392,12 +392,17 @@ Source Text:
             renderPrompts(loadedPrompts);
         }
 
+        window.showWarning = window.showWarning || function(title, message) { alert(title + '\n' + message); };
+        window.showSuccess = window.showSuccess || function(title, message) { alert(title + '\n' + message); };
+        window.showError = window.showError || function(title, message) { alert(title + '\n' + message); };
+        window.showConfirmation = window.showConfirmation || function(title, message, onConfirm) { if (confirm(title + '\n' + message)) { onConfirm?.(); } };
+
         async function savePrompt() {
             const name = document.getElementById('prompt-name').value;
             const promt = document.getElementById('prompt-text').value;
 
             if (!name || !promt) {
-                alert("Prompt name and template content are required.");
+                showWarning("Input Required", "Prompt name and template content are required.");
                 return;
             }
 
@@ -420,29 +425,37 @@ Source Text:
                 if (response.ok) {
                     const result = await response.json();
                     if (!activePromptId) activePromptId = result.data.id;
-                    fetchPrompts();
+                    await fetchPrompts();
+                    showSuccess("Prompt Saved", "Prompt template saved successfully in the Library!");
                 } else {
-                    alert("Error saving prompt.");
+                    showError("Save Failed", "Error saving prompt template.");
                 }
             } catch (err) {
                 console.error("Error saving prompt:", err);
+                showError("System Error", "Could not complete saving request.");
             }
         }
 
         async function deletePrompt(id) {
-            if (!confirm("Are you sure you want to delete this prompt template?")) return;
-
-            try {
-                const response = await fetch(`/api/v1/prompts/${id}`, { method: 'DELETE' });
-                if (response.ok) {
-                    if (activePromptId === id) activePromptId = null;
-                    fetchPrompts();
-                } else {
-                    alert("Error deleting prompt.");
+            showConfirmation(
+                "Delete Prompt Template",
+                "Are you sure you want to delete this prompt template?",
+                async () => {
+                    try {
+                        const response = await fetch(`/api/v1/prompts/${id}`, { method: 'DELETE' });
+                        if (response.ok) {
+                            if (activePromptId === id) activePromptId = null;
+                            await fetchPrompts();
+                            showSuccess("Prompt Deleted", "Prompt template deleted successfully.");
+                        } else {
+                            showError("Deletion Failed", "Error deleting prompt.");
+                        }
+                    } catch (err) {
+                        console.error("Error deleting prompt:", err);
+                        showError("System Error", "Could not complete deletion request.");
+                    }
                 }
-            } catch (err) {
-                console.error("Error deleting prompt:", err);
-            }
+            );
         }
 
         function runPromptTest() {
