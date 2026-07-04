@@ -1,0 +1,32 @@
+vendor/
+node_modules/
+tests/
+testsprite_tests/
+bootstrap/
+storage/
+newsblogify-client.zip
+newsblogify-v2.zip
+newsblogify.zip
+newsblogify
+*.zip
+*.log
+.phpunit.result.cache
+*.result.cache
+database/migrations/
+database/factories/
+resources/views/
+config/
+newsblogify-client/
+public/
+NewBlogAI New/vendor/
+NewBlogAI New/node_modules/
+NewBlogAI New/tests/
+NewBlogAI New/testsprite_tests/
+NewBlogAI New/bootstrap/
+NewBlogAI New/storage/
+NewBlogAI New/database/migrations/
+NewBlogAI New/database/factories/
+NewBlogAI New/resources/views/
+NewBlogAI New/config/
+NewBlogAI New/newsblogify-client/
+NewBlogAI New/public/

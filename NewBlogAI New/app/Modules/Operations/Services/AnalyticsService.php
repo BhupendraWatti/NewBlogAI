@@ -13,10 +13,13 @@ class AnalyticsService
     /**
      * Get aggregate statistics for AI consumption.
      */
-    public function getAIStatistics(): array
+    public function getAIStatistics(?string $customerId = null): array
     {
-        return Cache::remember('analytics_ai_stats', 300, function () {
-            $aggregates = AIRequestLog::selectRaw('
+        return Cache::remember('analytics_ai_stats:'.($customerId ?? 'global'), 300, function () use ($customerId) {
+            $baseQuery = AIRequestLog::query()
+                ->when($customerId, fn ($query) => $query->where('customer_id', $customerId));
+
+            $aggregates = (clone $baseQuery)->selectRaw('
                 COUNT(id) as total_requests,
                 SUM(CASE WHEN status = "success" THEN 1 ELSE 0 END) as successful_requests,
                 SUM(CASE WHEN status = "failed" THEN 1 ELSE 0 END) as failed_requests,
@@ -27,7 +30,7 @@ class AnalyticsService
             ')->first();
 
             // Provider breakdown
-            $providers = AIRequestLog::select('provider', DB::raw('COUNT(id) as count'), DB::raw('SUM(estimated_cost) as cost'))
+            $providers = (clone $baseQuery)->select('provider', DB::raw('COUNT(id) as count'), DB::raw('SUM(estimated_cost) as cost'))
                 ->groupBy('provider')
                 ->get()
                 ->toArray();
@@ -48,21 +51,29 @@ class AnalyticsService
     /**
      * Get statistics regarding generated content and publications.
      */
-    public function getContentStatistics(): array
+    public function getContentStatistics(?string $customerId = null): array
     {
-        return Cache::remember('analytics_content_stats', 300, function () {
-            $totalArticles = GeneratedContent::count();
+        return Cache::remember('analytics_content_stats:'.($customerId ?? 'global'), 300, function () use ($customerId) {
+            $siteIds = $customerId
+                ? \App\Modules\SiteManager\Models\Site::where('customer_id', $customerId)->pluck('id')
+                : null;
+            $contentQuery = GeneratedContent::query()
+                ->when($siteIds, fn ($query) => $query->whereIn('site_id', $siteIds));
+            $publishingQuery = PublishingLog::query()
+                ->when($siteIds, fn ($query) => $query->whereIn('site_id', $siteIds));
+
+            $totalArticles = (clone $contentQuery)->count();
             
-            $statusBreakdown = GeneratedContent::select('status', DB::raw('COUNT(id) as count'))
+            $statusBreakdown = (clone $contentQuery)->select('status', DB::raw('COUNT(id) as count'))
                 ->groupBy('status')
                 ->get()
                 ->pluck('count', 'status')
                 ->toArray();
 
             $publishingSuccessRate = 0.0;
-            $publishingTotal = PublishingLog::count();
+            $publishingTotal = (clone $publishingQuery)->count();
             if ($publishingTotal > 0) {
-                $completed = PublishingLog::where('status', 'completed')->count();
+                $completed = (clone $publishingQuery)->where('status', 'completed')->count();
                 $publishingSuccessRate = round(($completed / $publishingTotal) * 100, 2);
             }
 

@@ -3,6 +3,8 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use App\Modules\SubscriptionManager\Exceptions\EntitlementDeniedException;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -17,5 +19,15 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (EntitlementDeniedException $exception, Request $request) {
+            if (!$request->expectsJson()) {
+                return null;
+            }
+
+            return response()->json([
+                'message' => $exception->getMessage(),
+                'error' => 'entitlement_denied',
+                'details' => $exception->context(),
+            ], 422);
+        });
     })->create();

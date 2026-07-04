@@ -14,6 +14,7 @@ class UserResource extends JsonResource
             'name'  => $this->name,
             'email' => $this->email,
             'role'  => $this->role, // 1 = Super Admin, 2 = Admin, 3 = Support / Partner
+            'customer_id' => $this->customer_id,
             'role_label' => match ((int) $this->role) {
                 1 => 'Super Admin',
                 2 => 'Admin',

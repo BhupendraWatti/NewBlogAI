@@ -59,6 +59,10 @@ class AIProviderService
     {
         try {
             return DB::transaction(function () use ($provider, $data) {
+                if (array_key_exists('api_key', $data) && ($data['api_key'] === '' || is_null($data['api_key']))) {
+                    unset($data['api_key']);
+                }
+
                 if (!empty($data['is_default'])) {
                     AIProvider::where('id', '!=', $provider->id)
                         ->where('is_default', true)

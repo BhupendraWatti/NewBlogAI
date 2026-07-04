@@ -14,6 +14,7 @@ class StoreTopicRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'subscription_id'      => ['nullable', 'integer', 'exists:subscriptions,id'],
             'name'                 => ['required', 'string', 'max:255'],
             'parent_id'            => ['nullable', 'integer', 'exists:topics,id'],
             'category'             => ['nullable', 'string', 'max:255'],

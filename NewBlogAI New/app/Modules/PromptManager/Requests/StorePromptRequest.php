@@ -14,6 +14,7 @@ class StorePromptRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'topic_id'    => ['nullable', 'integer', 'exists:topics,id'],
             'name'        => ['required', 'string', 'max:255'],
             'promt'       => ['required', 'string'],
             'category'    => ['required', 'string', 'max:255'],

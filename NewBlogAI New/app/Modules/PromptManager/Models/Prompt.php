@@ -13,6 +13,7 @@ class Prompt extends Model
 
     protected $fillable = [
         'name',
+        'topic_id',
         'promt', // the raw prompt text
         'category',
         'variables', // json list of variables, e.g. ["topic", "keyword", "tone"]
@@ -28,5 +29,10 @@ class Prompt extends Model
         return [
             'variables' => 'array',
         ];
+    }
+
+    public function topic()
+    {
+        return $this->belongsTo(\App\Modules\TopicManager\Models\Topic::class, 'topic_id');
     }
 }

@@ -14,6 +14,7 @@ class UpdatePromptRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'topic_id'    => ['sometimes', 'nullable', 'integer', 'exists:topics,id'],
             'name'        => ['sometimes', 'required', 'string', 'max:255'],
             'promt'       => ['sometimes', 'required', 'string'],
             'category'    => ['sometimes', 'required', 'string', 'max:255'],

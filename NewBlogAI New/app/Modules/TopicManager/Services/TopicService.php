@@ -7,9 +7,13 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
+use App\Modules\SubscriptionManager\Models\Subscription;
+use App\Modules\SubscriptionManager\Services\EntitlementService;
 
 class TopicService
 {
+    public function __construct(protected EntitlementService $entitlements) {}
+
     /**
      * Get paginated list of topics with filters, search, and sorting.
      */
@@ -58,7 +62,18 @@ class TopicService
      */
     public function createTopic(array $data): Topic
     {
-        $this->preventDuplicate($data['name'], $data['parent_id'] ?? null);
+        if (!empty($data['subscription_id'])) {
+            $subscription = Subscription::findOrFail($data['subscription_id']);
+            $this->entitlements->activeSubscription($subscription->customer_id);
+            $this->entitlements->assertCanCreateTopic($subscription);
+        }
+
+        $this->preventDuplicate(
+            $data['name'],
+            $data['parent_id'] ?? null,
+            null,
+            $data['subscription_id'] ?? null,
+        );
 
         try {
             return Topic::create($data);
@@ -75,7 +90,12 @@ class TopicService
     {
         if (!empty($data['name']) && $data['name'] !== $topic->name) {
             $parentId = array_key_exists('parent_id', $data) ? $data['parent_id'] : $topic->parent_id;
-            $this->preventDuplicate($data['name'], $parentId, $topic->id);
+            $this->preventDuplicate(
+                $data['name'],
+                $parentId,
+                $topic->id,
+                $data['subscription_id'] ?? $topic->subscription_id,
+            );
         }
 
         try {
@@ -108,9 +128,18 @@ class TopicService
     /**
      * Prevent duplicate topics inside the same category/parent.
      */
-    protected function preventDuplicate(string $name, ?int $parentId = null, ?int $excludeId = null): void
+    protected function preventDuplicate(
+        string $name,
+        ?int $parentId = null,
+        ?int $excludeId = null,
+        ?int $subscriptionId = null,
+    ): void
     {
         $query = Topic::where('name', $name);
+
+        $subscriptionId
+            ? $query->where('subscription_id', $subscriptionId)
+            : $query->whereNull('subscription_id');
 
         if ($parentId) {
             $query->where('parent_id', $parentId);

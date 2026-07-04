@@ -14,6 +14,7 @@ class UpdateTopicRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'subscription_id'      => ['sometimes', 'nullable', 'integer', 'exists:subscriptions,id'],
             'name'                 => ['sometimes', 'required', 'string', 'max:255'],
             'parent_id'            => ['sometimes', 'nullable', 'integer', 'exists:topics,id'],
             'category'             => ['sometimes', 'nullable', 'string', 'max:255'],

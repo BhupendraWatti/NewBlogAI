@@ -4,11 +4,14 @@ namespace App\Modules\SiteManager\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Promt;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Site extends Model
 {
     protected $fillable = [
         'customer_id',
+        'name',
         'domain_url',
         'api_key',
         'key_id',
@@ -22,6 +25,11 @@ class Site extends Model
         'last_synced_at',
         'last_sync_status',
         'error_log'
+        ,'publishing_mode',
+        'category_mapping',
+        'sync_settings',
+        'timezone',
+        'configuration_version',
     ];
 
     /**
@@ -37,12 +45,30 @@ class Site extends Model
             'last_synced_at' => 'datetime',
             'is_active' => 'boolean',
             'is_default' => 'boolean',
+            'category_mapping' => 'array',
+            'sync_settings' => 'array',
+            'configuration_version' => 'integer',
         ];
     }
 
     public function promt()
     {
         return $this->belongsTo(Promt::class, 'promt_id');
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(\App\Modules\CustomerManager\Models\Customer::class, 'customer_id');
+    }
+
+    public function pipelines(): HasMany
+    {
+        return $this->hasMany(\App\Modules\ContentPipeline\Models\ContentPipeline::class, 'site_id');
+    }
+
+    public function schedules(): HasMany
+    {
+        return $this->hasMany(\App\Modules\ScheduleManager\Models\PublishingSchedule::class, 'site_id');
     }
 
     protected static function booted()

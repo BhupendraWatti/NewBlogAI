@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Log;
 
 class WPClientService
 {
+    public function __construct(protected SiteConfigurationService $configuration) {}
+
     /**
      * Synchronize a site's configuration with the remote WordPress site.
      *
@@ -36,11 +38,8 @@ class WPClientService
         }
 
         // Prepare payload
-        $payload = [
-            'selected_topics' => $site->selected_topics ?? [],
-            'slot'            => $site->slot ?? '12:00',
-            'api_key'         => $apiKey,
-        ];
+        $payload = $this->configuration->build($site);
+        $payload['api_key'] = $apiKey;
 
         $wpUrl = $domain . '/wp-json/ai-news/v1/sync-data';
 

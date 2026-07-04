@@ -116,7 +116,7 @@
                                     </tbody>
                                 </table>
                                 <!-- Empty State -->
-                                <div class="flex flex-col items-center justify-center py-12 text-center">
+                                <div id="pipeline-runs-empty" class="flex flex-col items-center justify-center py-12 text-center">
                                     <span class="material-symbols-outlined text-3xl text-muted mb-2">history</span>
                                     <p class="text-xs text-muted">No generation history.</p>
                                 </div>

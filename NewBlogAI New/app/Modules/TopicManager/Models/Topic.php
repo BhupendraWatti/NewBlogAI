@@ -16,6 +16,7 @@ class Topic extends Model
 
     protected $fillable = [
         'parent_id',
+        'subscription_id',
         'name',
         'category',
         'priority',
@@ -52,6 +53,16 @@ class Topic extends Model
     public function prompt(): BelongsTo
     {
         return $this->belongsTo(Prompt::class, 'prompt_id');
+    }
+
+    public function subscription(): BelongsTo
+    {
+        return $this->belongsTo(\App\Modules\SubscriptionManager\Models\Subscription::class, 'subscription_id');
+    }
+
+    public function prompts(): HasMany
+    {
+        return $this->hasMany(Prompt::class, 'topic_id');
     }
 
     protected static function booted()

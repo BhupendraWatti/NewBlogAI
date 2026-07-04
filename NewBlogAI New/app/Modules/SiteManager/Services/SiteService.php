@@ -7,11 +7,15 @@ use App\Modules\Operations\Models\AuditLog;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Modules\CustomerManager\Models\Customer;
+use App\Modules\SubscriptionManager\Services\EntitlementService;
 
 class SiteService
 {
     public function __construct(
-        protected WPClientService $wpClient
+        protected WPClientService $wpClient,
+        protected EntitlementService $entitlements,
+        protected PluginTokenService $pluginTokens,
     ) {}
 
     /**
@@ -19,10 +23,17 @@ class SiteService
      */
     public function createSite(array $data): Site
     {
+        if (!empty($data['customer_id'])) {
+            $customer = Customer::findOrFail($data['customer_id']);
+            $this->entitlements->assertCanRegisterSite($customer);
+        }
+
         try {
             return DB::transaction(function () use ($data) {
                 if (!empty($data['is_default'])) {
-                    Site::where('is_default', true)->update(['is_default' => false]);
+                    Site::where('customer_id', $data['customer_id'] ?? null)
+                        ->where('is_default', true)
+                        ->update(['is_default' => false]);
                 }
 
                 $site = Site::create($data);
@@ -35,6 +46,8 @@ class SiteService
                     'ip_address' => request()->ip(),
                     'user_agent' => request()->userAgent(),
                 ]);
+
+                $site->increment('configuration_version');
 
                 return $site->refresh();
             });
@@ -49,15 +62,22 @@ class SiteService
      */
     public function updateSite(Site $site, array $data): Site
     {
+        $customerId = $data['customer_id'] ?? $site->customer_id;
+        if ($customerId && $customerId !== $site->customer_id) {
+            $this->entitlements->assertCanRegisterSite(Customer::findOrFail($customerId), $site->id);
+        }
+
         try {
             return DB::transaction(function () use ($site, $data) {
                 if (!empty($data['is_default'])) {
                     Site::where('id', '!=', $site->id)
+                        ->where('customer_id', $data['customer_id'] ?? $site->customer_id)
                         ->where('is_default', true)
                         ->update(['is_default' => false]);
                 }
 
                 $oldValues = ['domain_url' => $site->domain_url];
+                $data['configuration_version'] = $site->configuration_version + 1;
                 $site->update($data);
 
                 // Audit Log
@@ -89,7 +109,9 @@ class SiteService
 
         try {
             return DB::transaction(function () use ($site) {
-                Site::where('is_default', true)->update(['is_default' => false]);
+                Site::where('customer_id', $site->customer_id)
+                    ->where('is_default', true)
+                    ->update(['is_default' => false]);
                 $site->update(['is_default' => true]);
 
                 // Audit Log
@@ -137,7 +159,12 @@ class SiteService
     {
         try {
             DB::transaction(function () use ($site) {
+                $customer = $site->customer;
                 $site->delete();
+
+                if ($customer) {
+                    $this->pluginTokens->revokeCustomerTokens($customer);
+                }
 
                 AuditLog::create([
                     'user_id'    => Auth::id(),

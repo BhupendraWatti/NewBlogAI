@@ -23,6 +23,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'customer_id',
     ];
 
     /**
@@ -46,5 +47,10 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function customer()
+    {
+        return $this->belongsTo(\App\Modules\CustomerManager\Models\Customer::class, 'customer_id');
     }
 }

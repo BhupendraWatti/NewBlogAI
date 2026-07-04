@@ -46,4 +46,9 @@ class Subscription extends Model
     {
         return $this->belongsTo(Plan::class, 'plan_id');
     }
+
+    public function topics()
+    {
+        return $this->hasMany(\App\Modules\TopicManager\Models\Topic::class, 'subscription_id');
+    }
 }

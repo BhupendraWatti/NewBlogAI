@@ -10,9 +10,13 @@ use App\Modules\PromptManager\Resources\PromptResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use App\Modules\SubscriptionManager\Services\EntitlementService;
+use App\Modules\TopicManager\Models\Topic;
 
 class PromptController extends Controller
 {
+    public function __construct(protected EntitlementService $entitlements) {}
+
     /**
      * Display a listing of prompts with filters, sorting, and pagination.
      */
@@ -54,7 +58,12 @@ class PromptController extends Controller
      */
     public function store(StorePromptRequest $request): JsonResponse
     {
-        $prompt = Prompt::create($request->validated());
+        $validated = $request->validated();
+        if (!empty($validated['topic_id'])) {
+            $this->entitlements->assertCanCreatePrompt(Topic::findOrFail($validated['topic_id']));
+        }
+
+        $prompt = Prompt::create($validated);
 
         return (new PromptResource($prompt))
             ->response()
@@ -75,7 +84,12 @@ class PromptController extends Controller
     public function update(UpdatePromptRequest $request, string $id): PromptResource
     {
         $prompt = Prompt::findOrFail($id);
-        $prompt->update($request->validated());
+        $validated = $request->validated();
+        if (!empty($validated['topic_id']) && $validated['topic_id'] !== $prompt->topic_id) {
+            $this->entitlements->assertCanCreatePrompt(Topic::findOrFail($validated['topic_id']));
+        }
+
+        $prompt->update($validated);
 
         return new PromptResource($prompt);
     }

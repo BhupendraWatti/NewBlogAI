@@ -13,6 +13,9 @@ class AIRequestLog extends Model
 
     protected $fillable = [
         'provider',
+        'customer_id',
+        'subscription_id',
+        'site_id',
         'model',
         'prompt_id',
         'topic_id',

@@ -1,0 +1,190 @@
+.newsblogify-wrap {
+    margin: 20px 20px 0 0;
+    max-width: 1200px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+}
+.newsblogify-header-banner {
+    background: #ffffff;
+    border: 1px solid #ccd0d4;
+    border-radius: 8px;
+    padding: 24px 30px;
+    margin-bottom: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 1px 15px rgba(0,0,0,0.05);
+}
+.newsblogify-brand {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+.newsblogify-brand h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1e1e1e;
+    margin: 0;
+}
+.newsblogify-tagline {
+    color: #646970;
+    margin: 5px 0 0 0;
+    font-size: 13px;
+}
+.newsblogify-logo-icon {
+    font-size: 32px;
+    color: #2271b1;
+    display: flex;
+    align-items: center;
+}
+.newsblogify-grid {
+    display: grid;
+    grid-template-cols: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-bottom: 25px;
+}
+.newsblogify-card {
+    background: #ffffff;
+    border: 1px solid #ccd0d4;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.04);
+    box-sizing: border-box;
+}
+.newsblogify-card h2 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-top: 0;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #f0f0f1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #1e1e1e;
+}
+.newsblogify-metric-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #2271b1;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.newsblogify-metric-desc {
+    font-size: 12px;
+    color: #646970;
+    margin-top: 4px;
+}
+.newsblogify-badge-active {
+    background: #dff2e3;
+    color: #107c10;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    display: inline-block;
+}
+.newsblogify-badge-inactive {
+    background: #fcf0f0;
+    color: #d11a2a;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    display: inline-block;
+}
+.newsblogify-wizard-container {
+    max-width: 650px;
+    margin: 40px auto;
+    background: #ffffff;
+    border: 1px solid #ccd0d4;
+    border-radius: 12px;
+    box-shadow: 0 3px 30px rgba(0,0,0,0.08);
+    overflow: hidden;
+}
+.newsblogify-wizard-header {
+    background: #2271b1;
+    color: #ffffff;
+    padding: 30px;
+    text-align: center;
+}
+.newsblogify-wizard-header h2 {
+    color: #ffffff;
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+}
+.newsblogify-wizard-steps {
+    display: flex;
+    justify-content: space-around;
+    background: #f6f7f7;
+    border-bottom: 1px solid #dcdcde;
+    padding: 15px 10px;
+}
+.newsblogify-wizard-step {
+    font-size: 12px;
+    font-weight: 600;
+    color: #8c8f94;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.newsblogify-wizard-step.active {
+    color: #2271b1;
+}
+.newsblogify-wizard-step.completed {
+    color: #107c10;
+}
+.newsblogify-wizard-body {
+    padding: 35px;
+}
+.newsblogify-wizard-table {
+    width: 100%;
+    margin-bottom: 20px;
+}
+.newsblogify-wizard-table td {
+    padding: 10px 0;
+    vertical-align: middle;
+}
+.newsblogify-wizard-table td.label-column {
+    width: 30%;
+    font-weight: 600;
+    color: #3c434a;
+}
+.newsblogify-wizard-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #8c8f94;
+    border-radius: 6px;
+    font-size: 13px;
+}
+.newsblogify-wizard-input[readonly] {
+    background: #f6f7f7;
+    color: #646970;
+    border-color: #dcdcde;
+}
+.newsblogify-tab-content {
+    display: none;
+}
+.newsblogify-tab-content.active {
+    display: block;
+}
+.newsblogify-nav-tab-wrapper {
+    margin-bottom: 20px;
+}
+.newsblogify-log-textarea {
+    width: 100%;
+    height: 350px;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    background: #f6f7f7;
+    color: #2c3338;
+    padding: 15px;
+    border: 1px solid #ccd0d4;
+    border-radius: 6px;
+    box-sizing: border-box;
+}

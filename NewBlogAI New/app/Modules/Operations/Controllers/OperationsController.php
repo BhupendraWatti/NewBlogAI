@@ -11,12 +11,15 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
+use App\Modules\CustomerManager\Models\Customer;
+use App\Modules\SubscriptionManager\Services\EntitlementService;
 
 class OperationsController extends Controller
 {
     public function __construct(
         protected AnalyticsService $analyticsService,
-        protected SystemHealthService $healthService
+        protected SystemHealthService $healthService,
+        protected EntitlementService $entitlements,
     ) {}
 
     /**
@@ -32,7 +35,12 @@ class OperationsController extends Controller
      */
     public function aiStats(): JsonResponse
     {
-        return response()->json($this->analyticsService->getAIStatistics());
+        $customerId = Auth::user()?->customer_id;
+        if ($customerId) {
+            $this->entitlements->assertFeatureEnabled(Customer::findOrFail($customerId), 'analytics');
+        }
+
+        return response()->json($this->analyticsService->getAIStatistics($customerId));
     }
 
     /**
@@ -40,7 +48,12 @@ class OperationsController extends Controller
      */
     public function contentStats(): JsonResponse
     {
-        return response()->json($this->analyticsService->getContentStatistics());
+        $customerId = Auth::user()?->customer_id;
+        if ($customerId) {
+            $this->entitlements->assertFeatureEnabled(Customer::findOrFail($customerId), 'analytics');
+        }
+
+        return response()->json($this->analyticsService->getContentStatistics($customerId));
     }
 
     /**

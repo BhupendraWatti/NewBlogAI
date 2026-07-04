@@ -13,9 +13,12 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
+use App\Modules\SubscriptionManager\Services\EntitlementService;
 
 class PipelineService
 {
+    public function __construct(protected EntitlementService $entitlements) {}
+
     /**
      * Get paginated pipelines with optional filters.
      */
@@ -76,6 +79,10 @@ class PipelineService
         if (!$pipeline->is_active) {
             throw new InvalidArgumentException("Cannot execute an inactive content pipeline.");
         }
+
+        $pipeline->loadMissing(['site', 'provider']);
+        $this->entitlements->assertCanGenerate($pipeline->site);
+        $this->entitlements->assertProviderAvailable($pipeline->site, $pipeline->provider->provider_key);
 
         try {
             return DB::transaction(function () use ($pipeline) {
@@ -192,6 +199,17 @@ class PipelineService
         }
         if (empty($provider->api_key)) {
             throw new InvalidArgumentException("Referenced AI Provider has no API Key configured.");
+        }
+
+        $this->entitlements->assertProviderAvailable($site, $provider->provider_key);
+
+        $subscription = $this->entitlements->subscriptionForSite($site);
+        if ($subscription && $topic->subscription_id && $topic->subscription_id !== $subscription->id) {
+            throw new InvalidArgumentException('The selected topic is not owned by the website subscription.');
+        }
+
+        if ($prompt->topic_id && $prompt->topic_id !== $topic->id) {
+            throw new InvalidArgumentException('The selected prompt does not belong to the selected topic.');
         }
     }
 }

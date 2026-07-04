@@ -52,6 +52,7 @@ Route::prefix('v1')->group(function () {
             Route::post('pipelines/runs/{run}/cancel', [\App\Modules\ContentPipeline\Controllers\PipelineController::class, 'cancel']);
             Route::get('pipelines/{id}/history', [\App\Modules\ContentPipeline\Controllers\PipelineController::class, 'history']);
             Route::apiResource('pipelines', \App\Modules\ContentPipeline\Controllers\PipelineController::class);
+            Route::apiResource('schedules', \App\Modules\ScheduleManager\Controllers\ScheduleController::class);
         });
 
         // AI Content Generation Engine Routes
@@ -90,28 +91,51 @@ Route::prefix('v1')->group(function () {
             Route::post('license/activate', [\App\Modules\Licensing\Controllers\LicenseController::class, 'activate']);
             Route::post('license/deactivate', [\App\Modules\Licensing\Controllers\LicenseController::class, 'deactivate']);
         });
-    });
 
-    Route::middleware('auth')->group(function () {
-        Route::apiResource('prompts', \App\Modules\PromptManager\Controllers\PromptController::class);
-        
-        // Customer Management Module
-        Route::apiResource('customers', \App\Modules\CustomerManager\Controllers\CustomerController::class);
-        Route::post('customers/{id}/restore', [\App\Modules\CustomerManager\Controllers\CustomerController::class, 'restore']);
-        Route::post('customers/{id}/archive', [\App\Modules\CustomerManager\Controllers\CustomerController::class, 'archive']);
-        Route::post('customers/{id}/notes', [\App\Modules\CustomerManager\Controllers\CustomerController::class, 'storeNote']);
-        Route::get('customers/{id}/timeline', [\App\Modules\CustomerManager\Controllers\CustomerController::class, 'timeline']);
+        Route::middleware('auth')->group(function () {
+            Route::apiResource('prompts', \App\Modules\PromptManager\Controllers\PromptController::class);
+            
+            // Customer Management Module
+            Route::apiResource('customers', \App\Modules\CustomerManager\Controllers\CustomerController::class);
+            Route::post('customers/{id}/restore', [\App\Modules\CustomerManager\Controllers\CustomerController::class, 'restore']);
+            Route::post('customers/{id}/archive', [\App\Modules\CustomerManager\Controllers\CustomerController::class, 'archive']);
+            Route::post('customers/{id}/notes', [\App\Modules\CustomerManager\Controllers\CustomerController::class, 'storeNote']);
+            Route::get('customers/{id}/timeline', [\App\Modules\CustomerManager\Controllers\CustomerController::class, 'timeline']);
 
-        // Subscription & Plan Management Module
-        Route::apiResource('plans', \App\Modules\SubscriptionManager\Controllers\PlanController::class);
-        Route::get('customers/{id}/subscription', [\App\Modules\SubscriptionManager\Controllers\SubscriptionController::class, 'show']);
-        Route::post('customers/{id}/subscription', [\App\Modules\SubscriptionManager\Controllers\SubscriptionController::class, 'store']);
-        Route::post('customers/{id}/subscription/upgrade', [\App\Modules\SubscriptionManager\Controllers\SubscriptionController::class, 'upgrade']);
-        Route::post('customers/{id}/subscription/downgrade', [\App\Modules\SubscriptionManager\Controllers\SubscriptionController::class, 'downgrade']);
-        Route::post('customers/{id}/subscription/pause', [\App\Modules\SubscriptionManager\Controllers\SubscriptionController::class, 'pause']);
-        Route::post('customers/{id}/subscription/resume', [\App\Modules\SubscriptionManager\Controllers\SubscriptionController::class, 'resume']);
-        Route::post('customers/{id}/subscription/cancel', [\App\Modules\SubscriptionManager\Controllers\SubscriptionController::class, 'cancel']);
-        Route::get('customers/{id}/subscription/history', [\App\Modules\SubscriptionManager\Controllers\SubscriptionController::class, 'history']);
+            // Subscription & Plan Management Module
+            Route::apiResource('plans', \App\Modules\SubscriptionManager\Controllers\PlanController::class);
+            Route::get('customers/{id}/subscription', [\App\Modules\SubscriptionManager\Controllers\SubscriptionController::class, 'show']);
+            Route::post('customers/{id}/subscription', [\App\Modules\SubscriptionManager\Controllers\SubscriptionController::class, 'store']);
+            Route::post('customers/{id}/subscription/upgrade', [\App\Modules\SubscriptionManager\Controllers\SubscriptionController::class, 'upgrade']);
+            Route::post('customers/{id}/subscription/downgrade', [\App\Modules\SubscriptionManager\Controllers\SubscriptionController::class, 'downgrade']);
+            Route::post('customers/{id}/subscription/pause', [\App\Modules\SubscriptionManager\Controllers\SubscriptionController::class, 'pause']);
+            Route::post('customers/{id}/subscription/resume', [\App\Modules\SubscriptionManager\Controllers\SubscriptionController::class, 'resume']);
+            Route::post('customers/{id}/subscription/cancel', [\App\Modules\SubscriptionManager\Controllers\SubscriptionController::class, 'cancel']);
+            Route::get('customers/{id}/subscription/history', [\App\Modules\SubscriptionManager\Controllers\SubscriptionController::class, 'history']);
+        });
     });
 
 });
+
+$pluginRoutes = static function (): void {
+    $controller = \App\Modules\SiteManager\Controllers\WPPluginAPIController::class;
+
+    Route::post('login', [$controller, 'login'])->middleware('throttle:10,1');
+    Route::post('connect', [$controller, 'login'])->middleware('throttle:10,1');
+    Route::post('register-website', [$controller, 'registerWebsite']);
+    Route::get('configuration', [$controller, 'configuration']);
+    Route::get('dashboard', [$controller, 'dashboard']);
+    Route::get('status', [$controller, 'status']);
+    Route::post('heartbeat', [$controller, 'heartbeat']);
+    Route::post('sync', [$controller, 'sync']);
+    Route::post('disconnect', [$controller, 'disconnect']);
+    Route::post('refresh-token', [$controller, 'refreshToken']);
+    Route::get('logs', [$controller, 'logs']);
+    Route::post('publish-result', [$controller, 'publishResult']);
+};
+
+// Canonical plugin contract.
+Route::prefix('v1/plugin')->middleware('throttle:120,1')->group($pluginRoutes);
+
+// Compatibility aliases used by existing plugin releases.
+Route::prefix('plugin')->middleware('throttle:120,1')->group($pluginRoutes);

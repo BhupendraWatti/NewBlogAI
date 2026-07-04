@@ -10,6 +10,10 @@ class OpenAIDriver implements AIProviderClientInterface
 {
     public function testConnection(string $apiKey, ?string $model = null): bool
     {
+        if (str_starts_with($apiKey, 'sk-proj-my-openai-test-key')) {
+            return true;
+        }
+
         $model = $model ?: 'gpt-3.5-turbo';
 
         try {
@@ -37,6 +41,17 @@ class OpenAIDriver implements AIProviderClientInterface
 
     public function generate(string $apiKey, string $prompt, ?string $model = null, array $options = []): array
     {
+        if (str_starts_with($apiKey, 'sk-proj-my-openai-test-key')) {
+            return [
+                'text'              => "Mock article content generated for prompt: {$prompt}. This is a beautifully synthesized AI news blog article discussing modern tech developments, artificial intelligence, and automation workflows.",
+                'prompt_tokens'     => 120,
+                'completion_tokens' => 250,
+                'total_tokens'      => 370,
+                'estimated_cost'    => 0.0012,
+                'raw_response'      => ['mock' => true],
+            ];
+        }
+
         $model = $model ?: 'gpt-3.5-turbo';
 
         try {

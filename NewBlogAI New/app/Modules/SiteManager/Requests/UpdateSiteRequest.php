@@ -31,6 +31,8 @@ class UpdateSiteRequest extends FormRequest
         $siteId = $this->route('site') ?? $this->route('id');
 
         return [
+            'customer_id'                => ['sometimes', 'nullable', 'uuid', 'exists:customers,id'],
+            'name'                       => ['sometimes', 'nullable', 'string', 'max:255'],
             'domain_url'                 => ['sometimes', 'required', 'url', 'unique:sites,domain_url,' . $siteId],
             'api_key'                    => ['nullable', 'string'],
             'key_id'                     => ['nullable', 'exists:keys,id'],
@@ -41,6 +43,10 @@ class UpdateSiteRequest extends FormRequest
             'slot'                       => ['nullable', 'string'],
             'is_active'                  => ['sometimes', 'boolean'],
             'is_default'                 => ['sometimes', 'boolean'],
+            'publishing_mode'            => ['sometimes', 'string', 'in:draft,review,publish'],
+            'category_mapping'           => ['nullable', 'array'],
+            'sync_settings'              => ['nullable', 'array'],
+            'timezone'                   => ['sometimes', 'timezone'],
         ];
     }
 }

@@ -11,11 +11,13 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
+use App\Modules\SubscriptionManager\Services\EntitlementService;
 
 class PublishingService
 {
     public function __construct(
-        protected WPClientService $wpClient
+        protected WPClientService $wpClient,
+        protected EntitlementService $entitlements,
     ) {}
 
     /**
@@ -57,6 +59,9 @@ class PublishingService
                 throw new InvalidArgumentException("Selected WordPress site is currently deactivated.");
             }
         }
+
+        $site = $site ?? Site::findOrFail($siteId);
+        $this->entitlements->assertCanPublish($site);
 
         // Prevent duplicates: disallow publishing if already successfully published to the same site
         $duplicate = PublishingLog::where('generated_content_id', $article->id)

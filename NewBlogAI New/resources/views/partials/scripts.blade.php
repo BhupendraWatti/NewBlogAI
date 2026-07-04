@@ -109,6 +109,130 @@
             });
         };
 
+        // ─── Global API Fetch Wrapper ────────────────────────────────────────────
+        // Automatically injects X-CSRF-TOKEN + Accept: application/json headers and
+        // credentials: 'same-origin' into every request, eliminating HTTP 419 errors
+        // on all DELETE / POST / PUT / PATCH mutations across the entire application.
+        window.apiFetch = function(url, options = {}) {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')
+                ? document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                : '';
+
+            const defaultHeaders = {
+                'Accept':       'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+            };
+
+            // Merge caller-supplied headers on top of defaults (caller wins)
+            const mergedHeaders = Object.assign({}, defaultHeaders, options.headers || {});
+
+            return fetch(url, Object.assign({}, options, {
+                headers:     mergedHeaders,
+                credentials: 'same-origin',
+            }));
+        };
+
+        window.safeParseJson = async function(response) {
+            if (!response || response.status === 204) {
+                return null;
+            }
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                try {
+                    return await response.json();
+                } catch (e) {
+                    console.error("Failed to parse JSON response:", e);
+                    return null;
+                }
+            }
+            return null;
+        };
+
+        window.getResponseErrorMessage = function(response, result, defaultMessage = "Could not complete request.") {
+            if (!response) return defaultMessage;
+            if (result && result.message) return result.message;
+            if (result && result.error) return result.error;
+            if (response.status === 401) return "Unauthenticated. Please log in again.";
+            if (response.status === 403) return "Unauthorized action. You do not have permission.";
+            if (response.status === 404) return "Requested resource not found.";
+            if (response.status === 422) {
+                if (result && result.errors) {
+                    return Object.values(result.errors).flat().join('\n');
+                }
+                return "Validation failed. Please check your inputs.";
+            }
+            if (response.status === 500) return "Server error. Please contact administrator.";
+            return `${defaultMessage} (Status: ${response.status})`;
+        };
+
+        window.apiRequest = async function(url, options = {}, config = {}) {
+            const {
+                loadingMessage = null,
+                successTitle = null,
+                successMessage = null,
+                onSuccess = null,
+                defaultErrorMessage = "Operation failed",
+                submitBtn = null,
+                onCleanup = null
+            } = config;
+
+            // Disable button and show spinner if applicable
+            let btnEl = null;
+            let originalBtnText = "";
+            if (submitBtn) {
+                btnEl = typeof submitBtn === 'string' ? document.querySelector(submitBtn) : submitBtn;
+                if (btnEl) {
+                    originalBtnText = btnEl.innerHTML || btnEl.innerText;
+                    btnEl.disabled = true;
+                    if (options.method && options.method !== 'GET') {
+                        btnEl.innerHTML = `<span class="inline-block w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin"></span>Processing...`;
+                    }
+                }
+            }
+
+            // Show loading alert if requested
+            if (loadingMessage) {
+                showLoading(loadingMessage);
+            }
+
+            try {
+                // If it is a GET request, we can just use normal fetch, but using apiFetch keeps cookies/headers consistent.
+                const isGet = !options.method || options.method.toUpperCase() === 'GET';
+                const response = await apiFetch(url, options);
+                const result = await safeParseJson(response);
+
+                if (response.ok) {
+                    if (loadingMessage) {
+                        Swal.close();
+                    }
+                    if (successTitle || successMessage) {
+                        showSuccess(successTitle || "Success", successMessage || "Operation completed successfully.");
+                    }
+                    if (onSuccess) {
+                        await onSuccess(result);
+                    }
+                    return { ok: true, data: result };
+                } else {
+                    const errorMsg = getResponseErrorMessage(response, result, defaultErrorMessage);
+                    showError(successTitle ? `${successTitle} Failed` : "Failed", errorMsg);
+                    return { ok: false, error: errorMsg, status: response.status };
+                }
+            } catch (err) {
+                console.error("API Request Exception:", err);
+                showError("System Error", `Could not complete connection. ${err.message || ''}`);
+                return { ok: false, error: err.message || "Network Error", status: 500 };
+            } finally {
+                if (btnEl) {
+                    btnEl.disabled = false;
+                    btnEl.innerHTML = originalBtnText;
+                }
+                if (onCleanup) {
+                    onCleanup();
+                }
+            }
+        };
+        // ────────────────────────────────────────────────────────────────────────
+
         // Reactive Dashboard Stats Refresher
         window.refreshDashboardStats = async function() {
             try {
@@ -491,7 +615,8 @@
             try {
                 const response = await fetch('/api/v1/sites');
                 if (!response.ok) return;
-                const result = await response.json();
+                const result = await safeParseJson(response);
+                if (!result) return;
                 const sites = result.data || result;
 
                 // Update fleet counters
@@ -557,27 +682,17 @@
         };
 
         window.triggerSync = async function(id, element) {
-            let originalText = element.innerText;
-            element.innerText = "Syncing...";
-            element.disabled = true;
-            try {
-                const response = await fetch(`/api/v1/sites/${id}/sync`, { method: 'POST' });
-                const result = await response.json();
-                if (response.ok) {
-                    showSuccess("Sync Successful", "WordPress configurations synchronized.");
+            await apiRequest(`/api/v1/sites/${id}/sync`, { method: 'POST' }, {
+                submitBtn: element,
+                successTitle: "Sync Successful",
+                successMessage: "WordPress configurations synchronized.",
+                defaultErrorMessage: "Sync Failed",
+                onSuccess: () => {
                     if (window.fetchFleetTelemetry) {
                         window.fetchFleetTelemetry();
                     }
-                } else {
-                    showError("Sync Failed", result.message);
                 }
-            } catch (err) {
-                console.error("Error triggering sync:", err);
-                showError("System Error", "Could not trigger remote sync.");
-            } finally {
-                element.innerText = originalText;
-                element.disabled = false;
-            }
+            });
         };
 
         // Topics Management functions
@@ -587,7 +702,8 @@
             try {
                 const response = await fetch('/api/v1/topics');
                 if (!response.ok) return;
-                const result = await response.json();
+                const result = await safeParseJson(response);
+                if (!result) return;
                 allTopics = result.data || result;
                 renderTopics(allTopics);
                 populateTopicPrompts();
@@ -644,7 +760,8 @@
             try {
                 const response = await fetch('/api/v1/prompts');
                 if (!response.ok) return;
-                const result = await response.json();
+                const result = await safeParseJson(response);
+                if (!result) return;
                 const promptsList = result.data || result;
                 const select = document.getElementById('topic-prompt-id');
                 if (select) {
@@ -693,50 +810,35 @@
             if (prompt_id) payload.prompt_id = parseInt(prompt_id);
 
             const submitBtn = e.target.querySelector('button[type="submit"]');
-            if (submitBtn) submitBtn.disabled = true;
+            const url = id ? `/api/v1/topics/${id}` : '/api/v1/topics';
+            const method = id ? 'PUT' : 'POST';
 
-            showLoading("Saving topic configuration...");
-
-            try {
-                let response;
-                if (id) {
-                    response = await fetch(`/api/v1/topics/${id}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                } else {
-                    response = await fetch('/api/v1/topics', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                }
-
-                if (response.ok) {
+            await apiRequest(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }, {
+                loadingMessage: "Saving topic configuration...",
+                successTitle: "Topic Saved",
+                successMessage: "Content topic configuration saved successfully!",
+                defaultErrorMessage: "Save Failed",
+                submitBtn: submitBtn,
+                onSuccess: async () => {
                     closeTopicModal();
                     await fetchTopics();
                     if (window.refreshDashboardStats) {
                         await window.refreshDashboardStats();
                     }
-                    showSuccess("Topic Saved", "Content topic configuration saved successfully!");
-                } else {
-                    const result = await response.json();
-                    showError("Save Failed", result.message || JSON.stringify(result.errors));
                 }
-            } catch (err) {
-                console.error("Error saving topic:", err);
-                showError("System Error", "Could not complete saving request.");
-            } finally {
-                if (submitBtn) submitBtn.disabled = false;
-            }
+            });
         };
 
         window.editTopic = async function(id) {
             try {
                 const response = await fetch(`/api/v1/topics/${id}`);
                 if (!response.ok) return;
-                const result = await response.json();
+                const result = await safeParseJson(response);
+                if (!result) return;
                 const topic = result.data || result;
 
                 document.getElementById('topic-id').value = topic.id;
@@ -761,21 +863,17 @@
                 "Delete Topic",
                 "Are you sure you want to delete this content topic?",
                 async () => {
-                    try {
-                        const response = await fetch(`/api/v1/topics/${id}`, { method: 'DELETE' });
-                        if (response.ok) {
+                    await apiRequest(`/api/v1/topics/${id}`, { method: 'DELETE' }, {
+                        successTitle: "Topic Deleted",
+                        successMessage: "Content topic deleted successfully.",
+                        defaultErrorMessage: "Deletion Failed",
+                        onSuccess: async () => {
                             await fetchTopics();
                             if (window.refreshDashboardStats) {
                                 await window.refreshDashboardStats();
                             }
-                            showSuccess("Topic Deleted", "Content topic deleted successfully.");
-                        } else {
-                            showError("Deletion Failed", "Error deleting content topic.");
                         }
-                    } catch (err) {
-                        console.error("Error deleting topic:", err);
-                        showError("System Error", "Could not communicate with database.");
-                    }
+                    });
                 }
             );
         };
@@ -787,7 +885,8 @@
             try {
                 const response = await fetch('/api/v1/customers');
                 if (!response.ok) return;
-                const result = await response.json();
+                const result = await safeParseJson(response);
+                if (!result) return;
                 allCustomers = result.data || result;
                 renderCustomers(allCustomers);
             } catch (err) {
@@ -867,50 +966,35 @@
             const payload = { company_name, owner_name, email, phone, country, status };
 
             const submitBtn = e.target.querySelector('button[type="submit"]');
-            if (submitBtn) submitBtn.disabled = true;
+            const url = id ? `/api/v1/customers/${id}` : '/api/v1/customers';
+            const method = id ? 'PUT' : 'POST';
 
-            showLoading("Saving customer details...");
-
-            try {
-                let response;
-                if (id) {
-                    response = await fetch(`/api/v1/customers/${id}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                } else {
-                    response = await fetch('/api/v1/customers', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                }
-
-                if (response.ok) {
+            await apiRequest(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }, {
+                loadingMessage: "Saving customer details...",
+                successTitle: "Customer Saved",
+                successMessage: "Customer details saved successfully in registry!",
+                defaultErrorMessage: "Save Failed",
+                submitBtn: submitBtn,
+                onSuccess: async () => {
                     closeCustomerModal();
                     await fetchCustomers();
                     if (window.refreshDashboardStats) {
                         await window.refreshDashboardStats();
                     }
-                    showSuccess("Customer Saved", "Customer details saved successfully in registry!");
-                } else {
-                    const result = await response.json();
-                    showError("Save Failed", result.message || JSON.stringify(result.errors));
                 }
-            } catch (err) {
-                console.error("Error saving customer:", err);
-                showError("System Error", "Could not communicate with customer registry endpoint.");
-            } finally {
-                if (submitBtn) submitBtn.disabled = false;
-            }
+            });
         };
 
         window.editCustomer = async function(id) {
             try {
                 const response = await fetch(`/api/v1/customers/${id}`);
                 if (!response.ok) return;
-                const result = await response.json();
+                const result = await safeParseJson(response);
+                if (!result) return;
                 const customer = result.data || result;
 
                 document.getElementById('customer-id').value = customer.id;
@@ -933,21 +1017,17 @@
                 "Delete Customer",
                 "Are you sure you want to remove this customer?",
                 async () => {
-                    try {
-                        const response = await fetch(`/api/v1/customers/${id}`, { method: 'DELETE' });
-                        if (response.ok) {
+                    await apiRequest(`/api/v1/customers/${id}`, { method: 'DELETE' }, {
+                        successTitle: "Customer Deleted",
+                        successMessage: "Customer has been removed.",
+                        defaultErrorMessage: "Deletion Failed",
+                        onSuccess: async () => {
                             await fetchCustomers();
                             if (window.refreshDashboardStats) {
                                 await window.refreshDashboardStats();
                             }
-                            showSuccess("Customer Deleted", "Customer has been removed.");
-                        } else {
-                            showError("Deletion Failed", "Error deleting customer record.");
                         }
-                    } catch (err) {
-                        console.error("Error deleting customer:", err);
-                        showError("System Error", "Could not complete request.");
-                    }
+                    });
                 }
             );
         };
@@ -960,7 +1040,8 @@
             try {
                 const response = await fetch('/api/v1/operations/jobs');
                 if (!response.ok) return;
-                const result = await response.json();
+                const result = await safeParseJson(response);
+                if (!result) return;
                 const jobs = result.data || result;
 
                 // Update scheduler KPI stats cards
@@ -1029,27 +1110,17 @@
         };
 
         window.retryJob = async function(id, element) {
-            let originalText = element.innerText;
-            element.innerText = "Retrying...";
-            element.disabled = true;
-            try {
-                const response = await fetch(`/api/v1/operations/jobs/${id}/retry`, { method: 'POST' });
-                const result = await response.json();
-                if (response.ok) {
-                    showSuccess("Job Retried", "Background queue job has been queued for execution.");
+            await apiRequest(`/api/v1/operations/jobs/${id}/retry`, { method: 'POST' }, {
+                submitBtn: element,
+                successTitle: "Job Retried",
+                successMessage: "Background queue job has been queued for execution.",
+                defaultErrorMessage: "Job retry failed",
+                onSuccess: () => {
                     if (window.fetchScheduledJobs) {
                         window.fetchScheduledJobs();
                     }
-                } else {
-                    showError("Retry Failed", result.message);
                 }
-            } catch (err) {
-                console.error("Error retrying job:", err);
-                showError("System Error", "Could not trigger job retry.");
-            } finally {
-                element.innerText = originalText;
-                element.disabled = false;
-            }
+            });
         };
 
         window.triggerManualSchedulerRelease = async function() {
@@ -1238,7 +1309,7 @@
             }
         }
 
-        function wizardNext() {
+        async function wizardNext() {
             if (wizardStep < 4) {
                 wizardStep++;
                 renderWizardStep();
@@ -1260,30 +1331,23 @@
                         plugin_version: '1.2.0'
                     };
 
-                    showLoading("Registering WordPress site...");
-
-                    fetch('/api/v1/sites', {
+                    await apiRequest('/api/v1/sites', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'Accept': 'application/json'
                         },
                         body: JSON.stringify(payload)
-                    })
-                    .then(async response => {
-                        const result = await response.json();
-                        if (response.ok) {
-                            showSuccess("Website Connected", "Your WordPress site has been successfully registered.");
+                    }, {
+                        loadingMessage: "Registering WordPress site...",
+                        successTitle: "Website Connected",
+                        successMessage: "Your WordPress site has been successfully registered.",
+                        defaultErrorMessage: "Could not register website.",
+                        onSuccess: async () => {
                             if (window.fetchSites) await window.fetchSites();
                             if (window.refreshDashboardStats) await window.refreshDashboardStats();
                             switchWorkspace('sites');
-                        } else {
-                            showError("Registration Failed", result.message || "Could not register website.");
                         }
-                    })
-                    .catch(err => {
-                        console.error("Error registering site:", err);
-                        showError("System Error", "Could not contact Site Manager API.");
                     });
                 } else {
                     showSuccess("Pipeline Committed", wizardType.charAt(0).toUpperCase() + wizardType.slice(1) + " pipeline committed successfully!");
@@ -1395,23 +1459,15 @@
                 promt: document.getElementById('prompt-editor-textarea')?.value || ''
             };
 
-            try {
-                const response = await fetch('/api/v1/prompts', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) {
-                    const result = await response.json().catch(() => ({}));
-                    throw new Error(result.message || 'Could not save prompt template.');
-                }
-
-                showSuccess("Prompt Saved", "Prompt template saved successfully in the Library!");
-            } catch (err) {
-                console.error('Error saving active prompt:', err);
-                showError('Save Failed', err.message || 'Could not save prompt template.');
-            }
+            await apiRequest('/api/v1/prompts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }, {
+                successTitle: "Prompt Saved",
+                successMessage: "Prompt template saved successfully in the Library!",
+                defaultErrorMessage: "Could not save prompt template."
+            });
         }
 
 
@@ -1707,7 +1763,7 @@
 
                 let retriedCount = 0;
                 for (const job of failedJobs) {
-                    const retryRes = await fetch(`/api/v1/operations/jobs/${job.id}/retry`, { method: 'POST' });
+                    const retryRes = await apiFetch(`/api/v1/operations/jobs/${job.id}/retry`, { method: 'POST' });
                     if (retryRes.ok) retriedCount++;
                 }
 
@@ -1839,29 +1895,25 @@
 
             const url = id ? `/api/v1/users/${id}` : '/api/v1/users';
             const method = id ? 'PUT' : 'POST';
+            const submitBtn = event.target.querySelector('button[type="submit"]');
 
-            try {
-                const response = await fetch(url, {
-                    method: method,
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                if (response.ok) {
-                    showSuccess("Operator Saved", id ? "Operator details updated successfully." : "Platform operator invited successfully.");
+            await apiRequest(url, {
+                method: method,
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            }, {
+                successTitle: "Operator Saved",
+                successMessage: id ? "Operator details updated successfully." : "Platform operator invited successfully.",
+                defaultErrorMessage: "Failed to persist operator configuration.",
+                submitBtn: submitBtn,
+                onSuccess: async () => {
                     closeUserModal();
                     await fetchUsers();
-                } else {
-                    const result = await response.json();
-                    showError("Failed", result.message || "Failed to persist operator configuration.");
                 }
-            } catch (err) {
-                console.error("Error saving user:", err);
-                showError("System Error", "Could not connect to user API.");
-            }
+            });
         };
 
         window.deleteUser = async function(id) {
@@ -1869,19 +1921,14 @@
                 "Remove Operator",
                 "Are you sure you want to disconnect this platform operator?",
                 async () => {
-                    try {
-                        const response = await fetch(`/api/v1/users/${id}`, { method: 'DELETE' });
-                        if (response.ok) {
-                            showSuccess("Operator Removed", "Operator access revoked.");
+                    await apiRequest(`/api/v1/users/${id}`, { method: 'DELETE' }, {
+                        successTitle: "Operator Removed",
+                        successMessage: "Operator access revoked.",
+                        defaultErrorMessage: "Failed to delete operator.",
+                        onSuccess: async () => {
                             await fetchUsers();
-                        } else {
-                            const result = await response.json();
-                            showError("Access Denied", result.message || "Failed to delete operator.");
                         }
-                    } catch (err) {
-                        console.error("Error deleting user:", err);
-                        showError("System Error", "Error connecting to access controller.");
-                    }
+                    });
                 }
             );
         };
@@ -2424,9 +2471,6 @@
                 return;
             }
 
-            btn.textContent = 'Saving...';
-            btn.disabled = true;
-
             const payload = {
                 provider_key: providerKey,
                 name: _providerMeta[providerKey] ? _providerMeta[providerKey].label : providerKey,
@@ -2437,37 +2481,22 @@
             };
 
             const dbId = card.getAttribute('data-db-id');
+            const url = dbId ? `/api/v1/providers/${dbId}` : '/api/v1/providers';
+            const method = dbId ? 'PUT' : 'POST';
 
-            try {
-                let response;
-                if (dbId) {
-                    response = await fetch(`/api/v1/providers/${dbId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                } else {
-                    response = await fetch('/api/v1/providers', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                }
-
-                if (response.ok) {
-                    showSuccess("Config Saved", `${payload.name} configuration saved successfully.`);
+            await apiRequest(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }, {
+                successTitle: "Config Saved",
+                successMessage: `${payload.name} configuration saved successfully.`,
+                defaultErrorMessage: "Error saving credentials.",
+                submitBtn: btn,
+                onSuccess: async () => {
                     await fetchAIProviders();
-                } else {
-                    const result = await response.json();
-                    showError("Save Failed", result.message || "Error saving credentials.");
                 }
-            } catch (err) {
-                console.error("Error saving provider key:", err);
-                showError("System Error", "Could not complete save operation.");
-            } finally {
-                btn.textContent = 'Save Settings';
-                btn.disabled = false;
-            }
+            });
         };
 
         window.setDefaultProvider = async function(selectedProvider) {
@@ -2480,20 +2509,15 @@
                 return;
             }
 
-            showLoading("Setting default provider...");
-            try {
-                const response = await fetch(`/api/v1/providers/${dbId}/set-default`, { method: 'POST' });
-                if (response.ok) {
-                    showSuccess("Default Provider Updated", `${selectedProvider.toUpperCase()} is now the default provider.`);
+            await apiRequest(`/api/v1/providers/${dbId}/set-default`, { method: 'POST' }, {
+                loadingMessage: "Setting default provider...",
+                successTitle: "Default Provider Updated",
+                successMessage: `${selectedProvider.toUpperCase()} is now the default provider.`,
+                defaultErrorMessage: "Failed to update default provider.",
+                onSuccess: async () => {
                     await fetchAIProviders();
-                } else {
-                    const result = await response.json();
-                    showError("Update Failed", result.message);
                 }
-            } catch (err) {
-                console.error("Error setting default provider:", err);
-                showError("System Error", "Could not contact AI Provider API.");
-            }
+            });
         };
 
         window.saveNewProvider = async function() {
@@ -2508,8 +2532,6 @@
             }
             errEl.classList.add('hidden');
 
-            showLoading("Connecting provider...");
-
             const payload = {
                 provider_key: providerVal,
                 name: _providerMeta[providerVal] ? _providerMeta[providerVal].label : providerVal,
@@ -2519,25 +2541,20 @@
                 is_enabled: true
             };
 
-            try {
-                const response = await fetch('/api/v1/providers', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (response.ok) {
-                    showSuccess("Provider Connected", `${payload.name} has been added to AI pool.`);
+            await apiRequest('/api/v1/providers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }, {
+                loadingMessage: "Connecting provider...",
+                successTitle: "Provider Connected",
+                successMessage: `${payload.name} has been added to AI pool.`,
+                defaultErrorMessage: "Failed to save AI configuration.",
+                onSuccess: async () => {
                     closeAddProviderForm();
                     await fetchAIProviders();
-                } else {
-                    const result = await response.json();
-                    showError("Connection Failed", result.message || "Failed to save AI configuration.");
                 }
-            } catch (err) {
-                console.error("Error connecting provider:", err);
-                showError("System Error", "Could not register new provider.");
-            }
+            });
         };
 
         window.removeProvider = async function(id, cardId) {
@@ -2545,19 +2562,14 @@
                 "Remove Provider",
                 "Are you sure you want to disconnect this AI Provider?",
                 async () => {
-                    try {
-                        const response = await fetch(`/api/v1/providers/${id}`, { method: 'DELETE' });
-                        if (response.ok) {
-                            showSuccess("Provider Disconnected", "AI configuration deleted.");
+                    await apiRequest(`/api/v1/providers/${id}`, { method: 'DELETE' }, {
+                        successTitle: "Provider Disconnected",
+                        successMessage: "AI configuration deleted.",
+                        defaultErrorMessage: "Could not delete provider configuration.",
+                        onSuccess: async () => {
                             await fetchAIProviders();
-                        } else {
-                            const result = await response.json();
-                            showError("Failed", result.message || "Could not delete provider configuration.");
                         }
-                    } catch (err) {
-                        console.error("Error deleting provider:", err);
-                        showError("System Error", "Error contacting API.");
-                    }
+                    });
                 }
             );
         };
@@ -2574,7 +2586,7 @@
                     if (select) {
                         select.innerHTML = '<option value="">— Select Provider —</option>';
                         providers.forEach(p => {
-                            select.innerHTML += `<option value="${p.provider_key}">${p.name} (${p.default_model || ''})</option>`;
+                            select.innerHTML += `<option value="${p.id}">${p.name} (${p.default_model || ''})</option>`;
                         });
                     }
                 }
@@ -2602,7 +2614,10 @@
                     if (select) {
                         select.innerHTML = '<option value="">— Select Topic —</option>';
                         topics.forEach(t => {
-                            select.innerHTML += `<option value="${t.id}">${t.name}</option>`;
+                            const isActive = t.status === 'active';
+                            const disabledAttr = isActive ? '' : 'disabled';
+                            const suffix = isActive ? '' : ` (${t.status})`;
+                            select.innerHTML += `<option value="${t.id}" ${disabledAttr}>${t.name}${suffix}</option>`;
                         });
                     }
                 }
@@ -2616,6 +2631,7 @@
 
         window.fetchRecentRuns = async function() {
             const tbody = document.getElementById('pipeline-runs-body');
+            const emptyState = document.getElementById('pipeline-runs-empty');
             if (!tbody) return;
 
             try {
@@ -2626,8 +2642,10 @@
 
                 tbody.innerHTML = '';
                 if (articles.length === 0) {
+                    if (emptyState) emptyState.classList.remove('hidden');
                     tbody.innerHTML = `<tr><td colspan="5" class="text-center text-outline py-8">No generation runs in database history.</td></tr>`;
                 } else {
+                    if (emptyState) emptyState.classList.add('hidden');
                     tbody.innerHTML = '';
                     articles.slice(0, 5).forEach(article => {
                         const tr = document.createElement('tr');
@@ -2709,11 +2727,11 @@
                     site_id: siteId,
                     topic_id: parseInt(topic_id),
                     prompt_id: parseInt(prompt_id),
-                    provider_key: provider,
+                    ai_provider_id: parseInt(provider),
                     status: 'active'
                 };
 
-                const createPipeRes = await fetch('/api/v1/pipelines', {
+                const createPipeRes = await apiFetch('/api/v1/pipelines', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(pipelinePayload)
@@ -2728,7 +2746,7 @@
                 const pipeId = newPipe.data ? newPipe.data.id : newPipe.id;
 
                 // Execute the pipeline!
-                const execRes = await fetch(`/api/v1/pipelines/${pipeId}/execute`, { method: 'POST' });
+                const execRes = await apiFetch(`/api/v1/pipelines/${pipeId}/execute`, { method: 'POST' });
                 if (!execRes.ok) {
                     throw new Error("Failed to execute content generation pipeline.");
                 }
@@ -2802,10 +2820,6 @@
         };
 
         window.publishArticle = async function(id, element) {
-            let originalText = element.innerText;
-            element.innerText = "Queuing...";
-            element.disabled = true;
-
             try {
                 const articleRes = await fetch(`/api/v1/articles/${id}`);
                 if (!articleRes.ok) throw new Error("Could not load article metadata.");
@@ -2818,28 +2832,25 @@
                     return;
                 }
 
-                const response = await fetch(`/api/v1/articles/${id}/publish`, {
+                await apiRequest(`/api/v1/articles/${id}/publish`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ site_id: siteId, wp_status: 'draft' })
-                });
-
-                if (response.ok) {
-                    showSuccess("Publishing Queued", "Article has been sent to queue worker for remote WordPress upload.");
-                    await fetchRecentRuns();
-                    if (window.refreshDashboardStats) {
-                        await window.refreshDashboardStats();
+                }, {
+                    submitBtn: element,
+                    successTitle: "Publishing Queued",
+                    successMessage: "Article has been sent to queue worker for remote WordPress upload.",
+                    defaultErrorMessage: "Failed to publish article.",
+                    onSuccess: async () => {
+                        await fetchRecentRuns();
+                        if (window.refreshDashboardStats) {
+                            await window.refreshDashboardStats();
+                        }
                     }
-                } else {
-                    const result = await response.json();
-                    showError("Publishing Failed", result.message || "Failed to publish article.");
-                }
+                });
             } catch (err) {
                 console.error("Error publishing article:", err);
-                showError("System Error", "Could not trigger publishing process.");
-            } finally {
-                element.innerText = originalText;
-                element.disabled = false;
+                showError("System Error", err.message || "Could not trigger publishing process.");
             }
         };
 
@@ -2851,6 +2862,24 @@
             const topic    = document.getElementById('gen-topic')?.value;
             const btn      = document.getElementById('generate-btn');
             if (btn) btn.disabled = !(provider && prompt && topic);
+        });
+
+        // Enable Save Settings button when input/select changes in AI Providers cards
+        document.addEventListener('input', function(e) {
+            const card = e.target.closest('#providers-grid .glass-surface');
+            if (!card) return;
+            const saveBtn = card.querySelector('button[onclick^="saveProviderKey"]');
+            if (saveBtn) {
+                saveBtn.disabled = false;
+            }
+        });
+        document.addEventListener('change', function(e) {
+            const card = e.target.closest('#providers-grid .glass-surface');
+            if (!card) return;
+            const saveBtn = card.querySelector('button[onclick^="saveProviderKey"]');
+            if (saveBtn) {
+                saveBtn.disabled = false;
+            }
         });
 
         // ─── Media Studio: category tab switcher ────────────────────────────
@@ -2938,7 +2967,10 @@
                 const topicSelect = document.getElementById('workflow-topic');
                 topicSelect.innerHTML = '<option value="">— Select Topic —</option>';
                 topicsList.forEach(t => {
-                    topicSelect.innerHTML += `<option value="${t.id}">${t.name}</option>`;
+                    const isActive = t.status === 'active';
+                    const disabledAttr = isActive ? '' : 'disabled';
+                    const suffix = isActive ? '' : ` (${t.status})`;
+                    topicSelect.innerHTML += `<option value="${t.id}" ${disabledAttr}>${t.name}${suffix}</option>`;
                 });
 
                 // 3. Prompts
@@ -2958,7 +2990,7 @@
                 const providerSelect = document.getElementById('workflow-provider');
                 providerSelect.innerHTML = '<option value="">— Select Provider —</option>';
                 providersList.forEach(p => {
-                    providerSelect.innerHTML += `<option value="${p.provider_key}">${p.name} (${p.default_model || ''})</option>`;
+                    providerSelect.innerHTML += `<option value="${p.id}">${p.name} (${p.default_model || ''})</option>`;
                 });
 
                 modal.classList.add('active');
@@ -2979,38 +3011,34 @@
             const site_id = document.getElementById('workflow-site').value;
             const topic_id = document.getElementById('workflow-topic').value;
             const prompt_id = document.getElementById('workflow-prompt').value;
-            const provider_key = document.getElementById('workflow-provider').value;
+            const provider_id = document.getElementById('workflow-provider').value;
 
             const payload = {
                 site_id: parseInt(site_id),
                 topic_id: parseInt(topic_id),
                 prompt_id: parseInt(prompt_id),
-                provider_key: provider_key,
+                ai_provider_id: parseInt(provider_id),
                 status: 'active'
             };
 
             const url = id ? `/api/v1/pipelines/${id}` : '/api/v1/pipelines';
             const method = id ? 'PUT' : 'POST';
+            const submitBtn = event.target.querySelector('button[type="submit"]');
 
-            try {
-                const response = await fetch(url, {
-                    method: method,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (response.ok) {
-                    showSuccess("Workflow Saved", id ? "Workflow configuration updated." : "Automation workflow registered successfully.");
+            await apiRequest(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }, {
+                successTitle: "Workflow Saved",
+                successMessage: id ? "Workflow configuration updated." : "Automation workflow registered successfully.",
+                defaultErrorMessage: "Failed to save workflow.",
+                submitBtn: submitBtn,
+                onSuccess: async () => {
                     closeWorkflowModal();
                     await fetchRulesWorkflows();
-                } else {
-                    const result = await response.json();
-                    showError("Failed", result.message || "Failed to save workflow.");
                 }
-            } catch (err) {
-                console.error("Error saving workflow:", err);
-                showError("System Error", "Error writing configuration to database.");
-            }
+            });
         };
 
         window.deleteWorkflow = async function(id, event) {
@@ -3019,19 +3047,14 @@
                 "Delete Workflow",
                 "Are you sure you want to remove this automation workflow?",
                 async () => {
-                    try {
-                        const response = await fetch(`/api/v1/pipelines/${id}`, { method: 'DELETE' });
-                        if (response.ok) {
-                            showSuccess("Workflow Deleted", "Automation configuration removed from database.");
+                    await apiRequest(`/api/v1/pipelines/${id}`, { method: 'DELETE' }, {
+                        successTitle: "Workflow Deleted",
+                        successMessage: "Automation configuration removed from database.",
+                        defaultErrorMessage: "Could not delete pipeline.",
+                        onSuccess: async () => {
                             await fetchRulesWorkflows();
-                        } else {
-                            const result = await response.json();
-                            showError("Deletion Failed", result.message || "Could not delete pipeline.");
                         }
-                    } catch (err) {
-                        console.error("Error deleting workflow:", err);
-                        showError("System Error", "Could not contact configuration API.");
-                    }
+                    });
                 }
             );
         };
@@ -3109,24 +3132,15 @@
         };
 
         window.syncSite = async function(id, btn) {
-            let originalText = btn.innerText;
-            btn.innerText = "Syncing...";
-            btn.disabled = true;
-
-            try {
-                const response = await fetch(`/api/v1/sites/${id}/sync`, { method: 'POST' });
-                if (response.ok) {
-                    showSuccess("Sync Queued", "Site content sync task successfully queued.");
+            await apiRequest(`/api/v1/sites/${id}/sync`, { method: 'POST' }, {
+                submitBtn: btn,
+                successTitle: "Sync Queued",
+                successMessage: "Site content sync task successfully queued.",
+                defaultErrorMessage: "Could not queue synchronization.",
+                onSuccess: async () => {
                     await fetchSites();
-                } else {
-                    showError("Sync Failed", "Could not queue synchronization.");
                 }
-            } catch (err) {
-                console.error("Error syncing site:", err);
-            } finally {
-                btn.innerText = originalText;
-                btn.disabled = false;
-            }
+            });
         };
 
         window.deleteSite = async function(id) {
@@ -3134,19 +3148,15 @@
                 "Disconnect Website",
                 "Are you sure you want to disconnect this WordPress site?",
                 async () => {
-                    try {
-                        const response = await fetch(`/api/v1/sites/${id}`, { method: 'DELETE' });
-                        if (response.ok) {
-                            showSuccess("Website Disconnected", "Site configuration removed from MySQL.");
+                    await apiRequest(`/api/v1/sites/${id}`, { method: 'DELETE' }, {
+                        successTitle: "Website Disconnected",
+                        successMessage: "Site configuration removed from MySQL.",
+                        defaultErrorMessage: "Failed to delete site.",
+                        onSuccess: async () => {
                             await fetchSites();
                             if (window.refreshDashboardStats) await window.refreshDashboardStats();
-                        } else {
-                            const result = await response.json();
-                            showError("Failed", result.message || "Failed to delete site.");
                         }
-                    } catch (err) {
-                        console.error("Error deleting site:", err);
-                    }
+                    });
                 }
             );
         };
