@@ -11,11 +11,11 @@ class RequireRole
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next, ...$roles): Response
     {
-        if (!$request->user()) {
+        if (! $request->user()) {
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
@@ -24,9 +24,9 @@ class RequireRole
         // Convert the string array of roles to integers
         $allowedRoles = array_map('intval', $roles);
 
-        if (!in_array($userRole, $allowedRoles, true)) {
+        if (! in_array($userRole, $allowedRoles, true)) {
             return response()->json([
-                'message' => 'This action is unauthorized. Required role missing.'
+                'message' => 'This action is unauthorized. Required role missing.',
             ], 403);
         }
 

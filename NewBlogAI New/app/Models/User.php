@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Modules\CustomerManager\Models\Customer;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -51,6 +52,6 @@ class User extends Authenticatable
 
     public function customer()
     {
-        return $this->belongsTo(\App\Modules\CustomerManager\Models\Customer::class, 'customer_id');
+        return $this->belongsTo(Customer::class, 'customer_id');
     }
 }

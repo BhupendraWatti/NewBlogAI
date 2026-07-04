@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\CustomerManager\Models\Customer;
-use App\Modules\Licensing\Models\PluginLicense;
 use App\Modules\Licensing\Services\LicenseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -14,7 +13,9 @@ class BusinessLicensingTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected Customer $customer;
+
     protected LicenseService $licenseService;
 
     protected function setUp(): void
@@ -22,8 +23,8 @@ class BusinessLicensingTest extends TestCase
         parent::setUp();
 
         $this->admin = User::create([
-            'name'     => 'Admin User',
-            'email'    => 'admin@example.com',
+            'name' => 'Admin User',
+            'email' => 'admin@example.com',
             'password' => bcrypt('password'),
         ]);
         $this->admin->role = 2; // Admin
@@ -31,9 +32,9 @@ class BusinessLicensingTest extends TestCase
 
         $this->customer = Customer::create([
             'company_name' => 'Wernham Hogg',
-            'owner_name'   => 'David Brent',
-            'email'        => 'david@wernhamhogg.com',
-            'status'       => 'active',
+            'owner_name' => 'David Brent',
+            'email' => 'david@wernhamhogg.com',
+            'status' => 'active',
         ]);
 
         $this->licenseService = resolve(LicenseService::class);
@@ -46,13 +47,13 @@ class BusinessLicensingTest extends TestCase
 
         $this->assertDatabaseHas('plugin_licenses', [
             'license_key' => $license->license_key,
-            'status'      => 'inactive',
+            'status' => 'inactive',
         ]);
 
         // 2. Activate License via public REST API
         $response = $this->postJson('/api/v1/license/activate', [
             'license_key' => $license->license_key,
-            'domain'      => 'https://dundermifflin.com',
+            'domain' => 'https://dundermifflin.com',
         ]);
 
         $response->assertStatus(200)
@@ -60,14 +61,14 @@ class BusinessLicensingTest extends TestCase
 
         $this->assertDatabaseHas('plugin_licenses', [
             'license_key' => $license->license_key,
-            'domain'      => 'https://dundermifflin.com',
-            'status'      => 'active',
+            'domain' => 'https://dundermifflin.com',
+            'status' => 'active',
         ]);
 
         // 3. Verify License
         $responseVerify = $this->postJson('/api/v1/license/verify', [
             'license_key' => $license->license_key,
-            'domain'      => 'https://dundermifflin.com',
+            'domain' => 'https://dundermifflin.com',
         ]);
 
         $responseVerify->assertStatus(200)
@@ -76,7 +77,7 @@ class BusinessLicensingTest extends TestCase
         // Verify domain mismatch failure
         $responseVerifyFail = $this->postJson('/api/v1/license/verify', [
             'license_key' => $license->license_key,
-            'domain'      => 'https://wernhamhogg.com',
+            'domain' => 'https://wernhamhogg.com',
         ]);
 
         $responseVerifyFail->assertStatus(403);
@@ -84,15 +85,15 @@ class BusinessLicensingTest extends TestCase
         // 4. Deactivate License
         $responseDeactivate = $this->postJson('/api/v1/license/deactivate', [
             'license_key' => $license->license_key,
-            'domain'      => 'https://dundermifflin.com',
+            'domain' => 'https://dundermifflin.com',
         ]);
 
         $responseDeactivate->assertStatus(200);
 
         $this->assertDatabaseHas('plugin_licenses', [
             'license_key' => $license->license_key,
-            'domain'      => null,
-            'status'      => 'inactive',
+            'domain' => null,
+            'status' => 'inactive',
         ]);
     }
 
@@ -101,17 +102,17 @@ class BusinessLicensingTest extends TestCase
         // 1. Create User
         $response = $this->actingAs($this->admin)
             ->postJson('/api/v1/users', [
-                'name'     => 'Dwight Schrute',
-                'email'    => 'dwight@dundermifflin.com',
+                'name' => 'Dwight Schrute',
+                'email' => 'dwight@dundermifflin.com',
                 'password' => 'assistant-regional-manager',
-                'role'     => 4, // User
+                'role' => 4, // User
             ]);
 
         $response->assertStatus(201);
         $userId = $response->json('data.id');
 
         $this->assertDatabaseHas('users', [
-            'id'    => $userId,
+            'id' => $userId,
             'email' => 'dwight@dundermifflin.com',
         ]);
 

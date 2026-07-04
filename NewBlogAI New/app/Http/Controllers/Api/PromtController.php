@@ -24,13 +24,14 @@ class PromtController extends Controller
 
         return response()->json([
             'message' => 'Prompt template created successfully.',
-            'data' => $prompt
+            'data' => $prompt,
         ], 210); // Laravel standard
     }
 
     public function show($id)
     {
         $prompt = Promt::findOrFail($id);
+
         return response()->json($prompt);
     }
 
@@ -47,7 +48,7 @@ class PromtController extends Controller
 
         return response()->json([
             'message' => 'Prompt template updated successfully.',
-            'data' => $prompt
+            'data' => $prompt,
         ]);
     }
 
@@ -57,7 +58,7 @@ class PromtController extends Controller
         $prompt->delete();
 
         return response()->json([
-            'message' => 'Prompt template deleted successfully.'
+            'message' => 'Prompt template deleted successfully.',
         ]);
     }
 }

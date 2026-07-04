@@ -4,13 +4,13 @@ namespace App\Modules\SubscriptionManager\Services;
 
 use App\Modules\ContentGeneration\Models\AIRequestLog;
 use App\Modules\CustomerManager\Models\Customer;
+use App\Modules\PromptManager\Models\Prompt;
 use App\Modules\Publishing\Models\PublishingLog;
 use App\Modules\ScheduleManager\Models\PublishingSchedule;
 use App\Modules\SiteManager\Models\Site;
 use App\Modules\SubscriptionManager\Exceptions\EntitlementDeniedException;
 use App\Modules\SubscriptionManager\Models\Subscription;
 use App\Modules\TopicManager\Models\Topic;
-use App\Modules\PromptManager\Models\Prompt;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
@@ -36,7 +36,7 @@ class EntitlementService
             ->whereIn('status', self::ACTIVE_STATUSES)
             ->first();
 
-        if (!$subscription || !$subscription->plan || $subscription->plan->status !== 'active') {
+        if (! $subscription || ! $subscription->plan || $subscription->plan->status !== 'active') {
             throw new EntitlementDeniedException(
                 'An active subscription is required for this operation.',
                 'active_subscription',
@@ -130,7 +130,7 @@ class EntitlementService
 
     public function assertCanCreatePrompt(Topic $topic): void
     {
-        if (!$topic->subscription_id) {
+        if (! $topic->subscription_id) {
             return;
         }
 
@@ -153,12 +153,12 @@ class EntitlementService
     public function assertProviderAvailable(Site $site, string $providerKey): void
     {
         $subscription = $this->subscriptionForSite($site);
-        if (!$subscription) {
+        if (! $subscription) {
             return;
         }
 
         $available = array_map('strtolower', $this->limits($subscription)['ai_providers_available']);
-        if ($available !== [] && !in_array(strtolower($providerKey), $available, true)) {
+        if ($available !== [] && ! in_array(strtolower($providerKey), $available, true)) {
             throw new EntitlementDeniedException(
                 "The {$providerKey} provider is not available on this subscription.",
                 'ai_providers_available',
@@ -171,7 +171,7 @@ class EntitlementService
     public function assertCanGenerate(Site $site): ?Subscription
     {
         $subscription = $this->subscriptionForSite($site);
-        if (!$subscription) {
+        if (! $subscription) {
             return null;
         }
 
@@ -193,7 +193,7 @@ class EntitlementService
         ?int $topicId,
     ): ?AIRequestLog {
         $subscription = $this->subscriptionForSite($site);
-        if (!$subscription) {
+        if (! $subscription) {
             return null;
         }
 
@@ -226,7 +226,7 @@ class EntitlementService
     public function assertCanPublish(Site $site): ?Subscription
     {
         $subscription = $this->subscriptionForSite($site);
-        if (!$subscription) {
+        if (! $subscription) {
             return null;
         }
 
@@ -245,7 +245,7 @@ class EntitlementService
     public function assertCanCreateSchedule(Site $site, ?int $excludingScheduleId = null): ?Subscription
     {
         $subscription = $this->subscriptionForSite($site);
-        if (!$subscription) {
+        if (! $subscription) {
             return null;
         }
 
@@ -263,7 +263,7 @@ class EntitlementService
     public function assertFrequencyAllowed(Site $site, string $frequency): void
     {
         $subscription = $this->subscriptionForSite($site);
-        if (!$subscription) {
+        if (! $subscription) {
             return;
         }
 
@@ -291,7 +291,7 @@ class EntitlementService
             default => (bool) ($limits['feature_flags'][$feature] ?? false),
         };
 
-        if (!$enabled) {
+        if (! $enabled) {
             throw new EntitlementDeniedException(
                 "The {$feature} feature is not enabled for this subscription.",
                 "feature_flags.{$feature}",
@@ -301,7 +301,7 @@ class EntitlementService
 
     public function subscriptionForSite(Site $site): ?Subscription
     {
-        if (!$site->customer_id) {
+        if (! $site->customer_id) {
             return null;
         }
 

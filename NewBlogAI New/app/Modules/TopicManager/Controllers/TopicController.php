@@ -27,6 +27,7 @@ class TopicController extends Controller
         $limit = $request->input('limit', 15);
 
         $topics = $this->topicService->getPaginated($filters, $limit);
+
         return TopicResource::collection($topics);
     }
 
@@ -48,6 +49,7 @@ class TopicController extends Controller
     public function show(string $id): TopicResource
     {
         $topic = Topic::with(['parent', 'prompt'])->findOrFail($id);
+
         return new TopicResource($topic);
     }
 
@@ -71,7 +73,7 @@ class TopicController extends Controller
         $this->topicService->deleteTopic($topic);
 
         return response()->json([
-            'message' => 'Topic soft-deleted successfully.'
+            'message' => 'Topic soft-deleted successfully.',
         ]);
     }
 
@@ -84,7 +86,7 @@ class TopicController extends Controller
 
         return response()->json([
             'message' => 'Topic restored successfully.',
-            'data' => new TopicResource($restored->load(['parent', 'prompt']))
+            'data' => new TopicResource($restored->load(['parent', 'prompt'])),
         ]);
     }
 }

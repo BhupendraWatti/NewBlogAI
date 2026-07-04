@@ -2,7 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Models\keys;
+use App\Models\Promt;
+use App\Models\Topic;
 use App\Models\User;
+use App\Modules\SiteManager\Models\Site;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -21,72 +25,72 @@ class DatabaseSeeder extends Seeder
         User::firstOrCreate(
             ['email' => 'admin@newsblogify.com'],
             [
-                'name'     => 'Super Admin',
-                'email'    => 'admin@newsblogify.com',
+                'name' => 'Super Admin',
+                'email' => 'admin@newsblogify.com',
                 'password' => Hash::make('admin123'),
-                'role'     => 1,
+                'role' => 1,
             ]
         );
 
         // Seed Prompts
-        $prompt1 = \App\Models\Promt::create([
+        $prompt1 = Promt::create([
             'name' => 'Newsletter Compiler',
-            'promt' => 'Synthesize the latest news on this topic into an engaging weekly newsletter format. Use markdown.'
+            'promt' => 'Synthesize the latest news on this topic into an engaging weekly newsletter format. Use markdown.',
         ]);
 
-        $prompt2 = \App\Models\Promt::create([
+        $prompt2 = Promt::create([
             'name' => 'Tech Blog Writer',
-            'promt' => 'Write a deeply analytical blog post regarding the latest AI releases. Keep the tone professional.'
+            'promt' => 'Write a deeply analytical blog post regarding the latest AI releases. Keep the tone professional.',
         ]);
 
         // Seed Topics
-        \App\Models\Topic::create(['name' => 'Generative AI']);
-        \App\Models\Topic::create(['name' => 'Venture Capital']);
-        \App\Models\Topic::create(['name' => 'Healthy Living']);
+        Topic::create(['name' => 'Generative AI']);
+        Topic::create(['name' => 'Venture Capital']);
+        Topic::create(['name' => 'Healthy Living']);
 
         // Seed Keys
-        $key1 = \App\Models\keys::create([
+        $key1 = keys::create([
             'name' => 'Primary OpenAI Key',
-            'key' => 'sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+            'key' => 'sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
         ]);
 
-        $key2 = \App\Models\keys::create([
+        $key2 = keys::create([
             'name' => 'Claude Anthropic Key',
-            'key' => 'sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+            'key' => 'sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
         ]);
 
         // Seed Sites
-        \App\Modules\SiteManager\Models\Site::create([
+        Site::create([
             'domain_url' => 'https://tech-insider.com',
             'slot' => '12:00',
             'api_key' => $key1->id, // References the key id
             'promt_id' => $prompt2->id,
             'selected_topics' => [
-                ['topic' => 'Generative AI', 'promt_id' => $prompt2->id]
+                ['topic' => 'Generative AI', 'promt_id' => $prompt2->id],
             ],
             'last_sync_status' => 'success',
             'last_synced_at' => now()->subMinutes(2),
         ]);
 
-        \App\Modules\SiteManager\Models\Site::create([
+        Site::create([
             'domain_url' => 'https://finance-daily.net',
             'slot' => '14:30',
             'api_key' => $key1->id,
             'promt_id' => $prompt1->id,
             'selected_topics' => [
-                ['topic' => 'Venture Capital', 'promt_id' => $prompt1->id]
+                ['topic' => 'Venture Capital', 'promt_id' => $prompt1->id],
             ],
             'last_sync_status' => 'syncing',
             'last_synced_at' => now()->subMinutes(45),
         ]);
 
-        \App\Modules\SiteManager\Models\Site::create([
+        Site::create([
             'domain_url' => 'https://health-trends.org',
             'slot' => '09:00',
             'api_key' => $key2->id,
             'promt_id' => $prompt1->id,
             'selected_topics' => [
-                ['topic' => 'Healthy Living', 'promt_id' => $prompt1->id]
+                ['topic' => 'Healthy Living', 'promt_id' => $prompt1->id],
             ],
             'last_sync_status' => 'failed',
             'last_synced_at' => now()->subHours(3),

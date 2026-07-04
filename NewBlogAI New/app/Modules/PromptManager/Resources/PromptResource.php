@@ -10,13 +10,13 @@ class PromptResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id'         => $this->id,
-            'name'       => $this->name,
-            'content'    => $this->promt,
-            'category'   => $this->category,
-            'variables'  => $this->variables ?? [],
-            'version'    => $this->version,
-            'status'     => $this->status,
+            'id' => $this->id,
+            'name' => $this->name,
+            'content' => $this->promt,
+            'category' => $this->category,
+            'variables' => $this->variables ?? [],
+            'version' => $this->version,
+            'status' => $this->status,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

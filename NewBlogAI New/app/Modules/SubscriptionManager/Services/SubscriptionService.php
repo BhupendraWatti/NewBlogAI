@@ -2,8 +2,8 @@
 
 namespace App\Modules\SubscriptionManager\Services;
 
-use App\Modules\CustomerManager\Models\CustomerActivity;
 use App\Modules\CustomerManager\Models\Customer;
+use App\Modules\CustomerManager\Models\CustomerActivity;
 use App\Modules\SubscriptionManager\Contracts\PaymentGatewayInterface;
 use App\Modules\SubscriptionManager\Models\Plan;
 use App\Modules\SubscriptionManager\Models\Subscription;
@@ -25,11 +25,11 @@ class SubscriptionService
         // 1. Fail Fast: Check active subscriptions
         $existing = Subscription::where('customer_id', $customer->id)->first();
         if ($existing) {
-            throw new \InvalidArgumentException("Customer already has an active subscription. Use upgrade or downgrade endpoints instead.");
+            throw new \InvalidArgumentException('Customer already has an active subscription. Use upgrade or downgrade endpoints instead.');
         }
 
         if ($plan->status !== 'active') {
-            throw new \DomainException("Cannot subscribe to an inactive plan.");
+            throw new \DomainException('Cannot subscribe to an inactive plan.');
         }
 
         $price = $billingPeriod === 'yearly' ? $plan->yearly_price : $plan->monthly_price;
@@ -41,37 +41,37 @@ class SubscriptionService
 
                 // 3. Create active subscription and snapshot limits
                 $subscription = Subscription::create([
-                    'customer_id'    => $customer->id,
-                    'plan_id'        => $plan->id,
-                    'status'         => 'active',
+                    'customer_id' => $customer->id,
+                    'plan_id' => $plan->id,
+                    'status' => 'active',
                     'billing_period' => $billingPeriod,
-                    'starts_at'      => now(),
-                    'ends_at'        => $billingPeriod === 'yearly' ? now()->addYear() : now()->addMonth(),
-                    'limits'         => $plan->toArray()
+                    'starts_at' => now(),
+                    'ends_at' => $billingPeriod === 'yearly' ? now()->addYear() : now()->addMonth(),
+                    'limits' => $plan->toArray(),
                 ]);
 
                 // 4. Log subscription history
                 SubscriptionHistory::create([
-                    'customer_id'    => $customer->id,
-                    'plan_id'        => $plan->id,
-                    'event_type'     => 'created',
+                    'customer_id' => $customer->id,
+                    'plan_id' => $plan->id,
+                    'event_type' => 'created',
                     'billing_period' => $billingPeriod,
-                    'amount_paid'    => $price
+                    'amount_paid' => $price,
                 ]);
 
                 // 5. Record customer activity
                 CustomerActivity::create([
                     'customer_id' => $customer->id,
-                    'event_type'  => 'subscription_created',
+                    'event_type' => 'subscription_created',
                     'description' => "Subscribed to plan '{$plan->name}' ($billingPeriod).",
-                    'properties'  => ['plan_id' => $plan->id, 'price' => $price]
+                    'properties' => ['plan_id' => $plan->id, 'price' => $price],
                 ]);
 
                 return $subscription;
             });
         } catch (\Exception $e) {
-            Log::error("Failed to subscribe customer {$customer->id} to plan {$plan->id}: " . $e->getMessage());
-            throw new \RuntimeException("Subscription registration failed. Payment could not be charged: " . $e->getMessage(), 0, $e);
+            Log::error("Failed to subscribe customer {$customer->id} to plan {$plan->id}: ".$e->getMessage());
+            throw new \RuntimeException('Subscription registration failed. Payment could not be charged: '.$e->getMessage(), 0, $e);
         }
     }
 
@@ -81,7 +81,7 @@ class SubscriptionService
     public function upgrade(Subscription $subscription, Plan $newPlan, string $billingPeriod, ?string $paymentToken = null): Subscription
     {
         if ($newPlan->status !== 'active') {
-            throw new \DomainException("Cannot upgrade to an inactive plan.");
+            throw new \DomainException('Cannot upgrade to an inactive plan.');
         }
 
         $price = $billingPeriod === 'yearly' ? $newPlan->yearly_price : $newPlan->monthly_price;
@@ -91,34 +91,34 @@ class SubscriptionService
                 $this->gateway->charge($subscription->customer->email, $price, $paymentToken);
 
                 $subscription->update([
-                    'plan_id'        => $newPlan->id,
-                    'status'         => 'active',
+                    'plan_id' => $newPlan->id,
+                    'status' => 'active',
                     'billing_period' => $billingPeriod,
-                    'starts_at'      => now(),
-                    'ends_at'        => $billingPeriod === 'yearly' ? now()->addYear() : now()->addMonth(),
-                    'limits'         => $newPlan->toArray()
+                    'starts_at' => now(),
+                    'ends_at' => $billingPeriod === 'yearly' ? now()->addYear() : now()->addMonth(),
+                    'limits' => $newPlan->toArray(),
                 ]);
 
                 SubscriptionHistory::create([
-                    'customer_id'    => $subscription->customer_id,
-                    'plan_id'        => $newPlan->id,
-                    'event_type'     => 'upgraded',
+                    'customer_id' => $subscription->customer_id,
+                    'plan_id' => $newPlan->id,
+                    'event_type' => 'upgraded',
                     'billing_period' => $billingPeriod,
-                    'amount_paid'    => $price
+                    'amount_paid' => $price,
                 ]);
 
                 CustomerActivity::create([
                     'customer_id' => $subscription->customer_id,
-                    'event_type'  => 'subscription_upgraded',
+                    'event_type' => 'subscription_upgraded',
                     'description' => "Upgraded subscription to plan '{$newPlan->name}'.",
-                    'properties'  => ['plan_id' => $newPlan->id, 'price' => $price]
+                    'properties' => ['plan_id' => $newPlan->id, 'price' => $price],
                 ]);
 
                 return $subscription;
             });
         } catch (\Exception $e) {
-            Log::error("Failed to upgrade subscription ID {$subscription->id}: " . $e->getMessage());
-            throw new \RuntimeException("Upgrade failed. Payment declined: " . $e->getMessage(), 0, $e);
+            Log::error("Failed to upgrade subscription ID {$subscription->id}: ".$e->getMessage());
+            throw new \RuntimeException('Upgrade failed. Payment declined: '.$e->getMessage(), 0, $e);
         }
     }
 
@@ -128,37 +128,37 @@ class SubscriptionService
     public function downgrade(Subscription $subscription, Plan $newPlan, string $billingPeriod): Subscription
     {
         if ($newPlan->status !== 'active') {
-            throw new \DomainException("Cannot downgrade to an inactive plan.");
+            throw new \DomainException('Cannot downgrade to an inactive plan.');
         }
 
         try {
             return DB::transaction(function () use ($subscription, $newPlan, $billingPeriod) {
                 $subscription->update([
-                    'plan_id'        => $newPlan->id,
+                    'plan_id' => $newPlan->id,
                     'billing_period' => $billingPeriod,
-                    'limits'         => $newPlan->toArray()
+                    'limits' => $newPlan->toArray(),
                 ]);
 
                 SubscriptionHistory::create([
-                    'customer_id'    => $subscription->customer_id,
-                    'plan_id'        => $newPlan->id,
-                    'event_type'     => 'downgraded',
+                    'customer_id' => $subscription->customer_id,
+                    'plan_id' => $newPlan->id,
+                    'event_type' => 'downgraded',
                     'billing_period' => $billingPeriod,
-                    'amount_paid'    => 0.00
+                    'amount_paid' => 0.00,
                 ]);
 
                 CustomerActivity::create([
                     'customer_id' => $subscription->customer_id,
-                    'event_type'  => 'subscription_downgraded',
+                    'event_type' => 'subscription_downgraded',
                     'description' => "Downgraded subscription to plan '{$newPlan->name}'.",
-                    'properties'  => ['plan_id' => $newPlan->id]
+                    'properties' => ['plan_id' => $newPlan->id],
                 ]);
 
                 return $subscription;
             });
         } catch (\Exception $e) {
-            Log::error("Failed to downgrade subscription ID {$subscription->id}: " . $e->getMessage());
-            throw new \RuntimeException("Downgrade failed.", 0, $e);
+            Log::error("Failed to downgrade subscription ID {$subscription->id}: ".$e->getMessage());
+            throw new \RuntimeException('Downgrade failed.', 0, $e);
         }
     }
 
@@ -168,14 +168,14 @@ class SubscriptionService
     public function pause(Subscription $subscription): void
     {
         $subscription->update([
-            'status'    => 'paused',
-            'paused_at' => now()
+            'status' => 'paused',
+            'paused_at' => now(),
         ]);
 
         CustomerActivity::create([
             'customer_id' => $subscription->customer_id,
-            'event_type'  => 'subscription_paused',
-            'description' => 'Subscription paused.'
+            'event_type' => 'subscription_paused',
+            'description' => 'Subscription paused.',
         ]);
     }
 
@@ -185,14 +185,14 @@ class SubscriptionService
     public function resume(Subscription $subscription): void
     {
         $subscription->update([
-            'status'    => 'active',
-            'paused_at' => null
+            'status' => 'active',
+            'paused_at' => null,
         ]);
 
         CustomerActivity::create([
             'customer_id' => $subscription->customer_id,
-            'event_type'  => 'subscription_resumed',
-            'description' => 'Subscription resumed.'
+            'event_type' => 'subscription_resumed',
+            'description' => 'Subscription resumed.',
         ]);
     }
 
@@ -202,16 +202,16 @@ class SubscriptionService
     public function cancel(Subscription $subscription): void
     {
         $subscription->update([
-            'status'       => 'cancelled',
-            'cancelled_at' => now()
+            'status' => 'cancelled',
+            'cancelled_at' => now(),
         ]);
 
         $this->gateway->cancelSubscription($subscription->id);
 
         CustomerActivity::create([
             'customer_id' => $subscription->customer_id,
-            'event_type'  => 'subscription_cancelled',
-            'description' => 'Subscription cancelled.'
+            'event_type' => 'subscription_cancelled',
+            'description' => 'Subscription cancelled.',
         ]);
     }
 }

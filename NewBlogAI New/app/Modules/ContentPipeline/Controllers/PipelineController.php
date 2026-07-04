@@ -29,6 +29,7 @@ class PipelineController extends Controller
         $limit = $request->input('limit', 15);
 
         $pipelines = $this->pipelineService->getPaginated($filters, $limit);
+
         return PipelineResource::collection($pipelines);
     }
 
@@ -50,6 +51,7 @@ class PipelineController extends Controller
     public function show(string $id): PipelineResource
     {
         $pipeline = ContentPipeline::with(['site', 'topic', 'prompt', 'provider', 'runs'])->findOrFail($id);
+
         return new PipelineResource($pipeline);
     }
 
@@ -73,7 +75,7 @@ class PipelineController extends Controller
         $pipeline->delete();
 
         return response()->json([
-            'message' => 'Content pipeline config deleted successfully.'
+            'message' => 'Content pipeline config deleted successfully.',
         ]);
     }
 
@@ -114,7 +116,7 @@ class PipelineController extends Controller
         $this->pipelineService->cancelRun($run);
 
         return response()->json([
-            'message' => 'Pipeline execution run cancelled successfully.'
+            'message' => 'Pipeline execution run cancelled successfully.',
         ]);
     }
 

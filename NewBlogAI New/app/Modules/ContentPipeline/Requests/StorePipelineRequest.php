@@ -14,13 +14,13 @@ class StorePipelineRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'site_id'         => ['required', 'integer', 'exists:sites,id'],
-            'topic_id'        => ['required', 'integer', 'exists:topics,id'],
-            'prompt_id'       => ['required', 'integer', 'exists:promts,id'],
-            'ai_provider_id'  => ['required', 'integer', 'exists:ai_providers,id'],
-            'language'        => ['sometimes', 'string', 'max:10'],
+            'site_id' => ['required', 'integer', 'exists:sites,id'],
+            'topic_id' => ['required', 'integer', 'exists:topics,id'],
+            'prompt_id' => ['required', 'integer', 'exists:promts,id'],
+            'ai_provider_id' => ['required', 'integer', 'exists:ai_providers,id'],
+            'language' => ['sometimes', 'string', 'max:10'],
             'generation_type' => ['sometimes', 'string', 'in:article,newsletter,blog,summary'],
-            'is_active'       => ['sometimes', 'boolean'],
+            'is_active' => ['sometimes', 'boolean'],
         ];
     }
 }

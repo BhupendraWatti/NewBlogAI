@@ -16,11 +16,11 @@ class UpdateSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'currency'            => ['sometimes', 'required', 'string', 'in:USD,INR'],
-            'timezone'            => ['sometimes', 'required', 'string', 'timezone'],
-            'language'            => ['sometimes', 'required', 'string', 'in:en,es,fr,de,hi'],
+            'currency' => ['sometimes', 'required', 'string', 'in:USD,INR'],
+            'timezone' => ['sometimes', 'required', 'string', 'timezone'],
+            'language' => ['sometimes', 'required', 'string', 'in:en,es,fr,de,hi'],
             'ai_default_provider' => ['sometimes', 'required', 'string', 'in:gemini,openai,claude,groq,openrouter,ollama'],
-            'ai_default_model'    => ['sometimes', 'required', 'string', 'max:255'],
+            'ai_default_model' => ['sometimes', 'required', 'string', 'max:255'],
         ];
     }
 }

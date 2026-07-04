@@ -2,13 +2,12 @@
 
 namespace App\Modules\TopicManager\Services;
 
-use App\Modules\TopicManager\Models\Topic;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use InvalidArgumentException;
 use App\Modules\SubscriptionManager\Models\Subscription;
 use App\Modules\SubscriptionManager\Services\EntitlementService;
+use App\Modules\TopicManager\Models\Topic;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 
 class TopicService
 {
@@ -22,11 +21,11 @@ class TopicService
         $query = Topic::query()->with(['parent', 'prompt']);
 
         // Search by name or category
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('category', 'like', "%{$search}%");
+                    ->orWhere('category', 'like', "%{$search}%");
             });
         }
 
@@ -36,12 +35,12 @@ class TopicService
         }
 
         // Filter by status
-        if (!empty($filters['status'])) {
+        if (! empty($filters['status'])) {
             $query->where('status', $filters['status']);
         }
 
         // Filter by language
-        if (!empty($filters['language'])) {
+        if (! empty($filters['language'])) {
             $query->where('language', $filters['language']);
         }
 
@@ -62,7 +61,7 @@ class TopicService
      */
     public function createTopic(array $data): Topic
     {
-        if (!empty($data['subscription_id'])) {
+        if (! empty($data['subscription_id'])) {
             $subscription = Subscription::findOrFail($data['subscription_id']);
             $this->entitlements->activeSubscription($subscription->customer_id);
             $this->entitlements->assertCanCreateTopic($subscription);
@@ -78,8 +77,8 @@ class TopicService
         try {
             return Topic::create($data);
         } catch (\Exception $e) {
-            Log::error("Failed to create topic: " . $e->getMessage());
-            throw new \RuntimeException("Could not register topic config.", 0, $e);
+            Log::error('Failed to create topic: '.$e->getMessage());
+            throw new \RuntimeException('Could not register topic config.', 0, $e);
         }
     }
 
@@ -88,7 +87,7 @@ class TopicService
      */
     public function updateTopic(Topic $topic, array $data): Topic
     {
-        if (!empty($data['name']) && $data['name'] !== $topic->name) {
+        if (! empty($data['name']) && $data['name'] !== $topic->name) {
             $parentId = array_key_exists('parent_id', $data) ? $data['parent_id'] : $topic->parent_id;
             $this->preventDuplicate(
                 $data['name'],
@@ -100,10 +99,11 @@ class TopicService
 
         try {
             $topic->update($data);
+
             return $topic;
         } catch (\Exception $e) {
-            Log::error("Failed to update topic: " . $e->getMessage());
-            throw new \RuntimeException("Could not update topic config.", 0, $e);
+            Log::error('Failed to update topic: '.$e->getMessage());
+            throw new \RuntimeException('Could not update topic config.', 0, $e);
         }
     }
 
@@ -122,6 +122,7 @@ class TopicService
     {
         $topic = Topic::onlyTrashed()->findOrFail($id);
         $topic->restore();
+
         return $topic;
     }
 
@@ -133,8 +134,7 @@ class TopicService
         ?int $parentId = null,
         ?int $excludeId = null,
         ?int $subscriptionId = null,
-    ): void
-    {
+    ): void {
         $query = Topic::where('name', $name);
 
         $subscriptionId

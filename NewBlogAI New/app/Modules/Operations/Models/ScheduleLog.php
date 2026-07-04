@@ -19,7 +19,7 @@ class ScheduleLog extends Model
     public $timestamps = false;
 
     protected $casts = [
-        'started_at'   => 'datetime',
+        'started_at' => 'datetime',
         'completed_at' => 'datetime',
     ];
 }

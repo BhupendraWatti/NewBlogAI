@@ -2,13 +2,13 @@
 
 namespace App\Modules\SiteManager\Services;
 
-use App\Modules\SiteManager\Models\Site;
+use App\Modules\CustomerManager\Models\Customer;
 use App\Modules\Operations\Models\AuditLog;
+use App\Modules\SiteManager\Models\Site;
+use App\Modules\SubscriptionManager\Services\EntitlementService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use App\Modules\CustomerManager\Models\Customer;
-use App\Modules\SubscriptionManager\Services\EntitlementService;
 
 class SiteService
 {
@@ -23,14 +23,14 @@ class SiteService
      */
     public function createSite(array $data): Site
     {
-        if (!empty($data['customer_id'])) {
+        if (! empty($data['customer_id'])) {
             $customer = Customer::findOrFail($data['customer_id']);
             $this->entitlements->assertCanRegisterSite($customer);
         }
 
         try {
             return DB::transaction(function () use ($data) {
-                if (!empty($data['is_default'])) {
+                if (! empty($data['is_default'])) {
                     Site::where('customer_id', $data['customer_id'] ?? null)
                         ->where('is_default', true)
                         ->update(['is_default' => false]);
@@ -40,8 +40,8 @@ class SiteService
 
                 // Audit Log
                 AuditLog::create([
-                    'user_id'    => Auth::id(),
-                    'event'      => 'website_connected',
+                    'user_id' => Auth::id(),
+                    'event' => 'website_connected',
                     'new_values' => ['domain_url' => $site->domain_url],
                     'ip_address' => request()->ip(),
                     'user_agent' => request()->userAgent(),
@@ -52,8 +52,8 @@ class SiteService
                 return $site->refresh();
             });
         } catch (\Exception $e) {
-            Log::error("Failed to create site: " . $e->getMessage());
-            throw new \RuntimeException("Could not create site configuration.", 0, $e);
+            Log::error('Failed to create site: '.$e->getMessage());
+            throw new \RuntimeException('Could not create site configuration.', 0, $e);
         }
     }
 
@@ -69,7 +69,7 @@ class SiteService
 
         try {
             return DB::transaction(function () use ($site, $data) {
-                if (!empty($data['is_default'])) {
+                if (! empty($data['is_default'])) {
                     Site::where('id', '!=', $site->id)
                         ->where('customer_id', $data['customer_id'] ?? $site->customer_id)
                         ->where('is_default', true)
@@ -82,8 +82,8 @@ class SiteService
 
                 // Audit Log
                 AuditLog::create([
-                    'user_id'    => Auth::id(),
-                    'event'      => 'website_updated',
+                    'user_id' => Auth::id(),
+                    'event' => 'website_updated',
                     'old_values' => $oldValues,
                     'new_values' => ['domain_url' => $site->domain_url],
                     'ip_address' => request()->ip(),
@@ -93,8 +93,8 @@ class SiteService
                 return $site;
             });
         } catch (\Exception $e) {
-            Log::error("Failed to update site configuration: " . $e->getMessage());
-            throw new \RuntimeException("Could not update site configuration.", 0, $e);
+            Log::error('Failed to update site configuration: '.$e->getMessage());
+            throw new \RuntimeException('Could not update site configuration.', 0, $e);
         }
     }
 
@@ -103,8 +103,8 @@ class SiteService
      */
     public function setDefault(Site $site): Site
     {
-        if (!$site->is_active) {
-            throw new \InvalidArgumentException("Cannot set an inactive website as the default.");
+        if (! $site->is_active) {
+            throw new \InvalidArgumentException('Cannot set an inactive website as the default.');
         }
 
         try {
@@ -116,8 +116,8 @@ class SiteService
 
                 // Audit Log
                 AuditLog::create([
-                    'user_id'    => Auth::id(),
-                    'event'      => 'website_set_default',
+                    'user_id' => Auth::id(),
+                    'event' => 'website_set_default',
                     'new_values' => ['domain_url' => $site->domain_url],
                     'ip_address' => request()->ip(),
                     'user_agent' => request()->userAgent(),
@@ -126,8 +126,8 @@ class SiteService
                 return $site;
             });
         } catch (\Exception $e) {
-            Log::error("Failed to set default site: " . $e->getMessage());
-            throw new \RuntimeException("Could not change default site.", 0, $e);
+            Log::error('Failed to set default site: '.$e->getMessage());
+            throw new \RuntimeException('Could not change default site.', 0, $e);
         }
     }
 
@@ -136,11 +136,12 @@ class SiteService
      */
     public function toggleActive(Site $site, bool $isActive): Site
     {
-        if (!$isActive && $site->is_default) {
-            throw new \InvalidArgumentException("Cannot deactivate the default website. Set another website as default first.");
+        if (! $isActive && $site->is_default) {
+            throw new \InvalidArgumentException('Cannot deactivate the default website. Set another website as default first.');
         }
 
         $site->update(['is_active' => $isActive]);
+
         return $site;
     }
 
@@ -167,16 +168,16 @@ class SiteService
                 }
 
                 AuditLog::create([
-                    'user_id'    => Auth::id(),
-                    'event'      => 'website_disconnected',
+                    'user_id' => Auth::id(),
+                    'event' => 'website_disconnected',
                     'old_values' => ['domain_url' => $site->getOriginal('domain_url')],
                     'ip_address' => request()->ip(),
                     'user_agent' => request()->userAgent(),
                 ]);
             });
         } catch (\Exception $e) {
-            Log::error("Failed to delete site configuration: " . $e->getMessage());
-            throw new \RuntimeException("Could not delete site configuration.", 0, $e);
+            Log::error('Failed to delete site configuration: '.$e->getMessage());
+            throw new \RuntimeException('Could not delete site configuration.', 0, $e);
         }
     }
 }

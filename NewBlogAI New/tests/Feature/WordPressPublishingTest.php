@@ -3,11 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Modules\ContentGeneration\Models\GeneratedContent;
+use App\Modules\Publishing\Jobs\PublishPostJob;
+use App\Modules\Publishing\Models\PublishingLog;
+use App\Modules\Publishing\Services\PublishingService;
 use App\Modules\SiteManager\Models\Site;
 use App\Modules\TopicManager\Models\Topic;
-use App\Modules\ContentGeneration\Models\GeneratedContent;
-use App\Modules\Publishing\Models\PublishingLog;
-use App\Modules\Publishing\Jobs\PublishPostJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -18,8 +19,11 @@ class WordPressPublishingTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected Site $site;
+
     protected Topic $topic;
+
     protected GeneratedContent $article;
 
     protected function setUp(): void
@@ -27,8 +31,8 @@ class WordPressPublishingTest extends TestCase
         parent::setUp();
 
         $this->admin = User::create([
-            'name'     => 'Admin User',
-            'email'    => 'admin@example.com',
+            'name' => 'Admin User',
+            'email' => 'admin@example.com',
             'password' => bcrypt('password'),
         ]);
         $this->admin->role = 2; // Admin
@@ -36,23 +40,23 @@ class WordPressPublishingTest extends TestCase
 
         $this->site = Site::create([
             'domain_url' => 'https://mockwp.com',
-            'api_key'    => 'secret-api-token',
-            'is_active'  => true,
+            'api_key' => 'secret-api-token',
+            'is_active' => true,
         ]);
 
         $this->topic = Topic::create([
-            'name'                 => 'Web Development',
-            'category'             => 'Tech',
-            'status'               => 'active',
+            'name' => 'Web Development',
+            'category' => 'Tech',
+            'status' => 'active',
             'generation_frequency' => 'daily',
         ]);
 
         $this->article = GeneratedContent::create([
-            'site_id'  => $this->site->id,
+            'site_id' => $this->site->id,
             'topic_id' => $this->topic->id,
-            'title'    => 'Mock Article Title',
-            'content'  => 'Mock article body content.',
-            'status'   => 'approved',
+            'title' => 'Mock Article Title',
+            'content' => 'Mock article body content.',
+            'status' => 'approved',
         ]);
     }
 
@@ -62,7 +66,7 @@ class WordPressPublishingTest extends TestCase
 
         $response = $this->actingAs($this->admin)
             ->postJson("/api/v1/articles/{$this->article->id}/publish", [
-                'site_id'   => $this->site->id,
+                'site_id' => $this->site->id,
                 'wp_status' => 'publish',
             ]);
 
@@ -71,9 +75,9 @@ class WordPressPublishingTest extends TestCase
 
         $this->assertDatabaseHas('publishing_logs', [
             'generated_content_id' => $this->article->id,
-            'site_id'              => $this->site->id,
-            'wp_status'            => 'publish',
-            'status'               => 'pending',
+            'site_id' => $this->site->id,
+            'wp_status' => 'publish',
+            'status' => 'pending',
         ]);
 
         Queue::assertPushed(PublishPostJob::class);
@@ -84,21 +88,21 @@ class WordPressPublishingTest extends TestCase
         // Fake WordPress Post Creation response
         Http::fake([
             'https://mockwp.com/wp-json/wp/v2/posts' => Http::response([
-                'id'   => 4521,
+                'id' => 4521,
                 'link' => 'https://mockwp.com/mock-article-title/',
-            ], 201)
+            ], 201),
         ]);
 
         $log = PublishingLog::create([
             'generated_content_id' => $this->article->id,
-            'site_id'              => $this->site->id,
-            'user_id'              => $this->admin->id,
-            'status'               => 'pending',
-            'wp_status'            => 'publish',
+            'site_id' => $this->site->id,
+            'user_id' => $this->admin->id,
+            'status' => 'pending',
+            'wp_status' => 'publish',
         ]);
 
         $job = new PublishPostJob($log->id);
-        $job->handle(resolve(\App\Modules\Publishing\Services\PublishingService::class));
+        $job->handle(resolve(PublishingService::class));
 
         $log->refresh();
         $this->assertEquals('completed', $log->status);
@@ -114,8 +118,8 @@ class WordPressPublishingTest extends TestCase
         // Setup completed log
         PublishingLog::create([
             'generated_content_id' => $this->article->id,
-            'site_id'              => $this->site->id,
-            'status'               => 'completed',
+            'site_id' => $this->site->id,
+            'status' => 'completed',
         ]);
 
         // Attempting to publish again to same site
@@ -131,15 +135,15 @@ class WordPressPublishingTest extends TestCase
     {
         // Fake remote deletion (returns 404)
         Http::fake([
-            'https://mockwp.com/wp-json/wp/v2/posts/4521' => Http::response([], 404)
+            'https://mockwp.com/wp-json/wp/v2/posts/4521' => Http::response([], 404),
         ]);
 
         $log = PublishingLog::create([
             'generated_content_id' => $this->article->id,
-            'site_id'              => $this->site->id,
-            'status'               => 'completed',
-            'wp_post_id'           => 4521,
-            'published_url'        => 'https://mockwp.com/mock-article-title/',
+            'site_id' => $this->site->id,
+            'status' => 'completed',
+            'wp_post_id' => 4521,
+            'published_url' => 'https://mockwp.com/mock-article-title/',
         ]);
 
         // Trigger manual status sync via API
@@ -151,7 +155,7 @@ class WordPressPublishingTest extends TestCase
         $log->refresh();
         $this->assertEquals('failed', $log->status);
         $this->assertEquals('Post was deleted or unpublished from WordPress.', $log->error_message);
-        
+
         // Assert content status reverted to draft
         $this->assertEquals('draft', $this->article->fresh()->status);
     }
@@ -160,8 +164,8 @@ class WordPressPublishingTest extends TestCase
     {
         $log = PublishingLog::create([
             'generated_content_id' => $this->article->id,
-            'site_id'              => $this->site->id,
-            'status'               => 'pending',
+            'site_id' => $this->site->id,
+            'status' => 'pending',
         ]);
 
         $response = $this->actingAs($this->admin)
@@ -169,7 +173,7 @@ class WordPressPublishingTest extends TestCase
 
         $response->assertStatus(200);
         $this->assertEquals('cancelled', $log->fresh()->status);
-        
+
         // Content status reverts to approved
         $this->assertEquals('approved', $this->article->fresh()->status);
     }

@@ -33,7 +33,7 @@ class WPPluginAPIController extends Controller
         ]);
 
         $user = User::where('email', $validated['email'])->first();
-        if (!$user || !Hash::check($validated['password'], $user->password)) {
+        if (! $user || ! Hash::check($validated['password'], $user->password)) {
             return response()->json(['message' => 'Invalid email or password credentials.'], 401);
         }
 
@@ -54,7 +54,7 @@ class WPPluginAPIController extends Controller
     public function registerWebsite(Request $request): JsonResponse
     {
         $user = $this->authenticatedUser($request);
-        if (!$user) {
+        if (! $user) {
             return $this->unauthorized();
         }
 
@@ -69,14 +69,14 @@ class WPPluginAPIController extends Controller
         ]);
 
         $customer = $this->tokens->customerForUser($user);
-        if (!$customer) {
+        if (! $customer) {
             throw new EntitlementDeniedException(
                 'The authenticated account is not linked to a customer.',
                 'customer_account',
             );
         }
 
-        if (!$user->customer_id) {
+        if (! $user->customer_id) {
             $user->update(['customer_id' => $customer->id]);
         }
 
@@ -224,12 +224,12 @@ class WPPluginAPIController extends Controller
     public function disconnect(Request $request): JsonResponse
     {
         $user = $this->authenticatedUser($request);
-        if (!$user) {
+        if (! $user) {
             return $this->unauthorized();
         }
 
         $site = $this->siteForUser($request, $user);
-        if (!$site) {
+        if (! $site) {
             return response()->json(['message' => 'Website not found.'], 404);
         }
 
@@ -249,7 +249,7 @@ class WPPluginAPIController extends Controller
     public function refreshToken(Request $request): JsonResponse
     {
         $user = $this->authenticatedUser($request);
-        if (!$user) {
+        if (! $user) {
             return $this->unauthorized();
         }
 
@@ -316,7 +316,7 @@ class WPPluginAPIController extends Controller
     private function authenticatedSite(Request $request): Site|JsonResponse
     {
         $user = $this->authenticatedUser($request);
-        if (!$user) {
+        if (! $user) {
             return $this->unauthorized();
         }
 
@@ -336,7 +336,7 @@ class WPPluginAPIController extends Controller
     private function siteForUser(Request $request, User $user): ?Site
     {
         $customer = $this->tokens->customerForUser($user);
-        if (!$customer) {
+        if (! $customer) {
             return null;
         }
 
@@ -345,7 +345,7 @@ class WPPluginAPIController extends Controller
         return Site::where('customer_id', $customer->id)
             ->when($siteUrl !== '', fn ($query) => $query->where('domain_url', $siteUrl))
             ->when($siteUrl === '' && $request->filled('site_id'), fn ($query) => $query->whereKey($request->integer('site_id')))
-            ->when($siteUrl === '' && !$request->filled('site_id'), fn ($query) => $query->where('is_default', true))
+            ->when($siteUrl === '' && ! $request->filled('site_id'), fn ($query) => $query->where('is_default', true))
             ->first();
     }
 

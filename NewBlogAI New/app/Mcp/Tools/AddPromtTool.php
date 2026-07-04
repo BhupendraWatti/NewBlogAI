@@ -2,12 +2,12 @@
 
 namespace App\Mcp\Tools;
 
+use App\Models\Promt;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
-use App\Models\Promt;
 
 #[Description('Add a new prompt template or update an existing prompt template.')]
 class AddPromtTool extends Tool

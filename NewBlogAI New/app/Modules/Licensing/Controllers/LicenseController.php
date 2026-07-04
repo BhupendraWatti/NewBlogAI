@@ -25,15 +25,15 @@ class LicenseController extends Controller
             $request->input('domain')
         );
 
-        if (!$result['valid']) {
+        if (! $result['valid']) {
             return response()->json([
-                'status'  => 'error',
-                'message' => $result['reason']
+                'status' => 'error',
+                'message' => $result['reason'],
             ], 403);
         }
 
         return response()->json([
-            'status'     => 'success',
+            'status' => 'success',
             'expires_at' => $result['expires_at'],
         ]);
     }
@@ -51,15 +51,15 @@ class LicenseController extends Controller
             );
 
             return response()->json([
-                'status'      => 'success',
-                'message'     => 'License key activated successfully.',
+                'status' => 'success',
+                'message' => 'License key activated successfully.',
                 'license_key' => $license->license_key,
-                'expires_at'  => $license->expires_at ? $license->expires_at->toIso8601String() : null,
+                'expires_at' => $license->expires_at ? $license->expires_at->toIso8601String() : null,
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'status'  => 'error',
-                'message' => $e->getMessage()
+                'status' => 'error',
+                'message' => $e->getMessage(),
             ], 422);
         }
     }
@@ -76,13 +76,13 @@ class LicenseController extends Controller
             );
 
             return response()->json([
-                'status'  => 'success',
-                'message' => 'License key deactivated successfully.'
+                'status' => 'success',
+                'message' => 'License key deactivated successfully.',
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'status'  => 'error',
-                'message' => $e->getMessage()
+                'status' => 'error',
+                'message' => $e->getMessage(),
             ], 422);
         }
     }

@@ -8,6 +8,7 @@ use App\Modules\TopicManager\Models\Topic;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Cache;
 
 class GeneratedContent extends Model
 {
@@ -50,13 +51,13 @@ class GeneratedContent extends Model
     protected static function booted()
     {
         static::saved(function () {
-            \Illuminate\Support\Facades\Cache::forget('analytics_content_stats');
-            \Illuminate\Support\Facades\Cache::forget('analytics_ai_stats');
+            Cache::forget('analytics_content_stats');
+            Cache::forget('analytics_ai_stats');
         });
 
         static::deleted(function () {
-            \Illuminate\Support\Facades\Cache::forget('analytics_content_stats');
-            \Illuminate\Support\Facades\Cache::forget('analytics_ai_stats');
+            Cache::forget('analytics_content_stats');
+            Cache::forget('analytics_ai_stats');
         });
     }
 }

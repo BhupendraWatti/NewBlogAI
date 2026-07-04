@@ -2,9 +2,9 @@
 
 namespace App\Modules\SiteManager\Jobs;
 
+use App\Modules\SiteManager\Events\SiteSyncTriggered;
 use App\Modules\SiteManager\Models\Site;
 use App\Modules\SiteManager\Services\WPClientService;
-use App\Modules\SiteManager\Events\SiteSyncTriggered;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -63,8 +63,8 @@ class SyncSiteDataJob implements ShouldQueue
             $clientService->sync($this->site);
             Log::info("SyncSiteDataJob successfully completed for Site ID: {$this->site->id}");
         } catch (\Exception $e) {
-            Log::error("SyncSiteDataJob failed for Site ID: {$this->site->id}. Error: " . $e->getMessage());
-            
+            Log::error("SyncSiteDataJob failed for Site ID: {$this->site->id}. Error: ".$e->getMessage());
+
             // Re-throw to trigger retry mechanism if attempts remain
             throw $e;
         }

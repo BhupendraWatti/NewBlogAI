@@ -12,13 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('sites', function (Blueprint $table) {
-            if (!Schema::hasColumn('sites', 'status')) {
+            if (! Schema::hasColumn('sites', 'status')) {
                 $table->string('status')->default('disconnected')->after('is_active'); // connected, disconnected, error
             }
-            if (!Schema::hasColumn('sites', 'plugin_version')) {
+            if (! Schema::hasColumn('sites', 'plugin_version')) {
                 $table->string('plugin_version')->nullable()->after('status');
             }
-            if (!Schema::hasColumn('sites', 'is_default')) {
+            if (! Schema::hasColumn('sites', 'is_default')) {
                 $table->boolean('is_default')->default(false)->after('plugin_version');
             }
 

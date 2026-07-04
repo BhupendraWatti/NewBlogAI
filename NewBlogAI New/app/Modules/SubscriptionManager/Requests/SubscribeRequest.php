@@ -14,9 +14,9 @@ class SubscribeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'plan_id'        => ['required', 'exists:plans,id'],
+            'plan_id' => ['required', 'exists:plans,id'],
             'billing_period' => ['required', 'string', 'in:monthly,yearly'],
-            'payment_token'  => ['nullable', 'string'] // Stub token for commented payment gateway flow
+            'payment_token' => ['nullable', 'string'], // Stub token for commented payment gateway flow
         ];
     }
 }

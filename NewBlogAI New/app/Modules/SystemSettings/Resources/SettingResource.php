@@ -10,7 +10,7 @@ class SettingResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'key'   => $this->key,
+            'key' => $this->key,
             'value' => $this->value,
         ];
     }

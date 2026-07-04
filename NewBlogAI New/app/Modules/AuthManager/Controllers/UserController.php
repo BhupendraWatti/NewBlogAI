@@ -26,7 +26,7 @@ class UserController extends Controller
         if ($request->filled('search')) {
             $search = $request->input('search');
             $query->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                ->orWhere('email', 'like', "%{$search}%");
         }
 
         if ($request->filled('role')) {
@@ -48,8 +48,8 @@ class UserController extends Controller
 
         // Audit Log
         AuditLog::create([
-            'user_id'    => Auth::id(),
-            'event'      => 'user_created',
+            'user_id' => Auth::id(),
+            'event' => 'user_created',
             'new_values' => ['user_id' => $user->id, 'email' => $user->email],
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
@@ -66,6 +66,7 @@ class UserController extends Controller
     public function show(string $id): UserResource
     {
         $user = User::findOrFail($id);
+
         return new UserResource($user);
     }
 
@@ -77,7 +78,7 @@ class UserController extends Controller
         $user = User::findOrFail($id);
         $data = $request->validated();
 
-        if (!empty($data['password'])) {
+        if (! empty($data['password'])) {
             $data['password'] = Hash::make($data['password']);
         } else {
             unset($data['password']);
@@ -88,8 +89,8 @@ class UserController extends Controller
 
         // Audit Log
         AuditLog::create([
-            'user_id'    => Auth::id(),
-            'event'      => 'user_updated',
+            'user_id' => Auth::id(),
+            'event' => 'user_updated',
             'old_values' => $oldValues,
             'new_values' => $user->only(['name', 'email', 'role']),
             'ip_address' => $request->ip(),
@@ -115,8 +116,8 @@ class UserController extends Controller
 
         // Audit Log
         AuditLog::create([
-            'user_id'    => Auth::id(),
-            'event'      => 'user_deleted',
+            'user_id' => Auth::id(),
+            'event' => 'user_deleted',
             'old_values' => $oldValues,
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),

@@ -22,19 +22,21 @@ class OpenRouterDriver implements AIProviderClientInterface
                 ->post('https://openrouter.ai/api/v1/chat/completions', [
                     'model' => $model,
                     'messages' => [
-                        ['role' => 'user', 'content' => 'ping']
+                        ['role' => 'user', 'content' => 'ping'],
                     ],
-                    'max_tokens' => 5
+                    'max_tokens' => 5,
                 ]);
 
             if ($response->successful()) {
                 return true;
             }
 
-            Log::warning("OpenRouter test connection failed with status {$response->status()}: " . $response->body());
+            Log::warning("OpenRouter test connection failed with status {$response->status()}: ".$response->body());
+
             return false;
         } catch (\Exception $e) {
-            Log::error("OpenRouter test connection exception: " . $e->getMessage());
+            Log::error('OpenRouter test connection exception: '.$e->getMessage());
+
             return false;
         }
     }
@@ -51,16 +53,16 @@ class OpenRouterDriver implements AIProviderClientInterface
                 ])
                 ->timeout($options['timeout'] ?? 30)
                 ->post('https://openrouter.ai/api/v1/chat/completions', [
-                    'model'       => $model,
-                    'messages'    => [
-                        ['role' => 'user', 'content' => $prompt]
+                    'model' => $model,
+                    'messages' => [
+                        ['role' => 'user', 'content' => $prompt],
                     ],
                     'temperature' => $options['temperature'] ?? 0.7,
-                    'max_tokens'  => $options['max_tokens'] ?? 2000,
+                    'max_tokens' => $options['max_tokens'] ?? 2000,
                 ]);
 
-            if (!$response->successful()) {
-                throw new \RuntimeException("OpenRouter API error: Status {$response->status()} - " . $response->body());
+            if (! $response->successful()) {
+                throw new \RuntimeException("OpenRouter API error: Status {$response->status()} - ".$response->body());
             }
 
             $data = $response->json();
@@ -74,16 +76,16 @@ class OpenRouterDriver implements AIProviderClientInterface
             $cost = (($promptTokens * 0.0005) + ($completionTokens * 0.0015)) / 1000;
 
             return [
-                'text'              => $text,
-                'prompt_tokens'     => $promptTokens,
+                'text' => $text,
+                'prompt_tokens' => $promptTokens,
                 'completion_tokens' => $completionTokens,
-                'total_tokens'      => $totalTokens,
-                'estimated_cost'    => $cost,
-                'raw_response'      => $data,
+                'total_tokens' => $totalTokens,
+                'estimated_cost' => $cost,
+                'raw_response' => $data,
             ];
 
         } catch (\Exception $e) {
-            Log::error("OpenRouter generation failed: " . $e->getMessage());
+            Log::error('OpenRouter generation failed: '.$e->getMessage());
             throw $e;
         }
     }

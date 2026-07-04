@@ -2,19 +2,19 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Queue;
-use Illuminate\Queue\Events\JobProcessing;
-use Illuminate\Queue\Events\JobProcessed;
-use Illuminate\Queue\Events\JobFailed;
-use App\Modules\Operations\Models\JobLog;
 use App\Modules\CustomerManager\Models\Customer;
 use App\Modules\CustomerManager\Policies\CustomerPolicy;
+use App\Modules\Operations\Models\JobLog;
 use App\Modules\SubscriptionManager\Contracts\PaymentGatewayInterface;
-use App\Modules\SubscriptionManager\Services\PaymentGatewayStub;
 use App\Modules\SubscriptionManager\Models\Subscription;
 use App\Modules\SubscriptionManager\Policies\SubscriptionPolicy;
+use App\Modules\SubscriptionManager\Services\PaymentGatewayStub;
+use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Queue\Events\JobProcessed;
+use Illuminate\Queue\Events\JobProcessing;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -36,37 +36,37 @@ class AppServiceProvider extends ServiceProvider
 
         // Queue Event Listeners for Operational Monitoring
         Queue::before(function (JobProcessing $event) {
-            $jobId = $event->job->getJobId() ?: $event->job->resolveName() . ':' . $event->job->getQueue();
+            $jobId = $event->job->getJobId() ?: $event->job->resolveName().':'.$event->job->getQueue();
             JobLog::updateOrCreate(
                 ['job_id' => $jobId],
                 [
-                    'name'       => $event->job->resolveName(),
-                    'queue'      => $event->job->getQueue(),
-                    'status'     => 'processing',
-                    'attempts'   => $event->job->attempts(),
+                    'name' => $event->job->resolveName(),
+                    'queue' => $event->job->getQueue(),
+                    'status' => 'processing',
+                    'attempts' => $event->job->attempts(),
                     'started_at' => now(),
                 ]
             );
         });
 
         Queue::after(function (JobProcessed $event) {
-            $jobId = $event->job->getJobId() ?: $event->job->resolveName() . ':' . $event->job->getQueue();
+            $jobId = $event->job->getJobId() ?: $event->job->resolveName().':'.$event->job->getQueue();
             JobLog::updateOrCreate(
                 ['job_id' => $jobId],
                 [
-                    'status'       => 'completed',
+                    'status' => 'completed',
                     'completed_at' => now(),
                 ]
             );
         });
 
         Queue::failing(function (JobFailed $event) {
-            $jobId = $event->job->getJobId() ?: $event->job->resolveName() . ':' . $event->job->getQueue();
+            $jobId = $event->job->getJobId() ?: $event->job->resolveName().':'.$event->job->getQueue();
             JobLog::updateOrCreate(
                 ['job_id' => $jobId],
                 [
-                    'status'       => 'failed',
-                    'exception'    => $event->exception->getMessage(),
+                    'status' => 'failed',
+                    'exception' => $event->exception->getMessage(),
                     'completed_at' => now(),
                 ]
             );

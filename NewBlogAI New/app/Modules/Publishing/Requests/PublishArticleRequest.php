@@ -15,8 +15,8 @@ class PublishArticleRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'site_id'      => ['nullable', 'integer', 'exists:sites,id'],
-            'wp_status'    => ['sometimes', 'required', 'string', 'in:draft,publish,pending,future'],
+            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'wp_status' => ['sometimes', 'required', 'string', 'in:draft,publish,pending,future'],
             'scheduled_at' => ['nullable', 'date', 'after:now'],
         ];
     }

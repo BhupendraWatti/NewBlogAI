@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (Schema::hasTable('users') && !Schema::hasColumn('users', 'role')) {
+        if (Schema::hasTable('users') && ! Schema::hasColumn('users', 'role')) {
             Schema::table('users', function (Blueprint $table) {
                 $table->tinyInteger('role')->default(3)->after('password'); // 1 = Super Admin, 2 = Admin, 3 = Support / Partner
             });

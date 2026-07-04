@@ -3,8 +3,6 @@
 namespace App\Modules\SubscriptionManager\Policies;
 
 use App\Models\User;
-use App\Modules\SubscriptionManager\Models\Plan;
-use App\Modules\SubscriptionManager\Models\Subscription;
 
 class SubscriptionPolicy
 {

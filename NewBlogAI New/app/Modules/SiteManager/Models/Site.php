@@ -2,10 +2,14 @@
 
 namespace App\Modules\SiteManager\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use App\Models\Promt;
+use App\Modules\ContentPipeline\Models\ContentPipeline;
+use App\Modules\CustomerManager\Models\Customer;
+use App\Modules\ScheduleManager\Models\PublishingSchedule;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Cache;
 
 class Site extends Model
 {
@@ -24,8 +28,7 @@ class Site extends Model
         'is_default',
         'last_synced_at',
         'last_sync_status',
-        'error_log'
-        ,'publishing_mode',
+        'error_log', 'publishing_mode',
         'category_mapping',
         'sync_settings',
         'timezone',
@@ -58,29 +61,29 @@ class Site extends Model
 
     public function customer(): BelongsTo
     {
-        return $this->belongsTo(\App\Modules\CustomerManager\Models\Customer::class, 'customer_id');
+        return $this->belongsTo(Customer::class, 'customer_id');
     }
 
     public function pipelines(): HasMany
     {
-        return $this->hasMany(\App\Modules\ContentPipeline\Models\ContentPipeline::class, 'site_id');
+        return $this->hasMany(ContentPipeline::class, 'site_id');
     }
 
     public function schedules(): HasMany
     {
-        return $this->hasMany(\App\Modules\ScheduleManager\Models\PublishingSchedule::class, 'site_id');
+        return $this->hasMany(PublishingSchedule::class, 'site_id');
     }
 
     protected static function booted()
     {
         static::saved(function () {
-            \Illuminate\Support\Facades\Cache::forget('analytics_content_stats');
-            \Illuminate\Support\Facades\Cache::forget('analytics_ai_stats');
+            Cache::forget('analytics_content_stats');
+            Cache::forget('analytics_ai_stats');
         });
 
         static::deleted(function () {
-            \Illuminate\Support\Facades\Cache::forget('analytics_content_stats');
-            \Illuminate\Support\Facades\Cache::forget('analytics_ai_stats');
+            Cache::forget('analytics_content_stats');
+            Cache::forget('analytics_ai_stats');
         });
     }
 }

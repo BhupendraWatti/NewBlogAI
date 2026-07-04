@@ -17,12 +17,12 @@ class CustomerActivity extends Model
         'user_id',
         'event_type',
         'description',
-        'properties'
+        'properties',
     ];
 
     protected $casts = [
         'properties' => 'array',
-        'created_at' => 'datetime'
+        'created_at' => 'datetime',
     ];
 
     /**

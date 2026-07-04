@@ -23,15 +23,17 @@ Route::get('/login', function () {
     if (auth()->check()) {
         return redirect('/');
     }
+
     return view('login');
 })->name('login');
 
 foreach ($workspaces as $workspace) {
     $path = $workspace === 'dashboard' ? '/' : "/{$workspace}";
     Route::get($path, function () {
-        if (app()->environment() !== 'testing' && !auth()->check()) {
+        if (app()->environment() !== 'testing' && ! auth()->check()) {
             abort(401);
         }
+
         return view('dashboard');
     })->name($workspace);
 }

@@ -49,17 +49,17 @@ class CustomerDTO
     {
         return [
             'company_name' => $this->companyName,
-            'owner_name'   => $this->ownerName,
-            'email'        => $this->email,
-            'phone'        => $this->phone,
-            'country'      => $this->country,
-            'timezone'     => $this->timezone,
-            'language'     => $this->language,
+            'owner_name' => $this->ownerName,
+            'email' => $this->email,
+            'phone' => $this->phone,
+            'country' => $this->country,
+            'timezone' => $this->timezone,
+            'language' => $this->language,
             'company_logo' => $this->companyLogo,
-            'website'      => $this->website,
-            'industry'     => $this->industry,
-            'status'       => $this->status,
-            'tags'         => $this->tags
+            'website' => $this->website,
+            'industry' => $this->industry,
+            'status' => $this->status,
+            'tags' => $this->tags,
         ];
     }
 }

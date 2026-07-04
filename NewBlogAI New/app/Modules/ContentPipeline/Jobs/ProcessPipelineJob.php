@@ -2,8 +2,8 @@
 
 namespace App\Modules\ContentPipeline\Jobs;
 
-use App\Modules\ContentPipeline\Models\PipelineRun;
 use App\Modules\ContentGeneration\Services\ContentGenerationService;
+use App\Modules\ContentPipeline\Models\PipelineRun;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -28,8 +28,9 @@ class ProcessPipelineJob implements ShouldQueue
     public function handle(ContentGenerationService $generationService): void
     {
         $run = PipelineRun::with('pipeline')->find($this->runId);
-        if (!$run || !$run->pipeline) {
+        if (! $run || ! $run->pipeline) {
             Log::error("ProcessPipelineJob failed: Run ID {$this->runId} or associated pipeline not found.");
+
             return;
         }
 
@@ -37,6 +38,7 @@ class ProcessPipelineJob implements ShouldQueue
 
         if ($run->status === 'cancelled') {
             Log::info("ProcessPipelineJob ID {$this->runId} execution was cancelled. Aborting.");
+
             return;
         }
 
@@ -56,7 +58,7 @@ class ProcessPipelineJob implements ShouldQueue
             Log::info("Content Pipeline ID {$pipeline->id} completed successfully via Generation Engine.");
 
         } catch (\Exception $e) {
-            Log::error("Content Pipeline execution failed: " . $e->getMessage());
+            Log::error('Content Pipeline execution failed: '.$e->getMessage());
 
             $run->update([
                 'status' => 'failed',

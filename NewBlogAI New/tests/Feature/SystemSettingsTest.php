@@ -14,6 +14,7 @@ class SystemSettingsTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected User $support;
 
     protected function setUp(): void
@@ -21,16 +22,16 @@ class SystemSettingsTest extends TestCase
         parent::setUp();
 
         $this->admin = User::create([
-            'name'     => 'Admin User',
-            'email'    => 'admin@example.com',
+            'name' => 'Admin User',
+            'email' => 'admin@example.com',
             'password' => bcrypt('password'),
         ]);
         $this->admin->role = 2; // Admin
         $this->admin->save();
 
         $this->support = User::create([
-            'name'     => 'Support User',
-            'email'    => 'support@example.com',
+            'name' => 'Support User',
+            'email' => 'support@example.com',
             'password' => bcrypt('password'),
         ]);
         $this->support->role = 3; // Support
@@ -53,11 +54,11 @@ class SystemSettingsTest extends TestCase
     {
         $response = $this->actingAs($this->admin)
             ->postJson('/api/v1/settings', [
-                'currency'            => 'INR',
-                'timezone'            => 'Asia/Kolkata',
-                'language'            => 'hi',
+                'currency' => 'INR',
+                'timezone' => 'Asia/Kolkata',
+                'language' => 'hi',
                 'ai_default_provider' => 'gemini',
-                'ai_default_model'    => 'gemini-2.0-flash',
+                'ai_default_model' => 'gemini-2.0-flash',
             ]);
 
         $response->assertStatus(200)
@@ -67,7 +68,7 @@ class SystemSettingsTest extends TestCase
 
         $this->assertDatabaseHas('settings', [
             'key' => 'currency',
-            'value' => json_encode('INR')
+            'value' => json_encode('INR'),
         ]);
     }
 
@@ -83,7 +84,7 @@ class SystemSettingsTest extends TestCase
 
     public function test_settings_are_cached_centrally(): void
     {
-        $service = new SystemSettingsService();
+        $service = new SystemSettingsService;
 
         // Fresh retrieval triggers DB hit
         $val1 = $service->get('currency', 'USD');

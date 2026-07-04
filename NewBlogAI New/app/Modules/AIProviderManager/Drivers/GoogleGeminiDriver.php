@@ -18,23 +18,25 @@ class GoogleGeminiDriver implements AIProviderClientInterface
                 'contents' => [
                     [
                         'parts' => [
-                            ['text' => 'ping']
-                        ]
-                    ]
+                            ['text' => 'ping'],
+                        ],
+                    ],
                 ],
                 'generationConfig' => [
-                    'maxOutputTokens' => 5
-                ]
+                    'maxOutputTokens' => 5,
+                ],
             ]);
 
             if ($response->successful()) {
                 return true;
             }
 
-            Log::warning("Gemini test connection failed with status {$response->status()}: " . $response->body());
+            Log::warning("Gemini test connection failed with status {$response->status()}: ".$response->body());
+
             return false;
         } catch (\Exception $e) {
-            Log::error("Gemini test connection exception: " . $e->getMessage());
+            Log::error('Gemini test connection exception: '.$e->getMessage());
+
             return false;
         }
     }
@@ -49,23 +51,23 @@ class GoogleGeminiDriver implements AIProviderClientInterface
                 'contents' => [
                     [
                         'parts' => [
-                            ['text' => $prompt]
-                        ]
-                    ]
+                            ['text' => $prompt],
+                        ],
+                    ],
                 ],
                 'generationConfig' => [
-                    'temperature'     => $options['temperature'] ?? 0.7,
+                    'temperature' => $options['temperature'] ?? 0.7,
                     'maxOutputTokens' => $options['max_tokens'] ?? 2048,
-                ]
+                ],
             ]);
 
-            if (!$response->successful()) {
-                throw new \RuntimeException("Gemini API error: Status {$response->status()} - " . $response->body());
+            if (! $response->successful()) {
+                throw new \RuntimeException("Gemini API error: Status {$response->status()} - ".$response->body());
             }
 
             $data = $response->json();
             $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
-            
+
             // Gemini beta has usageMetadata
             $usage = $data['usageMetadata'] ?? [];
             $promptTokens = $usage['promptTokenCount'] ?? 0;
@@ -79,16 +81,16 @@ class GoogleGeminiDriver implements AIProviderClientInterface
             $cost = (($promptTokens * $promptRate) + ($completionTokens * $completionRate)) / 1000;
 
             return [
-                'text'              => $text,
-                'prompt_tokens'     => $promptTokens,
+                'text' => $text,
+                'prompt_tokens' => $promptTokens,
                 'completion_tokens' => $completionTokens,
-                'total_tokens'      => $totalTokens,
-                'estimated_cost'    => $cost,
-                'raw_response'      => $data,
+                'total_tokens' => $totalTokens,
+                'estimated_cost' => $cost,
+                'raw_response' => $data,
             ];
 
         } catch (\Exception $e) {
-            Log::error("Gemini generation failed: " . $e->getMessage());
+            Log::error('Gemini generation failed: '.$e->getMessage());
             throw $e;
         }
     }

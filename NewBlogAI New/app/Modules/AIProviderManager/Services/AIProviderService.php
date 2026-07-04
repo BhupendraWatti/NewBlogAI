@@ -22,13 +22,13 @@ class AIProviderService
     public function getDriver(string $providerKey): AIProviderClientInterface
     {
         return match (strtolower($providerKey)) {
-            'gemini'     => new GoogleGeminiDriver(),
-            'openai'     => new OpenAIDriver(),
-            'claude'     => new ClaudeDriver(),
-            'groq'       => new GroqDriver(),
-            'openrouter' => new OpenRouterDriver(),
-            'ollama'     => new OllamaDriver(),
-            default      => throw new InvalidArgumentException("Unsupported AI provider client: {$providerKey}"),
+            'gemini' => new GoogleGeminiDriver,
+            'openai' => new OpenAIDriver,
+            'claude' => new ClaudeDriver,
+            'groq' => new GroqDriver,
+            'openrouter' => new OpenRouterDriver,
+            'ollama' => new OllamaDriver,
+            default => throw new InvalidArgumentException("Unsupported AI provider client: {$providerKey}"),
         };
     }
 
@@ -40,15 +40,15 @@ class AIProviderService
         try {
             return DB::transaction(function () use ($data) {
                 // If this is set as default, unset others first
-                if (!empty($data['is_default'])) {
+                if (! empty($data['is_default'])) {
                     AIProvider::where('is_default', true)->update(['is_default' => false]);
                 }
 
                 return AIProvider::create($data);
             });
         } catch (\Exception $e) {
-            Log::error("Failed to create AI provider: " . $e->getMessage());
-            throw new \RuntimeException("Could not save AI provider.", 0, $e);
+            Log::error('Failed to create AI provider: '.$e->getMessage());
+            throw new \RuntimeException('Could not save AI provider.', 0, $e);
         }
     }
 
@@ -63,18 +63,19 @@ class AIProviderService
                     unset($data['api_key']);
                 }
 
-                if (!empty($data['is_default'])) {
+                if (! empty($data['is_default'])) {
                     AIProvider::where('id', '!=', $provider->id)
                         ->where('is_default', true)
                         ->update(['is_default' => false]);
                 }
 
                 $provider->update($data);
+
                 return $provider;
             });
         } catch (\Exception $e) {
-            Log::error("Failed to update AI provider: " . $e->getMessage());
-            throw new \RuntimeException("Could not update AI provider configuration.", 0, $e);
+            Log::error('Failed to update AI provider: '.$e->getMessage());
+            throw new \RuntimeException('Could not update AI provider configuration.', 0, $e);
         }
     }
 
@@ -83,11 +84,12 @@ class AIProviderService
      */
     public function toggleStatus(AIProvider $provider, bool $isEnabled): AIProvider
     {
-        if (!$isEnabled && $provider->is_default) {
-            throw new InvalidArgumentException("Cannot disable the default AI provider. Set another default provider first.");
+        if (! $isEnabled && $provider->is_default) {
+            throw new InvalidArgumentException('Cannot disable the default AI provider. Set another default provider first.');
         }
 
         $provider->update(['is_enabled' => $isEnabled]);
+
         return $provider;
     }
 
@@ -96,19 +98,20 @@ class AIProviderService
      */
     public function setDefault(AIProvider $provider): AIProvider
     {
-        if (!$provider->is_enabled) {
-            throw new InvalidArgumentException("Cannot set a disabled provider as default.");
+        if (! $provider->is_enabled) {
+            throw new InvalidArgumentException('Cannot set a disabled provider as default.');
         }
 
         try {
             return DB::transaction(function () use ($provider) {
                 AIProvider::where('is_default', true)->update(['is_default' => false]);
                 $provider->update(['is_default' => true]);
+
                 return $provider;
             });
         } catch (\Exception $e) {
-            Log::error("Failed to set default provider: " . $e->getMessage());
-            throw new \RuntimeException("Could not mark AI provider as default.", 0, $e);
+            Log::error('Failed to set default provider: '.$e->getMessage());
+            throw new \RuntimeException('Could not mark AI provider as default.', 0, $e);
         }
     }
 
@@ -118,6 +121,7 @@ class AIProviderService
     public function testConnection(string $providerKey, string $apiKey, ?string $model = null): bool
     {
         $driver = $this->getDriver($providerKey);
+
         return $driver->testConnection($apiKey, $model);
     }
 }

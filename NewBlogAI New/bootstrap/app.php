@@ -1,9 +1,10 @@
 <?php
 
+use App\Modules\AuthManager\Middleware\RequireRole;
+use App\Modules\SubscriptionManager\Exceptions\EntitlementDeniedException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use App\Modules\SubscriptionManager\Exceptions\EntitlementDeniedException;
 use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -15,12 +16,12 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'role' => \App\Modules\AuthManager\Middleware\RequireRole::class,
+            'role' => RequireRole::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (EntitlementDeniedException $exception, Request $request) {
-            if (!$request->expectsJson()) {
+            if (! $request->expectsJson()) {
                 return null;
             }
 

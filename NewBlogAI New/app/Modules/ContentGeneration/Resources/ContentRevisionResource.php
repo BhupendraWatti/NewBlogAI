@@ -10,12 +10,12 @@ class ContentRevisionResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id'                   => $this->id,
+            'id' => $this->id,
             'generated_content_id' => $this->generated_content_id,
-            'title'                => $this->title,
-            'content'              => $this->content,
-            'user_id'              => $this->user_id,
-            'created_at'           => $this->created_at,
+            'title' => $this->title,
+            'content' => $this->content,
+            'user_id' => $this->user_id,
+            'created_at' => $this->created_at,
         ];
     }
 }

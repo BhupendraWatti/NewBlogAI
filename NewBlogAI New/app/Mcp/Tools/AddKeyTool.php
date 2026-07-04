@@ -2,12 +2,12 @@
 
 namespace App\Mcp\Tools;
 
+use App\Models\keys;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
-use App\Models\keys;
 
 #[Description('Add a new API key or update an existing API key.')]
 class AddKeyTool extends Tool
@@ -36,7 +36,7 @@ class AddKeyTool extends Tool
             "Successfully saved API key!\nID: %d\nName: %s\nKey: %s",
             $key->id,
             $key->name,
-            $key->key ? substr($key->key, 0, 4) . '***' : 'None'
+            $key->key ? substr($key->key, 0, 4).'***' : 'None'
         ));
     }
 

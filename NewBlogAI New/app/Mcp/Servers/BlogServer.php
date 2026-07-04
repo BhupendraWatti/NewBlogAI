@@ -2,6 +2,15 @@
 
 namespace App\Mcp\Servers;
 
+use App\Mcp\Tools\AddKeyTool;
+use App\Mcp\Tools\AddPromtTool;
+use App\Mcp\Tools\AddSiteTool;
+use App\Mcp\Tools\AddTopicTool;
+use App\Mcp\Tools\ListKeysTool;
+use App\Mcp\Tools\ListPromtsTool;
+use App\Mcp\Tools\ListSitesTool;
+use App\Mcp\Tools\ListTopicsTool;
+use App\Mcp\Tools\SyncSiteTopicsTool;
 use Laravel\Mcp\Server;
 use Laravel\Mcp\Server\Attributes\Instructions;
 use Laravel\Mcp\Server\Attributes\Name;
@@ -13,15 +22,15 @@ use Laravel\Mcp\Server\Attributes\Version;
 class BlogServer extends Server
 {
     protected array $tools = [
-        \App\Mcp\Tools\ListSitesTool::class,
-        \App\Mcp\Tools\AddSiteTool::class,
-        \App\Mcp\Tools\SyncSiteTopicsTool::class,
-        \App\Mcp\Tools\ListTopicsTool::class,
-        \App\Mcp\Tools\AddTopicTool::class,
-        \App\Mcp\Tools\ListPromtsTool::class,
-        \App\Mcp\Tools\AddPromtTool::class,
-        \App\Mcp\Tools\ListKeysTool::class,
-        \App\Mcp\Tools\AddKeyTool::class,
+        ListSitesTool::class,
+        AddSiteTool::class,
+        SyncSiteTopicsTool::class,
+        ListTopicsTool::class,
+        AddTopicTool::class,
+        ListPromtsTool::class,
+        AddPromtTool::class,
+        ListKeysTool::class,
+        AddKeyTool::class,
     ];
 
     protected array $resources = [

@@ -48,7 +48,7 @@ return new class extends Migration
                 'generation_frequency',
                 'tags',
                 'prompt_id',
-                'deleted_at'
+                'deleted_at',
             ]);
         });
     }

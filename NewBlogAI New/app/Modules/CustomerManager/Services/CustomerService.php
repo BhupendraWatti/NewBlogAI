@@ -4,13 +4,14 @@ namespace App\Modules\CustomerManager\Services;
 
 use App\Modules\CustomerManager\DTOs\CustomerDTO;
 use App\Modules\CustomerManager\Models\Customer;
-use App\Modules\CustomerManager\Models\CustomerNote;
 use App\Modules\CustomerManager\Models\CustomerActivity;
+use App\Modules\CustomerManager\Models\CustomerNote;
 use App\Modules\CustomerManager\Repositories\CustomerRepository;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class CustomerService
 {
@@ -25,7 +26,7 @@ class CustomerService
     {
         // Fail Fast invariant checks
         if (empty($dto->companyName) || empty($dto->email)) {
-            throw new \InvalidArgumentException("Company name and email address are required fields.");
+            throw new \InvalidArgumentException('Company name and email address are required fields.');
         }
 
         try {
@@ -36,27 +37,27 @@ class CustomerService
                 if ($dto->notes) {
                     CustomerNote::create([
                         'customer_id' => $customer->id,
-                        'user_id'     => Auth::id() ?? 1, // Fallback to System ID if CLI/Seeder
-                        'content'     => $dto->notes
+                        'user_id' => Auth::id() ?? 1, // Fallback to System ID if CLI/Seeder
+                        'content' => $dto->notes,
                     ]);
 
                     CustomerActivity::create([
                         'customer_id' => $customer->id,
-                        'user_id'     => Auth::id(),
-                        'event_type'  => 'note_added',
-                        'description' => "Initial configuration note registered.",
-                        'properties'  => ['content' => $dto->notes]
+                        'user_id' => Auth::id(),
+                        'event_type' => 'note_added',
+                        'description' => 'Initial configuration note registered.',
+                        'properties' => ['content' => $dto->notes],
                     ]);
                 }
 
                 return $customer;
             });
         } catch (\Exception $e) {
-            Log::error("Failed to register customer: " . $e->getMessage(), [
+            Log::error('Failed to register customer: '.$e->getMessage(), [
                 'dto' => $dto->toArray(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            throw new \RuntimeException("Could not register customer. System encountered a database error: " . $e->getMessage(), 0, $e);
+            throw new \RuntimeException('Could not register customer. System encountered a database error: '.$e->getMessage(), 0, $e);
         }
     }
 
@@ -66,15 +67,15 @@ class CustomerService
     public function updateCustomer(string $id, array $data): Customer
     {
         $customer = $this->repository->find($id);
-        if (!$customer) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Customer record with ID '{$id}' does not exist.");
+        if (! $customer) {
+            throw new ModelNotFoundException("Customer record with ID '{$id}' does not exist.");
         }
 
         try {
             return $this->repository->update($customer, $data);
         } catch (\Exception $e) {
-            Log::error("Failed to update customer ID {$id}: " . $e->getMessage());
-            throw new \RuntimeException("Could not update customer. Database transaction failed.", 0, $e);
+            Log::error("Failed to update customer ID {$id}: ".$e->getMessage());
+            throw new \RuntimeException('Could not update customer. Database transaction failed.', 0, $e);
         }
     }
 
@@ -84,8 +85,8 @@ class CustomerService
     public function deleteCustomer(string $id): void
     {
         $customer = $this->repository->find($id);
-        if (!$customer) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Customer with ID '{$id}' not found.");
+        if (! $customer) {
+            throw new ModelNotFoundException("Customer with ID '{$id}' not found.");
         }
 
         $this->repository->delete($customer);
@@ -97,8 +98,8 @@ class CustomerService
     public function restoreCustomer(string $id): void
     {
         $customer = $this->repository->findTrashed($id);
-        if (!$customer) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Deleted Customer with ID '{$id}' not found in trash.");
+        if (! $customer) {
+            throw new ModelNotFoundException("Deleted Customer with ID '{$id}' not found in trash.");
         }
 
         $this->repository->restore($customer);
@@ -110,8 +111,8 @@ class CustomerService
     public function archiveCustomer(string $id): Customer
     {
         $customer = $this->repository->find($id);
-        if (!$customer) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Customer with ID '{$id}' not found.");
+        if (! $customer) {
+            throw new ModelNotFoundException("Customer with ID '{$id}' not found.");
         }
 
         return $this->repository->update($customer, ['status' => 'archived']);
@@ -123,35 +124,35 @@ class CustomerService
     public function addNote(string $customerId, string $content): CustomerNote
     {
         if (empty(trim($content))) {
-            throw new \InvalidArgumentException("Note content cannot be empty.");
+            throw new \InvalidArgumentException('Note content cannot be empty.');
         }
 
         $customer = $this->repository->find($customerId);
-        if (!$customer) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Customer with ID '{$customerId}' not found.");
+        if (! $customer) {
+            throw new ModelNotFoundException("Customer with ID '{$customerId}' not found.");
         }
 
         try {
             return DB::transaction(function () use ($customer, $content) {
                 $note = CustomerNote::create([
                     'customer_id' => $customer->id,
-                    'user_id'     => Auth::id() ?? 1,
-                    'content'     => $content
+                    'user_id' => Auth::id() ?? 1,
+                    'content' => $content,
                 ]);
 
                 CustomerActivity::create([
                     'customer_id' => $customer->id,
-                    'user_id'     => Auth::id(),
-                    'event_type'  => 'note_added',
-                    'description' => "Note added by staff member.",
-                    'properties'  => ['content' => $content]
+                    'user_id' => Auth::id(),
+                    'event_type' => 'note_added',
+                    'description' => 'Note added by staff member.',
+                    'properties' => ['content' => $content],
                 ]);
 
                 return $note;
             });
         } catch (\Exception $e) {
-            Log::error("Failed to add note to customer ID {$customerId}: " . $e->getMessage());
-            throw new \RuntimeException("Could not save note. Database error occurred.", 0, $e);
+            Log::error("Failed to add note to customer ID {$customerId}: ".$e->getMessage());
+            throw new \RuntimeException('Could not save note. Database error occurred.', 0, $e);
         }
     }
 
@@ -161,8 +162,8 @@ class CustomerService
     public function getTimeline(string $customerId, int $limit = 10): LengthAwarePaginator
     {
         $customer = $this->repository->find($customerId);
-        if (!$customer) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Customer with ID '{$customerId}' not found.");
+        if (! $customer) {
+            throw new ModelNotFoundException("Customer with ID '{$customerId}' not found.");
         }
 
         return CustomerActivity::where('customer_id', $customerId)

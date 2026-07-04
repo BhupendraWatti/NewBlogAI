@@ -19,7 +19,7 @@ class SystemSettingsController extends Controller
     public function index(): JsonResponse
     {
         return response()->json([
-            'settings' => $this->settingsService->all()
+            'settings' => $this->settingsService->all(),
         ]);
     }
 
@@ -32,7 +32,7 @@ class SystemSettingsController extends Controller
 
         return response()->json([
             'message' => 'System settings updated successfully.',
-            'settings' => $this->settingsService->all()
+            'settings' => $this->settingsService->all(),
         ]);
     }
 }

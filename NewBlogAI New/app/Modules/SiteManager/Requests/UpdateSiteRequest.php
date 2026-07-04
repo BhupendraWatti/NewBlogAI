@@ -31,22 +31,22 @@ class UpdateSiteRequest extends FormRequest
         $siteId = $this->route('site') ?? $this->route('id');
 
         return [
-            'customer_id'                => ['sometimes', 'nullable', 'uuid', 'exists:customers,id'],
-            'name'                       => ['sometimes', 'nullable', 'string', 'max:255'],
-            'domain_url'                 => ['sometimes', 'required', 'url', 'unique:sites,domain_url,' . $siteId],
-            'api_key'                    => ['nullable', 'string'],
-            'key_id'                     => ['nullable', 'exists:keys,id'],
-            'selected_topics'            => ['nullable', 'array'],
-            'selected_topics.*.topic'    => ['required', 'string'],
+            'customer_id' => ['sometimes', 'nullable', 'uuid', 'exists:customers,id'],
+            'name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'domain_url' => ['sometimes', 'required', 'url', 'unique:sites,domain_url,'.$siteId],
+            'api_key' => ['nullable', 'string'],
+            'key_id' => ['nullable', 'exists:keys,id'],
+            'selected_topics' => ['nullable', 'array'],
+            'selected_topics.*.topic' => ['required', 'string'],
             'selected_topics.*.promt_id' => ['nullable', 'integer', 'exists:promts,id'],
-            'promt_id'                   => ['nullable', 'exists:promts,id'],
-            'slot'                       => ['nullable', 'string'],
-            'is_active'                  => ['sometimes', 'boolean'],
-            'is_default'                 => ['sometimes', 'boolean'],
-            'publishing_mode'            => ['sometimes', 'string', 'in:draft,review,publish'],
-            'category_mapping'           => ['nullable', 'array'],
-            'sync_settings'              => ['nullable', 'array'],
-            'timezone'                   => ['sometimes', 'timezone'],
+            'promt_id' => ['nullable', 'exists:promts,id'],
+            'slot' => ['nullable', 'string'],
+            'is_active' => ['sometimes', 'boolean'],
+            'is_default' => ['sometimes', 'boolean'],
+            'publishing_mode' => ['sometimes', 'string', 'in:draft,review,publish'],
+            'category_mapping' => ['nullable', 'array'],
+            'sync_settings' => ['nullable', 'array'],
+            'timezone' => ['sometimes', 'timezone'],
         ];
     }
 }

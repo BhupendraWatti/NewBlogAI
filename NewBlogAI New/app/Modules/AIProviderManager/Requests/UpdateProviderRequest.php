@@ -17,11 +17,11 @@ class UpdateProviderRequest extends FormRequest
         $providerId = $this->route('provider');
 
         return [
-            'name'          => ['sometimes', 'required', 'string', 'max:255'],
-            'api_key'       => ['sometimes', 'nullable', 'string'],
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'api_key' => ['sometimes', 'nullable', 'string'],
             'default_model' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'is_default'    => ['sometimes', 'boolean'],
-            'is_enabled'    => ['sometimes', 'boolean'],
+            'is_default' => ['sometimes', 'boolean'],
+            'is_enabled' => ['sometimes', 'boolean'],
         ];
     }
 }

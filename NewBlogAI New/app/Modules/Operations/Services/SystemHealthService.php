@@ -4,10 +4,10 @@ namespace App\Modules\Operations\Services;
 
 use App\Modules\AIProviderManager\Models\AIProvider;
 use App\Modules\SiteManager\Models\Site;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class SystemHealthService
 {
@@ -17,12 +17,12 @@ class SystemHealthService
     public function getSystemHealth(): array
     {
         return [
-            'status'     => $this->overallStatus(),
-            'timestamp'  => now()->toIso8601String(),
-            'database'   => $this->checkDatabase(),
-            'cache'      => $this->checkCache(),
-            'storage'    => $this->checkStorage(),
-            'websites'   => $this->checkWebsites(),
+            'status' => $this->overallStatus(),
+            'timestamp' => now()->toIso8601String(),
+            'database' => $this->checkDatabase(),
+            'cache' => $this->checkCache(),
+            'storage' => $this->checkStorage(),
+            'websites' => $this->checkWebsites(),
             'ai_engines' => $this->checkAIEngines(),
         ];
     }
@@ -34,9 +34,11 @@ class SystemHealthService
     {
         try {
             DB::connection()->getPdo();
+
             return ['status' => 'healthy', 'message' => 'Connection established.'];
         } catch (\Exception $e) {
-            Log::error("Health check - Database failed: " . $e->getMessage());
+            Log::error('Health check - Database failed: '.$e->getMessage());
+
             return ['status' => 'unhealthy', 'message' => $e->getMessage()];
         }
     }
@@ -47,7 +49,7 @@ class SystemHealthService
     protected function checkCache(): array
     {
         try {
-            $testKey = 'health_ping_' . uniqid();
+            $testKey = 'health_ping_'.uniqid();
             Cache::put($testKey, 'pong', 10);
             $val = Cache::get($testKey);
             Cache::forget($testKey);
@@ -58,7 +60,8 @@ class SystemHealthService
 
             return ['status' => 'unhealthy', 'message' => 'Cache mismatch.'];
         } catch (\Exception $e) {
-            Log::error("Health check - Cache failed: " . $e->getMessage());
+            Log::error('Health check - Cache failed: '.$e->getMessage());
+
             return ['status' => 'unhealthy', 'message' => $e->getMessage()];
         }
     }
@@ -69,13 +72,14 @@ class SystemHealthService
     protected function checkStorage(): array
     {
         try {
-            $filename = 'health_test_' . uniqid() . '.txt';
+            $filename = 'health_test_'.uniqid().'.txt';
             Storage::disk('local')->put($filename, 'test');
             Storage::disk('local')->delete($filename);
 
             return ['status' => 'healthy', 'message' => 'Writable permissions verified.'];
         } catch (\Exception $e) {
-            Log::error("Health check - Storage failed: " . $e->getMessage());
+            Log::error('Health check - Storage failed: '.$e->getMessage());
+
             return ['status' => 'unhealthy', 'message' => $e->getMessage()];
         }
     }
@@ -90,10 +94,10 @@ class SystemHealthService
         $errors = Site::where('status', 'error')->count();
 
         return [
-            'status'    => ($errors > 0) ? 'warning' : 'healthy',
-            'total'     => $total,
+            'status' => ($errors > 0) ? 'warning' : 'healthy',
+            'total' => $total,
             'connected' => $connected,
-            'errors'    => $errors,
+            'errors' => $errors,
         ];
     }
 
@@ -106,8 +110,8 @@ class SystemHealthService
         $configured = AIProvider::where('is_enabled', true)->whereNotNull('api_key')->count();
 
         return [
-            'status'     => ($configured > 0) ? 'healthy' : 'unhealthy',
-            'enabled'    => $enabled,
+            'status' => ($configured > 0) ? 'healthy' : 'unhealthy',
+            'enabled' => $enabled,
             'configured' => $configured,
         ];
     }

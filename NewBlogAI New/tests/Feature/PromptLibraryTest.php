@@ -18,8 +18,8 @@ class PromptLibraryTest extends TestCase
         parent::setUp();
 
         $this->user = User::create([
-            'name'     => 'Test User',
-            'email'    => 'user@example.com',
+            'name' => 'Test User',
+            'email' => 'user@example.com',
             'password' => bcrypt('password'),
         ]);
         $this->user->role = 2; // Admin
@@ -30,12 +30,12 @@ class PromptLibraryTest extends TestCase
     {
         $response = $this->actingAs($this->user)
             ->postJson('/api/v1/prompts', [
-                'name'      => 'SEO Meta generator',
-                'promt'     => 'Write meta tags for @{{topic}}.',
-                'category'  => 'SEO',
+                'name' => 'SEO Meta generator',
+                'promt' => 'Write meta tags for @{{topic}}.',
+                'category' => 'SEO',
                 'variables' => ['topic'],
-                'version'   => 'v1.1',
-                'status'    => 'active',
+                'version' => 'v1.1',
+                'status' => 'active',
             ]);
 
         $response->assertStatus(201)
@@ -45,7 +45,7 @@ class PromptLibraryTest extends TestCase
             ->assertJsonPath('data.version', 'v1.1');
 
         $this->assertDatabaseHas('promts', [
-            'name'     => 'SEO Meta generator',
+            'name' => 'SEO Meta generator',
             'category' => 'SEO',
         ]);
     }
@@ -54,21 +54,21 @@ class PromptLibraryTest extends TestCase
     {
         // Seed some prompts
         Prompt::create([
-            'name'      => 'A Prompt',
-            'promt'     => 'Content A',
-            'category'  => 'Tech',
+            'name' => 'A Prompt',
+            'promt' => 'Content A',
+            'category' => 'Tech',
             'variables' => [],
-            'version'   => 'v1.0',
-            'status'    => 'active',
+            'version' => 'v1.0',
+            'status' => 'active',
         ]);
 
         Prompt::create([
-            'name'      => 'B Prompt',
-            'promt'     => 'Content B',
-            'category'  => 'Finance',
+            'name' => 'B Prompt',
+            'promt' => 'Content B',
+            'category' => 'Finance',
             'variables' => [],
-            'version'   => 'v1.0',
-            'status'    => 'inactive',
+            'version' => 'v1.0',
+            'status' => 'inactive',
         ]);
 
         // Filter by category = Tech

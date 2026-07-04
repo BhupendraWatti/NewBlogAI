@@ -14,14 +14,14 @@ class UpdatePromptRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'topic_id'    => ['sometimes', 'nullable', 'integer', 'exists:topics,id'],
-            'name'        => ['sometimes', 'required', 'string', 'max:255'],
-            'promt'       => ['sometimes', 'required', 'string'],
-            'category'    => ['sometimes', 'required', 'string', 'max:255'],
-            'variables'   => ['sometimes', 'nullable', 'array'],
+            'topic_id' => ['sometimes', 'nullable', 'integer', 'exists:topics,id'],
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'promt' => ['sometimes', 'required', 'string'],
+            'category' => ['sometimes', 'required', 'string', 'max:255'],
+            'variables' => ['sometimes', 'nullable', 'array'],
             'variables.*' => ['string'],
-            'version'     => ['sometimes', 'required', 'string', 'max:50'],
-            'status'      => ['sometimes', 'required', 'string', 'in:active,inactive'],
+            'version' => ['sometimes', 'required', 'string', 'max:50'],
+            'status' => ['sometimes', 'required', 'string', 'in:active,inactive'],
         ];
     }
 }

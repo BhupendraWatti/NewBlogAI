@@ -4,7 +4,6 @@ namespace App\Modules\CustomerManager\Repositories;
 
 use App\Modules\CustomerManager\Models\Customer;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Collection;
 
 class CustomerRepository
 {
@@ -18,8 +17,8 @@ class CustomerRepository
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('company_name', 'like', "%{$search}%")
-                  ->orWhere('owner_name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('owner_name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
@@ -60,6 +59,7 @@ class CustomerRepository
     public function update(Customer $customer, array $data): Customer
     {
         $customer->update($data);
+
         return $customer;
     }
 

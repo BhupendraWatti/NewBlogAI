@@ -16,12 +16,12 @@ class SubscriptionHistory extends Model
         'plan_id',
         'event_type', // created, upgraded, downgraded, cancelled, renewed
         'billing_period',
-        'amount_paid'
+        'amount_paid',
     ];
 
     protected $casts = [
         'amount_paid' => 'decimal:2',
-        'created_at' => 'datetime'
+        'created_at' => 'datetime',
     ];
 
     /**

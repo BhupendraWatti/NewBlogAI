@@ -31,7 +31,7 @@ class AIRequestLog extends Model
 
     protected $casts = [
         'response_metadata' => 'array',
-        'estimated_cost'    => 'float',
+        'estimated_cost' => 'float',
     ];
 
     public $timestamps = false;

@@ -19,18 +19,20 @@ class OllamaDriver implements AIProviderClientInterface
                 'prompt' => 'ping',
                 'stream' => false,
                 'options' => [
-                    'num_predict' => 5
-                ]
+                    'num_predict' => 5,
+                ],
             ]);
 
             if ($response->successful()) {
                 return true;
             }
 
-            Log::warning("Ollama test connection failed with status {$response->status()}: " . $response->body());
+            Log::warning("Ollama test connection failed with status {$response->status()}: ".$response->body());
+
             return false;
         } catch (\Exception $e) {
-            Log::error("Ollama test connection exception: " . $e->getMessage());
+            Log::error('Ollama test connection exception: '.$e->getMessage());
+
             return false;
         }
     }
@@ -42,38 +44,38 @@ class OllamaDriver implements AIProviderClientInterface
 
         try {
             $response = Http::timeout($options['timeout'] ?? 60)->post("{$host}/api/generate", [
-                'model'  => $model,
+                'model' => $model,
                 'prompt' => $prompt,
                 'stream' => false,
                 'options' => [
                     'temperature' => $options['temperature'] ?? 0.7,
                     'num_predict' => $options['max_tokens'] ?? 2048,
-                ]
+                ],
             ]);
 
-            if (!$response->successful()) {
-                throw new \RuntimeException("Ollama API error: Status {$response->status()} - " . $response->body());
+            if (! $response->successful()) {
+                throw new \RuntimeException("Ollama API error: Status {$response->status()} - ".$response->body());
             }
 
             $data = $response->json();
             $text = $data['response'] ?? '';
-            
+
             // Ollama outputs token counts directly
             $promptTokens = $data['prompt_eval_count'] ?? 0;
             $completionTokens = $data['eval_count'] ?? 0;
             $totalTokens = $promptTokens + $completionTokens;
 
             return [
-                'text'              => $text,
-                'prompt_tokens'     => $promptTokens,
+                'text' => $text,
+                'prompt_tokens' => $promptTokens,
                 'completion_tokens' => $completionTokens,
-                'total_tokens'      => $totalTokens,
-                'estimated_cost'    => 0.0, // Local processing is free!
-                'raw_response'      => $data,
+                'total_tokens' => $totalTokens,
+                'estimated_cost' => 0.0, // Local processing is free!
+                'raw_response' => $data,
             ];
 
         } catch (\Exception $e) {
-            Log::error("Ollama generation failed: " . $e->getMessage());
+            Log::error('Ollama generation failed: '.$e->getMessage());
             throw $e;
         }
     }

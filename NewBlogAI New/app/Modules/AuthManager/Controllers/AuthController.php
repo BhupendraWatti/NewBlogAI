@@ -3,9 +3,9 @@
 namespace App\Modules\AuthManager\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\AuthManager\Requests\ChangePasswordRequest;
 use App\Modules\AuthManager\Requests\LoginRequest;
 use App\Modules\AuthManager\Requests\UpdateProfileRequest;
-use App\Modules\AuthManager\Requests\ChangePasswordRequest;
 use App\Modules\AuthManager\Resources\UserResource;
 use App\Modules\AuthManager\Services\AuthService;
 use Illuminate\Http\JsonResponse;
@@ -26,7 +26,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Login successful.',
-            'user'    => new UserResource($user)
+            'user' => new UserResource($user),
         ]);
     }
 
@@ -38,7 +38,7 @@ class AuthController extends Controller
         $this->authService->logout();
 
         return response()->json([
-            'message' => 'Logout successful.'
+            'message' => 'Logout successful.',
         ]);
     }
 
@@ -60,7 +60,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Profile updated successfully.',
-            'user'    => new UserResource($updatedUser)
+            'user' => new UserResource($updatedUser),
         ]);
     }
 
@@ -77,7 +77,7 @@ class AuthController extends Controller
         );
 
         return response()->json([
-            'message' => 'Password updated successfully.'
+            'message' => 'Password updated successfully.',
         ]);
     }
 }

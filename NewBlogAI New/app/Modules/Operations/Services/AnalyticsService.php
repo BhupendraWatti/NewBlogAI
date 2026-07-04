@@ -5,6 +5,7 @@ namespace App\Modules\Operations\Services;
 use App\Modules\ContentGeneration\Models\AIRequestLog;
 use App\Modules\ContentGeneration\Models\GeneratedContent;
 use App\Modules\Publishing\Models\PublishingLog;
+use App\Modules\SiteManager\Models\Site;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -36,14 +37,14 @@ class AnalyticsService
                 ->toArray();
 
             return [
-                'total_requests'      => (int) ($aggregates->total_requests ?? 0),
+                'total_requests' => (int) ($aggregates->total_requests ?? 0),
                 'successful_requests' => (int) ($aggregates->successful_requests ?? 0),
-                'failed_requests'     => (int) ($aggregates->failed_requests ?? 0),
+                'failed_requests' => (int) ($aggregates->failed_requests ?? 0),
                 'total_prompt_tokens' => (int) ($aggregates->total_prompt_tokens ?? 0),
                 'total_completion_tokens' => (int) ($aggregates->total_completion_tokens ?? 0),
-                'total_tokens'        => (int) ($aggregates->total_tokens ?? 0),
-                'total_cost'          => (float) ($aggregates->total_cost ?? 0.0),
-                'providers'           => $providers,
+                'total_tokens' => (int) ($aggregates->total_tokens ?? 0),
+                'total_cost' => (float) ($aggregates->total_cost ?? 0.0),
+                'providers' => $providers,
             ];
         });
     }
@@ -55,7 +56,7 @@ class AnalyticsService
     {
         return Cache::remember('analytics_content_stats:'.($customerId ?? 'global'), 300, function () use ($customerId) {
             $siteIds = $customerId
-                ? \App\Modules\SiteManager\Models\Site::where('customer_id', $customerId)->pluck('id')
+                ? Site::where('customer_id', $customerId)->pluck('id')
                 : null;
             $contentQuery = GeneratedContent::query()
                 ->when($siteIds, fn ($query) => $query->whereIn('site_id', $siteIds));
@@ -63,7 +64,7 @@ class AnalyticsService
                 ->when($siteIds, fn ($query) => $query->whereIn('site_id', $siteIds));
 
             $totalArticles = (clone $contentQuery)->count();
-            
+
             $statusBreakdown = (clone $contentQuery)->select('status', DB::raw('COUNT(id) as count'))
                 ->groupBy('status')
                 ->get()
@@ -78,9 +79,9 @@ class AnalyticsService
             }
 
             return [
-                'total_articles'          => $totalArticles,
-                'status_breakdown'        => $statusBreakdown,
-                'total_publishing_runs'   => $publishingTotal,
+                'total_articles' => $totalArticles,
+                'status_breakdown' => $statusBreakdown,
+                'total_publishing_runs' => $publishingTotal,
                 'publishing_success_rate' => $publishingSuccessRate,
             ];
         });

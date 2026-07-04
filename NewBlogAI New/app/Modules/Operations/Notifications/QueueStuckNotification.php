@@ -3,8 +3,8 @@
 namespace App\Modules\Operations\Notifications;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Notifications\Notification;
 
 class QueueStuckNotification extends Notification
 {
@@ -34,8 +34,8 @@ class QueueStuckNotification extends Notification
     public function toArray(object $notifiable): array
     {
         return [
-            'type'          => 'queue_stuck',
-            'queue'         => $this->queue,
+            'type' => 'queue_stuck',
+            'queue' => $this->queue,
             'pending_count' => $this->pendingCount,
         ];
     }

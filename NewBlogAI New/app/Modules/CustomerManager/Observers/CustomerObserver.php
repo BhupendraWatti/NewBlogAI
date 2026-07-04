@@ -15,10 +15,10 @@ class CustomerObserver
     {
         CustomerActivity::create([
             'customer_id' => $customer->id,
-            'user_id'     => Auth::id(),
-            'event_type'  => 'created',
+            'user_id' => Auth::id(),
+            'event_type' => 'created',
             'description' => "Customer '{$customer->company_name}' was registered.",
-            'properties'  => $customer->toArray()
+            'properties' => $customer->toArray(),
         ]);
     }
 
@@ -47,22 +47,22 @@ class CustomerObserver
     public function updated(Customer $customer): void
     {
         $dirty = $customer->getDirty();
-        
+
         // Remove timestamps from changes list
         unset($dirty['updated_at']);
 
-        if (!empty($dirty)) {
+        if (! empty($dirty)) {
             $original = array_intersect_key($customer->getOriginal(), $dirty);
-            
+
             CustomerActivity::create([
                 'customer_id' => $customer->id,
-                'user_id'     => Auth::id(),
-                'event_type'  => 'updated',
+                'user_id' => Auth::id(),
+                'event_type' => 'updated',
                 'description' => "Customer '{$customer->company_name}' details were updated.",
-                'properties'  => [
+                'properties' => [
                     'before' => $original,
-                    'after'  => $dirty
-                ]
+                    'after' => $dirty,
+                ],
             ]);
         }
     }
@@ -74,10 +74,10 @@ class CustomerObserver
     {
         CustomerActivity::create([
             'customer_id' => $customer->id,
-            'user_id'     => Auth::id(),
-            'event_type'  => 'deleted',
+            'user_id' => Auth::id(),
+            'event_type' => 'deleted',
             'description' => "Customer '{$customer->company_name}' was soft-deleted.",
-            'properties'  => ['deleted_at' => $customer->deleted_at]
+            'properties' => ['deleted_at' => $customer->deleted_at],
         ]);
     }
 
@@ -88,10 +88,10 @@ class CustomerObserver
     {
         CustomerActivity::create([
             'customer_id' => $customer->id,
-            'user_id'     => Auth::id(),
-            'event_type'  => 'restored',
+            'user_id' => Auth::id(),
+            'event_type' => 'restored',
             'description' => "Customer '{$customer->company_name}' was restored.",
-            'properties'  => []
+            'properties' => [],
         ]);
     }
 }

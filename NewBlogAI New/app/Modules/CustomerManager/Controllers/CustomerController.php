@@ -3,15 +3,16 @@
 namespace App\Modules\CustomerManager\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\CustomerManager\Models\Customer;
 use App\Modules\CustomerManager\DTOs\CustomerDTO;
+use App\Modules\CustomerManager\Models\Customer;
+use App\Modules\CustomerManager\Repositories\CustomerRepository;
 use App\Modules\CustomerManager\Requests\StoreCustomerRequest;
 use App\Modules\CustomerManager\Requests\UpdateCustomerRequest;
-use App\Modules\CustomerManager\Services\CustomerService;
-use App\Modules\CustomerManager\Repositories\CustomerRepository;
-use App\Modules\CustomerManager\Resources\CustomerResource;
-use App\Modules\CustomerManager\Resources\CustomerNoteResource;
 use App\Modules\CustomerManager\Resources\CustomerActivityResource;
+use App\Modules\CustomerManager\Resources\CustomerNoteResource;
+use App\Modules\CustomerManager\Resources\CustomerResource;
+use App\Modules\CustomerManager\Services\CustomerService;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -63,8 +64,8 @@ class CustomerController extends Controller
     public function show(string $id): CustomerResource
     {
         $customer = $this->repository->find($id);
-        if (!$customer) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Customer with ID '{$id}' not found.");
+        if (! $customer) {
+            throw new ModelNotFoundException("Customer with ID '{$id}' not found.");
         }
 
         Gate::authorize('view', $customer);
@@ -81,8 +82,8 @@ class CustomerController extends Controller
     public function update(UpdateCustomerRequest $request, string $id): CustomerResource
     {
         $customer = $this->repository->find($id);
-        if (!$customer) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Customer with ID '{$id}' not found.");
+        if (! $customer) {
+            throw new ModelNotFoundException("Customer with ID '{$id}' not found.");
         }
 
         Gate::authorize('update', $customer);
@@ -99,8 +100,8 @@ class CustomerController extends Controller
     public function destroy(string $id): JsonResponse
     {
         $customer = $this->repository->find($id);
-        if (!$customer) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Customer with ID '{$id}' not found.");
+        if (! $customer) {
+            throw new ModelNotFoundException("Customer with ID '{$id}' not found.");
         }
 
         Gate::authorize('delete', $customer);
@@ -108,7 +109,7 @@ class CustomerController extends Controller
         $this->service->deleteCustomer($id);
 
         return response()->json([
-            'message' => "Customer '{$customer->company_name}' soft-deleted successfully."
+            'message' => "Customer '{$customer->company_name}' soft-deleted successfully.",
         ]);
     }
 
@@ -118,8 +119,8 @@ class CustomerController extends Controller
     public function restore(string $id): JsonResponse
     {
         $customer = $this->repository->findTrashed($id);
-        if (!$customer) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Deleted Customer with ID '{$id}' not found in trash.");
+        if (! $customer) {
+            throw new ModelNotFoundException("Deleted Customer with ID '{$id}' not found in trash.");
         }
 
         Gate::authorize('restore', $customer);
@@ -127,7 +128,7 @@ class CustomerController extends Controller
         $this->service->restoreCustomer($id);
 
         return response()->json([
-            'message' => "Customer '{$customer->company_name}' restored successfully."
+            'message' => "Customer '{$customer->company_name}' restored successfully.",
         ]);
     }
 
@@ -137,8 +138,8 @@ class CustomerController extends Controller
     public function archive(string $id): CustomerResource
     {
         $customer = $this->repository->find($id);
-        if (!$customer) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Customer with ID '{$id}' not found.");
+        if (! $customer) {
+            throw new ModelNotFoundException("Customer with ID '{$id}' not found.");
         }
 
         Gate::authorize('update', $customer);
@@ -154,14 +155,14 @@ class CustomerController extends Controller
     public function storeNote(Request $request, string $id): JsonResponse
     {
         $customer = $this->repository->find($id);
-        if (!$customer) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Customer with ID '{$id}' not found.");
+        if (! $customer) {
+            throw new ModelNotFoundException("Customer with ID '{$id}' not found.");
         }
 
         Gate::authorize('addNote', $customer);
 
         $request->validate([
-            'content' => ['required', 'string']
+            'content' => ['required', 'string'],
         ]);
 
         $note = $this->service->addNote($id, $request->input('content'));
@@ -177,8 +178,8 @@ class CustomerController extends Controller
     public function timeline(string $id): AnonymousResourceCollection
     {
         $customer = $this->repository->find($id);
-        if (!$customer) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Customer with ID '{$id}' not found.");
+        if (! $customer) {
+            throw new ModelNotFoundException("Customer with ID '{$id}' not found.");
         }
 
         Gate::authorize('view', $customer);

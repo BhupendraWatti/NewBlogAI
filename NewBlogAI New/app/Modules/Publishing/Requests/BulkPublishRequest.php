@@ -15,10 +15,10 @@ class BulkPublishRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'article_ids'   => ['required', 'array'],
+            'article_ids' => ['required', 'array'],
             'article_ids.*' => ['integer', 'exists:generated_contents,id'],
-            'site_id'       => ['nullable', 'integer', 'exists:sites,id'],
-            'wp_status'     => ['sometimes', 'required', 'string', 'in:draft,publish,pending,future'],
+            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'wp_status' => ['sometimes', 'required', 'string', 'in:draft,publish,pending,future'],
         ];
     }
 }

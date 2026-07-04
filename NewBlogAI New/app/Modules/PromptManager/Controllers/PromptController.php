@@ -7,11 +7,11 @@ use App\Modules\PromptManager\Models\Prompt;
 use App\Modules\PromptManager\Requests\StorePromptRequest;
 use App\Modules\PromptManager\Requests\UpdatePromptRequest;
 use App\Modules\PromptManager\Resources\PromptResource;
+use App\Modules\SubscriptionManager\Services\EntitlementService;
+use App\Modules\TopicManager\Models\Topic;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use App\Modules\SubscriptionManager\Services\EntitlementService;
-use App\Modules\TopicManager\Models\Topic;
 
 class PromptController extends Controller
 {
@@ -39,7 +39,7 @@ class PromptController extends Controller
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('promt', 'like', "%{$search}%");
+                    ->orWhere('promt', 'like', "%{$search}%");
             });
         }
 
@@ -59,7 +59,7 @@ class PromptController extends Controller
     public function store(StorePromptRequest $request): JsonResponse
     {
         $validated = $request->validated();
-        if (!empty($validated['topic_id'])) {
+        if (! empty($validated['topic_id'])) {
             $this->entitlements->assertCanCreatePrompt(Topic::findOrFail($validated['topic_id']));
         }
 
@@ -85,7 +85,7 @@ class PromptController extends Controller
     {
         $prompt = Prompt::findOrFail($id);
         $validated = $request->validated();
-        if (!empty($validated['topic_id']) && $validated['topic_id'] !== $prompt->topic_id) {
+        if (! empty($validated['topic_id']) && $validated['topic_id'] !== $prompt->topic_id) {
             $this->entitlements->assertCanCreatePrompt(Topic::findOrFail($validated['topic_id']));
         }
 
@@ -102,7 +102,7 @@ class PromptController extends Controller
         Prompt::findOrFail($id)->delete();
 
         return response()->json([
-            'message' => 'Prompt template deleted successfully.'
+            'message' => 'Prompt template deleted successfully.',
         ]);
     }
 }

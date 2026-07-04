@@ -3,11 +3,12 @@
 namespace App\Modules\SubscriptionManager\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\SubscriptionManager\DTOs\PlanDTO;
 use App\Modules\SubscriptionManager\Models\Plan;
 use App\Modules\SubscriptionManager\Models\Subscription;
 use App\Modules\SubscriptionManager\Requests\StorePlanRequest;
-use App\Modules\SubscriptionManager\DTOs\PlanDTO;
 use App\Modules\SubscriptionManager\Resources\PlanResource;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -50,8 +51,8 @@ class PlanController extends Controller
         Gate::authorize('viewAny', Subscription::class);
 
         $plan = Plan::find($id);
-        if (!$plan) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Plan with ID '{$id}' not found.");
+        if (! $plan) {
+            throw new ModelNotFoundException("Plan with ID '{$id}' not found.");
         }
 
         return new PlanResource($plan);
@@ -65,8 +66,8 @@ class PlanController extends Controller
         Gate::authorize('managePlans', Subscription::class);
 
         $plan = Plan::find($id);
-        if (!$plan) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Plan with ID '{$id}' not found.");
+        if (! $plan) {
+            throw new ModelNotFoundException("Plan with ID '{$id}' not found.");
         }
 
         $dto = PlanDTO::fromRequest($request->validated());
@@ -83,8 +84,8 @@ class PlanController extends Controller
         Gate::authorize('managePlans', Subscription::class);
 
         $plan = Plan::find($id);
-        if (!$plan) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Plan with ID '{$id}' not found.");
+        if (! $plan) {
+            throw new ModelNotFoundException("Plan with ID '{$id}' not found.");
         }
 
         $plan->delete();

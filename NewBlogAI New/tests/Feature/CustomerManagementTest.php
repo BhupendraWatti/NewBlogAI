@@ -4,8 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\CustomerManager\Models\Customer;
-use App\Modules\CustomerManager\Models\CustomerNote;
-use App\Modules\CustomerManager\Models\CustomerActivity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -14,6 +12,7 @@ class CustomerManagementTest extends TestCase
     use RefreshDatabase;
 
     protected User $superAdmin;
+
     protected User $supportUser;
 
     protected function setUp(): void
@@ -22,8 +21,8 @@ class CustomerManagementTest extends TestCase
 
         // Create Super Admin (role 1)
         $this->superAdmin = User::create([
-            'name'     => 'Super Admin',
-            'email'    => 'super@newsblogify.com',
+            'name' => 'Super Admin',
+            'email' => 'super@newsblogify.com',
             'password' => bcrypt('password'),
         ]);
         $this->superAdmin->role = 1;
@@ -31,8 +30,8 @@ class CustomerManagementTest extends TestCase
 
         // Create Support Staff (role 3)
         $this->supportUser = User::create([
-            'name'     => 'Support Staff',
-            'email'    => 'support@newsblogify.com',
+            'name' => 'Support Staff',
+            'email' => 'support@newsblogify.com',
             'password' => bcrypt('password'),
         ]);
         $this->supportUser->role = 3;
@@ -46,13 +45,13 @@ class CustomerManagementTest extends TestCase
     {
         $payload = [
             'company_name' => 'Acme Corp',
-            'owner_name'   => 'John Doe',
-            'email'        => 'john@acme.com',
-            'phone'        => '+1234567890',
-            'country'      => 'USA',
-            'website'      => 'https://acme.com',
-            'status'       => 'trial',
-            'notes'        => 'Acme onboarding started.'
+            'owner_name' => 'John Doe',
+            'email' => 'john@acme.com',
+            'phone' => '+1234567890',
+            'country' => 'USA',
+            'website' => 'https://acme.com',
+            'status' => 'trial',
+            'notes' => 'Acme onboarding started.',
         ];
 
         $response = $this->actingAs($this->superAdmin)
@@ -63,17 +62,17 @@ class CustomerManagementTest extends TestCase
 
         $this->assertDatabaseHas('customers', [
             'company_name' => 'Acme Corp',
-            'email'        => 'john@acme.com'
+            'email' => 'john@acme.com',
         ]);
 
         // Assert Note was recorded
         $this->assertDatabaseHas('customer_notes', [
-            'content' => 'Acme onboarding started.'
+            'content' => 'Acme onboarding started.',
         ]);
 
         // Assert audit log was recorded
         $this->assertDatabaseHas('customer_activities', [
-            'event_type' => 'created'
+            'event_type' => 'created',
         ]);
     }
 
@@ -84,8 +83,8 @@ class CustomerManagementTest extends TestCase
     {
         $payload = [
             'company_name' => 'Acme Corp',
-            'owner_name'   => 'John Doe',
-            'email'        => 'john@acme.com'
+            'owner_name' => 'John Doe',
+            'email' => 'john@acme.com',
         ];
 
         $response = $this->actingAs($this->supportUser)
@@ -101,9 +100,9 @@ class CustomerManagementTest extends TestCase
     {
         $customer = Customer::create([
             'company_name' => 'Legacy Inc',
-            'owner_name'   => 'Alice Smith',
-            'email'        => 'alice@legacy.com',
-            'status'       => 'active'
+            'owner_name' => 'Alice Smith',
+            'email' => 'alice@legacy.com',
+            'status' => 'active',
         ]);
 
         // Super Admin deletes customer
@@ -119,8 +118,8 @@ class CustomerManagementTest extends TestCase
 
         $restoreResponse->assertStatus(200);
         $this->assertDatabaseHas('customers', [
-            'id'         => $customer->id,
-            'deleted_at' => null
+            'id' => $customer->id,
+            'deleted_at' => null,
         ]);
     }
 }

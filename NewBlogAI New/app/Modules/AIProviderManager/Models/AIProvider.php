@@ -27,7 +27,7 @@ class AIProvider extends Model
     protected function casts(): array
     {
         return [
-            'api_key'    => 'encrypted',
+            'api_key' => 'encrypted',
             'is_default' => 'boolean',
             'is_enabled' => 'boolean',
         ];

@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Modules\SiteManager\Models\Site;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class WebsiteManagementTest extends TestCase
@@ -20,8 +20,8 @@ class WebsiteManagementTest extends TestCase
         parent::setUp();
 
         $this->admin = User::create([
-            'name'     => 'Admin User',
-            'email'    => 'admin@example.com',
+            'name' => 'Admin User',
+            'email' => 'admin@example.com',
             'password' => bcrypt('password'),
         ]);
         $this->admin->role = 2; // Admin
@@ -33,8 +33,8 @@ class WebsiteManagementTest extends TestCase
         $response = $this->actingAs($this->admin)
             ->postJson('/api/v1/sites', [
                 'domain_url' => 'https://testsite.com',
-                'api_key'    => 'wp-api-token-12345',
-                'is_active'  => true,
+                'api_key' => 'wp-api-token-12345',
+                'is_active' => true,
                 'is_default' => true,
             ]);
 
@@ -52,8 +52,8 @@ class WebsiteManagementTest extends TestCase
     {
         $site = Site::create([
             'domain_url' => 'https://inactivesite.com',
-            'api_key'    => 'secret',
-            'is_active'  => false,
+            'api_key' => 'secret',
+            'is_active' => false,
             'is_default' => false,
         ]);
 
@@ -68,13 +68,13 @@ class WebsiteManagementTest extends TestCase
     {
         // Mock custom WordPress plugin endpoint
         Http::fake([
-            'https://connectedwp.com/wp-json/ai-news/v1/ping' => Http::response(['version' => '1.2.3'], 200)
+            'https://connectedwp.com/wp-json/ai-news/v1/ping' => Http::response(['version' => '1.2.3'], 200),
         ]);
 
         $site = Site::create([
             'domain_url' => 'https://connectedwp.com',
-            'api_key'    => 'token',
-            'is_active'  => true,
+            'api_key' => 'token',
+            'is_active' => true,
         ]);
 
         $response = $this->actingAs($this->admin)

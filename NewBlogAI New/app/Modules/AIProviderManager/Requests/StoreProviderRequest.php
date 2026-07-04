@@ -15,12 +15,12 @@ class StoreProviderRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'provider_key'  => ['required', 'string', 'unique:ai_providers,provider_key', 'in:gemini,openai,claude,groq,openrouter,ollama'],
-            'name'          => ['required', 'string', 'max:255'],
-            'api_key'       => ['required', 'string'],
+            'provider_key' => ['required', 'string', 'unique:ai_providers,provider_key', 'in:gemini,openai,claude,groq,openrouter,ollama'],
+            'name' => ['required', 'string', 'max:255'],
+            'api_key' => ['required', 'string'],
             'default_model' => ['nullable', 'string', 'max:255'],
-            'is_default'    => ['sometimes', 'boolean'],
-            'is_enabled'    => ['sometimes', 'boolean'],
+            'is_default' => ['sometimes', 'boolean'],
+            'is_enabled' => ['sometimes', 'boolean'],
         ];
     }
 }

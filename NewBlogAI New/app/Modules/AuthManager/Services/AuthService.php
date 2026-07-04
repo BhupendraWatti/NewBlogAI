@@ -6,8 +6,8 @@ use App\Models\User;
 use App\Modules\AuthManager\Models\AuthActivity;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Request;
 use Illuminate\Validation\ValidationException;
 
 class AuthService
@@ -22,9 +22,9 @@ class AuthService
         $ip = Request::ip();
         $userAgent = Request::header('User-Agent');
 
-        if (!Auth::attempt($credentials)) {
+        if (! Auth::attempt($credentials)) {
             // Log failed login event
-            $this->logActivity(null, 'login_failed', "Failed login attempt for email: " . ($credentials['email'] ?? 'unknown'), [
+            $this->logActivity(null, 'login_failed', 'Failed login attempt for email: '.($credentials['email'] ?? 'unknown'), [
                 'email' => $credentials['email'] ?? null,
             ]);
 
@@ -68,11 +68,15 @@ class AuthService
         $user->update($data);
 
         $changes = [];
-        if ($oldName !== $user->name) $changes['name'] = ['from' => $oldName, 'to' => $user->name];
-        if ($oldEmail !== $user->email) $changes['email'] = ['from' => $oldEmail, 'to' => $user->email];
+        if ($oldName !== $user->name) {
+            $changes['name'] = ['from' => $oldName, 'to' => $user->name];
+        }
+        if ($oldEmail !== $user->email) {
+            $changes['email'] = ['from' => $oldEmail, 'to' => $user->email];
+        }
 
         if (count($changes) > 0) {
-            $this->logActivity($user->id, 'profile_updated', "Profile updated.", ['changes' => $changes]);
+            $this->logActivity($user->id, 'profile_updated', 'Profile updated.', ['changes' => $changes]);
         }
 
         return $user;
@@ -83,18 +87,18 @@ class AuthService
      */
     public function changePassword(User $user, string $currentPassword, string $newPassword): void
     {
-        if (!Hash::check($currentPassword, $user->password)) {
-            $this->logActivity($user->id, 'password_change_failed', "Failed password change attempt: current password mismatch.");
+        if (! Hash::check($currentPassword, $user->password)) {
+            $this->logActivity($user->id, 'password_change_failed', 'Failed password change attempt: current password mismatch.');
             throw ValidationException::withMessages([
                 'current_password' => ['The provided password does not match our records.'],
             ]);
         }
 
         $user->update([
-            'password' => Hash::make($newPassword)
+            'password' => Hash::make($newPassword),
         ]);
 
-        $this->logActivity($user->id, 'password_changed', "Password changed successfully.");
+        $this->logActivity($user->id, 'password_changed', 'Password changed successfully.');
     }
 
     /**
@@ -104,20 +108,20 @@ class AuthService
     {
         try {
             AuthActivity::create([
-                'user_id'     => $userId,
-                'event_type'  => $eventType,
-                'ip_address'  => Request::ip(),
-                'user_agent'  => Request::header('User-Agent'),
+                'user_id' => $userId,
+                'event_type' => $eventType,
+                'ip_address' => Request::ip(),
+                'user_agent' => Request::header('User-Agent'),
                 'description' => $description,
-                'properties'  => $properties,
+                'properties' => $properties,
             ]);
 
             Log::info("AuthEvent: [{$eventType}] - {$description}", [
                 'user_id' => $userId,
-                'ip' => Request::ip()
+                'ip' => Request::ip(),
             ]);
         } catch (\Exception $e) {
-            Log::error("Failed to log auth activity: " . $e->getMessage());
+            Log::error('Failed to log auth activity: '.$e->getMessage());
         }
     }
 }

@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use App\Modules\AuthManager\Models\AuthActivity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -19,8 +18,8 @@ class AuthManagementTest extends TestCase
         parent::setUp();
 
         $this->user = User::create([
-            'name'     => 'Test User',
-            'email'    => 'test@example.com',
+            'name' => 'Test User',
+            'email' => 'test@example.com',
             'password' => Hash::make('password123'),
         ]);
         $this->user->role = 2; // Admin
@@ -30,7 +29,7 @@ class AuthManagementTest extends TestCase
     public function test_user_can_login_with_valid_credentials(): void
     {
         $response = $this->postJson('/api/v1/auth/login', [
-            'email'    => 'test@example.com',
+            'email' => 'test@example.com',
             'password' => 'password123',
         ]);
 
@@ -41,7 +40,7 @@ class AuthManagementTest extends TestCase
 
         // Verify activity logged
         $this->assertDatabaseHas('auth_activities', [
-            'user_id'    => $this->user->id,
+            'user_id' => $this->user->id,
             'event_type' => 'login',
         ]);
     }
@@ -49,7 +48,7 @@ class AuthManagementTest extends TestCase
     public function test_user_cannot_login_with_invalid_password(): void
     {
         $response = $this->postJson('/api/v1/auth/login', [
-            'email'    => 'test@example.com',
+            'email' => 'test@example.com',
             'password' => 'wrongpassword',
         ]);
 
@@ -58,7 +57,7 @@ class AuthManagementTest extends TestCase
 
         // Verify failed attempt logged
         $this->assertDatabaseHas('auth_activities', [
-            'user_id'    => null,
+            'user_id' => null,
             'event_type' => 'login_failed',
         ]);
     }
@@ -76,7 +75,7 @@ class AuthManagementTest extends TestCase
     {
         $response = $this->actingAs($this->user)
             ->putJson('/api/v1/auth/profile', [
-                'name'  => 'Updated Name',
+                'name' => 'Updated Name',
                 'email' => 'updated@example.com',
             ]);
 
@@ -85,13 +84,13 @@ class AuthManagementTest extends TestCase
             ->assertJsonPath('user.email', 'updated@example.com');
 
         $this->assertDatabaseHas('users', [
-            'id'    => $this->user->id,
-            'name'  => 'Updated Name',
+            'id' => $this->user->id,
+            'name' => 'Updated Name',
             'email' => 'updated@example.com',
         ]);
 
         $this->assertDatabaseHas('auth_activities', [
-            'user_id'    => $this->user->id,
+            'user_id' => $this->user->id,
             'event_type' => 'profile_updated',
         ]);
     }
@@ -100,8 +99,8 @@ class AuthManagementTest extends TestCase
     {
         $response = $this->actingAs($this->user)
             ->putJson('/api/v1/auth/password', [
-                'current_password'          => 'password123',
-                'new_password'              => 'newsecurepassword',
+                'current_password' => 'password123',
+                'new_password' => 'newsecurepassword',
                 'new_password_confirmation' => 'newsecurepassword',
             ]);
 
@@ -112,7 +111,7 @@ class AuthManagementTest extends TestCase
         $this->assertTrue(Hash::check('newsecurepassword', $this->user->password));
 
         $this->assertDatabaseHas('auth_activities', [
-            'user_id'    => $this->user->id,
+            'user_id' => $this->user->id,
             'event_type' => 'password_changed',
         ]);
     }
@@ -126,7 +125,7 @@ class AuthManagementTest extends TestCase
         $this->assertGuest();
 
         $this->assertDatabaseHas('auth_activities', [
-            'user_id'    => $this->user->id,
+            'user_id' => $this->user->id,
             'event_type' => 'logout',
         ]);
     }

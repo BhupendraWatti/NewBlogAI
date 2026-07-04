@@ -15,7 +15,7 @@ class VerifyLicenseRequest extends FormRequest
     {
         return [
             'license_key' => ['required', 'string'],
-            'domain'      => ['required', 'string', 'url'],
+            'domain' => ['required', 'string', 'url'],
         ];
     }
 }

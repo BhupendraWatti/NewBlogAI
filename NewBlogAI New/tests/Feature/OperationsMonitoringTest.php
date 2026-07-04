@@ -3,12 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use App\Modules\Operations\Models\JobLog;
 use App\Modules\Operations\Models\AuditLog;
-use App\Modules\Operations\Models\ScheduleLog;
+use App\Modules\Operations\Models\JobLog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Queue;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
 
@@ -23,8 +20,8 @@ class OperationsMonitoringTest extends TestCase
         parent::setUp();
 
         $this->admin = User::create([
-            'name'     => 'Admin User',
-            'email'    => 'admin@example.com',
+            'name' => 'Admin User',
+            'email' => 'admin@example.com',
             'password' => bcrypt('password'),
         ]);
         $this->admin->role = 2; // Admin
@@ -65,8 +62,8 @@ class OperationsMonitoringTest extends TestCase
         // Setup a mock job log in DB to verify tracking list
         JobLog::create([
             'job_id' => 'mock-id-123',
-            'name'   => 'SyncSiteDataJob',
-            'queue'  => 'default',
+            'name' => 'SyncSiteDataJob',
+            'queue' => 'default',
             'status' => 'completed',
         ]);
 
@@ -80,8 +77,8 @@ class OperationsMonitoringTest extends TestCase
     public function test_manual_configuration_audit_logging(): void
     {
         AuditLog::create([
-            'user_id'    => $this->admin->id,
-            'event'      => 'settings_updated',
+            'user_id' => $this->admin->id,
+            'event' => 'settings_updated',
             'old_values' => ['currency' => 'USD'],
             'new_values' => ['currency' => 'INR'],
             'ip_address' => '127.0.0.1',

@@ -16,8 +16,9 @@ class SystemSettingsService
      */
     public function get(string $key, $default = null)
     {
-        return Cache::remember(self::CACHE_PREFIX . $key, 3600, function () use ($key, $default) {
+        return Cache::remember(self::CACHE_PREFIX.$key, 3600, function () use ($key, $default) {
             $setting = Setting::where('key', $key)->first();
+
             return $setting ? $setting->value : $default;
         });
     }
@@ -32,8 +33,8 @@ class SystemSettingsService
             ['value' => $value]
         );
 
-        Cache::forget(self::CACHE_PREFIX . $key);
-        Cache::forget(self::CACHE_PREFIX . 'all');
+        Cache::forget(self::CACHE_PREFIX.$key);
+        Cache::forget(self::CACHE_PREFIX.'all');
 
         return $setting;
     }
@@ -43,7 +44,7 @@ class SystemSettingsService
      */
     public function all(): array
     {
-        return Cache::remember(self::CACHE_PREFIX . 'all', 3600, function () {
+        return Cache::remember(self::CACHE_PREFIX.'all', 3600, function () {
             $all = Setting::all();
             $mapped = [];
 
@@ -80,8 +81,8 @@ class SystemSettingsService
                 }
             });
         } catch (\Exception $e) {
-            Log::error("Failed to update system settings: " . $e->getMessage());
-            throw new \RuntimeException("Database transaction failed when updating system settings.", 0, $e);
+            Log::error('Failed to update system settings: '.$e->getMessage());
+            throw new \RuntimeException('Database transaction failed when updating system settings.', 0, $e);
         }
     }
 }

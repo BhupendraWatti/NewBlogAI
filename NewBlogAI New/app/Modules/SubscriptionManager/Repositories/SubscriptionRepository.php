@@ -5,6 +5,7 @@ namespace App\Modules\SubscriptionManager\Repositories;
 use App\Modules\SubscriptionManager\Models\Subscription;
 use App\Modules\SubscriptionManager\Models\SubscriptionHistory;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Collection;
 
 class SubscriptionRepository
 {
@@ -29,7 +30,7 @@ class SubscriptionRepository
     /**
      * Get all subscriptions expiring within a given number of days.
      */
-    public function getExpiringSoon(int $days = 7): \Illuminate\Database\Eloquent\Collection
+    public function getExpiringSoon(int $days = 7): Collection
     {
         return Subscription::where('status', 'active')
             ->whereBetween('ends_at', [now(), now()->addDays($days)])

@@ -2,12 +2,12 @@
 
 namespace App\Mcp\Tools;
 
+use App\Models\Topic;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
-use App\Models\Topic;
 
 #[Description('Get list of all news topics configured in the database.')]
 class ListTopicsTool extends Tool

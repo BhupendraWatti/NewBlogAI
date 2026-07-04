@@ -2,12 +2,12 @@
 
 namespace App\Mcp\Tools;
 
+use App\Models\keys;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
-use App\Models\keys;
 
 #[Description('Get list of all API keys configured in the database.')]
 class ListKeysTool extends Tool
@@ -29,7 +29,7 @@ class ListKeysTool extends Tool
                 "- ID: %d | Name: %s | Key: %s\n",
                 $key->id,
                 $key->name,
-                $key->key ? substr($key->key, 0, 4) . '***' : 'None'
+                $key->key ? substr($key->key, 0, 4).'***' : 'None'
             );
         }
 

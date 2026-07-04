@@ -4,8 +4,8 @@ namespace App\Modules\Publishing\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Publishing\Models\PublishingLog;
-use App\Modules\Publishing\Requests\PublishArticleRequest;
 use App\Modules\Publishing\Requests\BulkPublishRequest;
+use App\Modules\Publishing\Requests\PublishArticleRequest;
 use App\Modules\Publishing\Resources\PublishingLogResource;
 use App\Modules\Publishing\Services\PublishingService;
 use Illuminate\Http\JsonResponse;
@@ -28,6 +28,7 @@ class PublishingController extends Controller
         $limit = $request->input('limit', 15);
 
         $logs = $this->publishingService->getPaginated($filters, $limit);
+
         return PublishingLogResource::collection($logs);
     }
 
@@ -37,6 +38,7 @@ class PublishingController extends Controller
     public function show(string $id): PublishingLogResource
     {
         $log = PublishingLog::with(['content', 'site', 'author'])->findOrFail($id);
+
         return new PublishingLogResource($log);
     }
 
@@ -54,11 +56,11 @@ class PublishingController extends Controller
 
             return response()->json([
                 'message' => 'Publishing operation queued successfully.',
-                'log'     => new PublishingLogResource($log->load(['content', 'site'])),
+                'log' => new PublishingLogResource($log->load(['content', 'site'])),
             ], 202);
         } catch (\InvalidArgumentException $e) {
             return response()->json([
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 422);
         }
     }
@@ -76,12 +78,12 @@ class PublishingController extends Controller
             );
 
             return response()->json([
-                'message' => count($logs) . ' articles queued for bulk publication.',
-                'logs'    => PublishingLogResource::collection(collect($logs)->load(['content', 'site'])),
+                'message' => count($logs).' articles queued for bulk publication.',
+                'logs' => PublishingLogResource::collection(collect($logs)->load(['content', 'site'])),
             ], 202);
         } catch (\InvalidArgumentException $e) {
             return response()->json([
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 422);
         }
     }
@@ -95,7 +97,7 @@ class PublishingController extends Controller
         $this->publishingService->retryPublish($log);
 
         return response()->json([
-            'message' => 'Publishing retry queued successfully.'
+            'message' => 'Publishing retry queued successfully.',
         ], 202);
     }
 
@@ -108,7 +110,7 @@ class PublishingController extends Controller
         $this->publishingService->cancelPublish($log);
 
         return response()->json([
-            'message' => 'Publishing queue cancelled successfully.'
+            'message' => 'Publishing queue cancelled successfully.',
         ]);
     }
 
@@ -122,7 +124,7 @@ class PublishingController extends Controller
 
         return response()->json([
             'message' => 'WordPress status synchronized successfully.',
-            'log'     => new PublishingLogResource($log->fresh(['content', 'site']))
+            'log' => new PublishingLogResource($log->fresh(['content', 'site'])),
         ]);
     }
 }

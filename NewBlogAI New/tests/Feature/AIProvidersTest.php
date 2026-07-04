@@ -4,11 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\AIProviderManager\Models\AIProvider;
-use App\Modules\AIProviderManager\Services\AIProviderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class AIProvidersTest extends TestCase
@@ -22,8 +20,8 @@ class AIProvidersTest extends TestCase
         parent::setUp();
 
         $this->admin = User::create([
-            'name'     => 'Admin User',
-            'email'    => 'admin@example.com',
+            'name' => 'Admin User',
+            'email' => 'admin@example.com',
             'password' => bcrypt('password'),
         ]);
         $this->admin->role = 2; // Admin
@@ -34,11 +32,11 @@ class AIProvidersTest extends TestCase
     {
         $response = $this->actingAs($this->admin)
             ->postJson('/api/v1/providers', [
-                'provider_key'  => 'openai',
-                'name'          => 'OpenAI Main',
-                'api_key'       => 'sk-test123456789',
+                'provider_key' => 'openai',
+                'name' => 'OpenAI Main',
+                'api_key' => 'sk-test123456789',
                 'default_model' => 'gpt-4o',
-                'is_default'    => true,
+                'is_default' => true,
             ]);
 
         $response->assertStatus(201)
@@ -55,16 +53,16 @@ class AIProvidersTest extends TestCase
     public function test_admin_can_update_provider(): void
     {
         $provider = AIProvider::create([
-            'provider_key'  => 'gemini',
-            'name'          => 'Google Gemini',
-            'api_key'       => 'initial-key',
+            'provider_key' => 'gemini',
+            'name' => 'Google Gemini',
+            'api_key' => 'initial-key',
             'default_model' => 'gemini-1.5-flash',
         ]);
 
         $response = $this->actingAs($this->admin)
             ->putJson("/api/v1/providers/{$provider->id}", [
-                'name'          => 'Updated Google Gemini',
-                'api_key'       => 'new-secret-key',
+                'name' => 'Updated Google Gemini',
+                'api_key' => 'new-secret-key',
                 'default_model' => 'gemini-1.5-pro',
             ]);
 
@@ -79,11 +77,11 @@ class AIProvidersTest extends TestCase
     public function test_cannot_set_disabled_provider_as_default(): void
     {
         $provider = AIProvider::create([
-            'provider_key'  => 'claude',
-            'name'          => 'Claude',
-            'api_key'       => 'secret',
-            'is_enabled'    => false,
-            'is_default'    => false,
+            'provider_key' => 'claude',
+            'name' => 'Claude',
+            'api_key' => 'secret',
+            'is_enabled' => false,
+            'is_default' => false,
         ]);
 
         $response = $this->actingAs($this->admin)
@@ -97,13 +95,13 @@ class AIProvidersTest extends TestCase
     {
         // Mock OpenAI API endpoint response
         Http::fake([
-            'https://api.openai.com/v1/chat/completions' => Http::response(['choices' => []], 200)
+            'https://api.openai.com/v1/chat/completions' => Http::response(['choices' => []], 200),
         ]);
 
         $provider = AIProvider::create([
-            'provider_key'  => 'openai',
-            'name'          => 'OpenAI',
-            'api_key'       => 'valid-key',
+            'provider_key' => 'openai',
+            'name' => 'OpenAI',
+            'api_key' => 'valid-key',
             'default_model' => 'gpt-3.5-turbo',
         ]);
 

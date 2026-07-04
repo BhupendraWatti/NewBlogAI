@@ -2,12 +2,12 @@
 
 namespace App\Mcp\Tools;
 
+use App\Modules\SiteManager\Models\Site;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
-use App\Modules\SiteManager\Models\Site;
 
 #[Description('Register a new WordPress site or update an existing site configuration.')]
 class AddSiteTool extends Tool

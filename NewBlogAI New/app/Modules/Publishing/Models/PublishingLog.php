@@ -7,6 +7,7 @@ use App\Modules\ContentGeneration\Models\GeneratedContent;
 use App\Modules\SiteManager\Models\Site;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Cache;
 
 class PublishingLog extends Model
 {
@@ -29,7 +30,7 @@ class PublishingLog extends Model
 
     protected $casts = [
         'scheduled_at' => 'datetime',
-        'started_at'   => 'datetime',
+        'started_at' => 'datetime',
         'completed_at' => 'datetime',
     ];
 
@@ -51,13 +52,13 @@ class PublishingLog extends Model
     protected static function booted()
     {
         static::saved(function () {
-            \Illuminate\Support\Facades\Cache::forget('analytics_content_stats');
-            \Illuminate\Support\Facades\Cache::forget('analytics_ai_stats');
+            Cache::forget('analytics_content_stats');
+            Cache::forget('analytics_ai_stats');
         });
 
         static::deleted(function () {
-            \Illuminate\Support\Facades\Cache::forget('analytics_content_stats');
-            \Illuminate\Support\Facades\Cache::forget('analytics_ai_stats');
+            Cache::forget('analytics_content_stats');
+            Cache::forget('analytics_ai_stats');
         });
     }
 }

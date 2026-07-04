@@ -15,8 +15,8 @@ class ActivateLicenseRequest extends FormRequest
     {
         return [
             'license_key' => ['required', 'string'],
-            'domain'      => ['required', 'string', 'url'],
-            'site_id'     => ['nullable', 'integer', 'exists:sites,id'],
+            'domain' => ['required', 'string', 'url'],
+            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
         ];
     }
 }

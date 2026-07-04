@@ -2,6 +2,7 @@
 
 namespace App\Modules\SubscriptionManager\Models;
 
+use App\Modules\TopicManager\Models\Topic;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -19,7 +20,7 @@ class Subscription extends Model
         'trial_ends_at',
         'paused_at',
         'cancelled_at',
-        'limits' // JSON snapshot
+        'limits', // JSON snapshot
     ];
 
     protected $casts = [
@@ -28,7 +29,7 @@ class Subscription extends Model
         'ends_at' => 'datetime',
         'trial_ends_at' => 'datetime',
         'paused_at' => 'datetime',
-        'cancelled_at' => 'datetime'
+        'cancelled_at' => 'datetime',
     ];
 
     /**
@@ -49,6 +50,6 @@ class Subscription extends Model
 
     public function topics()
     {
-        return $this->hasMany(\App\Modules\TopicManager\Models\Topic::class, 'subscription_id');
+        return $this->hasMany(Topic::class, 'subscription_id');
     }
 }

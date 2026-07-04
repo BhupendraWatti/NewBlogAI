@@ -5,8 +5,8 @@ namespace App\Modules\AIProviderManager\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\AIProviderManager\Models\AIProvider;
 use App\Modules\AIProviderManager\Requests\StoreProviderRequest;
-use App\Modules\AIProviderManager\Requests\UpdateProviderRequest;
 use App\Modules\AIProviderManager\Requests\TestConnectionRequest;
+use App\Modules\AIProviderManager\Requests\UpdateProviderRequest;
 use App\Modules\AIProviderManager\Resources\AIProviderResource;
 use App\Modules\AIProviderManager\Services\AIProviderService;
 use Illuminate\Http\JsonResponse;
@@ -44,6 +44,7 @@ class AIProviderController extends Controller
     public function show(string $id): AIProviderResource
     {
         $provider = AIProvider::findOrFail($id);
+
         return new AIProviderResource($provider);
     }
 
@@ -67,14 +68,14 @@ class AIProviderController extends Controller
 
         if ($provider->is_default) {
             return response()->json([
-                'message' => 'Cannot delete default AI provider. Please set another provider as default first.'
+                'message' => 'Cannot delete default AI provider. Please set another provider as default first.',
             ], 422);
         }
 
         $provider->delete();
 
         return response()->json([
-            'message' => 'AI provider config deleted successfully.'
+            'message' => 'AI provider config deleted successfully.',
         ]);
     }
 
@@ -89,7 +90,7 @@ class AIProviderController extends Controller
 
         if (empty($apiKey)) {
             return response()->json([
-                'message' => 'Test failed: API Key is required but not configured.'
+                'message' => 'Test failed: API Key is required but not configured.',
             ], 422);
         }
 
@@ -97,12 +98,12 @@ class AIProviderController extends Controller
 
         if ($success) {
             return response()->json([
-                'message' => 'Connection test successful!'
+                'message' => 'Connection test successful!',
             ]);
         }
 
         return response()->json([
-            'message' => 'Connection test failed. Please verify API key, model, and network parameters.'
+            'message' => 'Connection test failed. Please verify API key, model, and network parameters.',
         ], 502);
     }
 
@@ -115,7 +116,7 @@ class AIProviderController extends Controller
         $this->providerService->setDefault($provider);
 
         return response()->json([
-            'message' => "{$provider->name} is now the default AI provider."
+            'message' => "{$provider->name} is now the default AI provider.",
         ]);
     }
 }

@@ -3,10 +3,12 @@
 namespace App\Modules\TopicManager\Models;
 
 use App\Modules\PromptManager\Models\Prompt;
+use App\Modules\SubscriptionManager\Models\Subscription;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Cache;
 
 class Topic extends Model
 {
@@ -57,7 +59,7 @@ class Topic extends Model
 
     public function subscription(): BelongsTo
     {
-        return $this->belongsTo(\App\Modules\SubscriptionManager\Models\Subscription::class, 'subscription_id');
+        return $this->belongsTo(Subscription::class, 'subscription_id');
     }
 
     public function prompts(): HasMany
@@ -68,13 +70,13 @@ class Topic extends Model
     protected static function booted()
     {
         static::saved(function () {
-            \Illuminate\Support\Facades\Cache::forget('analytics_content_stats');
-            \Illuminate\Support\Facades\Cache::forget('analytics_ai_stats');
+            Cache::forget('analytics_content_stats');
+            Cache::forget('analytics_ai_stats');
         });
 
         static::deleted(function () {
-            \Illuminate\Support\Facades\Cache::forget('analytics_content_stats');
-            \Illuminate\Support\Facades\Cache::forget('analytics_ai_stats');
+            Cache::forget('analytics_content_stats');
+            Cache::forget('analytics_ai_stats');
         });
     }
 }

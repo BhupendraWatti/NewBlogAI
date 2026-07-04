@@ -3,16 +3,15 @@
 namespace App\Modules\ContentGeneration\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\ContentGeneration\Models\GeneratedContent;
-use App\Modules\ContentGeneration\Models\ContentRevision;
 use App\Modules\ContentGeneration\Models\AIRequestLog;
+use App\Modules\ContentGeneration\Models\ContentRevision;
+use App\Modules\ContentGeneration\Models\GeneratedContent;
 use App\Modules\ContentGeneration\Requests\UpdateGeneratedContentRequest;
 use App\Modules\ContentGeneration\Requests\UpdateStatusRequest;
-use App\Modules\ContentGeneration\Resources\GeneratedContentResource;
-use App\Modules\ContentGeneration\Resources\ContentRevisionResource;
 use App\Modules\ContentGeneration\Resources\AIRequestLogResource;
+use App\Modules\ContentGeneration\Resources\ContentRevisionResource;
+use App\Modules\ContentGeneration\Resources\GeneratedContentResource;
 use App\Modules\ContentGeneration\Services\ContentGenerationService;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Auth;
@@ -32,6 +31,7 @@ class GeneratedContentController extends Controller
         $limit = $request->input('limit', 15);
 
         $articles = $this->generationService->getPaginated($filters, $limit);
+
         return GeneratedContentResource::collection($articles);
     }
 
@@ -41,6 +41,7 @@ class GeneratedContentController extends Controller
     public function show(string $id): GeneratedContentResource
     {
         $content = GeneratedContent::with(['site', 'topic', 'pipeline', 'revisions'])->findOrFail($id);
+
         return new GeneratedContentResource($content);
     }
 
@@ -99,6 +100,7 @@ class GeneratedContentController extends Controller
         }
 
         $logs = $query->paginate($request->input('limit', 15));
+
         return AIRequestLogResource::collection($logs);
     }
 }

@@ -22,19 +22,21 @@ class OpenAIDriver implements AIProviderClientInterface
                 ->post('https://api.openai.com/v1/chat/completions', [
                     'model' => $model,
                     'messages' => [
-                        ['role' => 'user', 'content' => 'ping']
+                        ['role' => 'user', 'content' => 'ping'],
                     ],
-                    'max_tokens' => 5
+                    'max_tokens' => 5,
                 ]);
 
             if ($response->successful()) {
                 return true;
             }
 
-            Log::warning("OpenAI test connection failed with status {$response->status()}: " . $response->body());
+            Log::warning("OpenAI test connection failed with status {$response->status()}: ".$response->body());
+
             return false;
         } catch (\Exception $e) {
-            Log::error("OpenAI test connection exception: " . $e->getMessage());
+            Log::error('OpenAI test connection exception: '.$e->getMessage());
+
             return false;
         }
     }
@@ -43,12 +45,12 @@ class OpenAIDriver implements AIProviderClientInterface
     {
         if (str_starts_with($apiKey, 'sk-proj-my-openai-test-key')) {
             return [
-                'text'              => "Mock article content generated for prompt: {$prompt}. This is a beautifully synthesized AI news blog article discussing modern tech developments, artificial intelligence, and automation workflows.",
-                'prompt_tokens'     => 120,
+                'text' => "Mock article content generated for prompt: {$prompt}. This is a beautifully synthesized AI news blog article discussing modern tech developments, artificial intelligence, and automation workflows.",
+                'prompt_tokens' => 120,
                 'completion_tokens' => 250,
-                'total_tokens'      => 370,
-                'estimated_cost'    => 0.0012,
-                'raw_response'      => ['mock' => true],
+                'total_tokens' => 370,
+                'estimated_cost' => 0.0012,
+                'raw_response' => ['mock' => true],
             ];
         }
 
@@ -58,16 +60,16 @@ class OpenAIDriver implements AIProviderClientInterface
             $response = Http::withToken($apiKey)
                 ->timeout($options['timeout'] ?? 30)
                 ->post('https://api.openai.com/v1/chat/completions', [
-                    'model'             => $model,
-                    'messages'          => [
-                        ['role' => 'user', 'content' => $prompt]
+                    'model' => $model,
+                    'messages' => [
+                        ['role' => 'user', 'content' => $prompt],
                     ],
-                    'temperature'       => $options['temperature'] ?? 0.7,
-                    'max_tokens'        => $options['max_tokens'] ?? 2000,
+                    'temperature' => $options['temperature'] ?? 0.7,
+                    'max_tokens' => $options['max_tokens'] ?? 2000,
                 ]);
 
-            if (!$response->successful()) {
-                throw new \RuntimeException("OpenAI API error: Status {$response->status()} - " . $response->body());
+            if (! $response->successful()) {
+                throw new \RuntimeException("OpenAI API error: Status {$response->status()} - ".$response->body());
             }
 
             $data = $response->json();
@@ -84,16 +86,16 @@ class OpenAIDriver implements AIProviderClientInterface
             $cost = (($promptTokens * $promptRate) + ($completionTokens * $completionRate)) / 1000;
 
             return [
-                'text'              => $text,
-                'prompt_tokens'     => $promptTokens,
+                'text' => $text,
+                'prompt_tokens' => $promptTokens,
                 'completion_tokens' => $completionTokens,
-                'total_tokens'      => $totalTokens,
-                'estimated_cost'    => $cost,
-                'raw_response'      => $data,
+                'total_tokens' => $totalTokens,
+                'estimated_cost' => $cost,
+                'raw_response' => $data,
             ];
 
         } catch (\Exception $e) {
-            Log::error("OpenAI generation failed: " . $e->getMessage());
+            Log::error('OpenAI generation failed: '.$e->getMessage());
             throw $e;
         }
     }

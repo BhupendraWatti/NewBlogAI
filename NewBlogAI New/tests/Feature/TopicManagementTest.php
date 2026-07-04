@@ -13,6 +13,7 @@ class TopicManagementTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected Prompt $prompt;
 
     protected function setUp(): void
@@ -20,18 +21,18 @@ class TopicManagementTest extends TestCase
         parent::setUp();
 
         $this->admin = User::create([
-            'name'     => 'Admin User',
-            'email'    => 'admin@example.com',
+            'name' => 'Admin User',
+            'email' => 'admin@example.com',
             'password' => bcrypt('password'),
         ]);
         $this->admin->role = 2; // Admin
         $this->admin->save();
 
         $this->prompt = Prompt::create([
-            'name'     => 'Test Prompt',
-            'promt'    => 'Generate text.',
+            'name' => 'Test Prompt',
+            'promt' => 'Generate text.',
             'category' => 'Testing',
-            'status'   => 'active',
+            'status' => 'active',
         ]);
     }
 
@@ -39,14 +40,14 @@ class TopicManagementTest extends TestCase
     {
         $response = $this->actingAs($this->admin)
             ->postJson('/api/v1/topics', [
-                'name'                 => 'Quantum Physics',
-                'category'             => 'Science',
-                'priority'             => 'high',
-                'language'             => 'en',
-                'status'               => 'active',
+                'name' => 'Quantum Physics',
+                'category' => 'Science',
+                'priority' => 'high',
+                'language' => 'en',
+                'status' => 'active',
                 'generation_frequency' => 'daily',
-                'tags'                 => ['physics', 'quantum'],
-                'prompt_id'            => $this->prompt->id,
+                'tags' => ['physics', 'quantum'],
+                'prompt_id' => $this->prompt->id,
             ]);
 
         $response->assertStatus(201)
@@ -54,7 +55,7 @@ class TopicManagementTest extends TestCase
             ->assertJsonPath('data.prompt_id', $this->prompt->id);
 
         $this->assertDatabaseHas('topics', [
-            'name'      => 'Quantum Physics',
+            'name' => 'Quantum Physics',
             'prompt_id' => $this->prompt->id,
         ]);
     }
@@ -63,22 +64,22 @@ class TopicManagementTest extends TestCase
     {
         // First creation
         Topic::create([
-            'name'                 => 'SEO Writing',
-            'category'             => 'Marketing',
-            'priority'             => 'medium',
-            'language'             => 'en',
-            'status'               => 'active',
+            'name' => 'SEO Writing',
+            'category' => 'Marketing',
+            'priority' => 'medium',
+            'language' => 'en',
+            'status' => 'active',
             'generation_frequency' => 'weekly',
         ]);
 
         // Attempting to create duplicate
         $response = $this->actingAs($this->admin)
             ->postJson('/api/v1/topics', [
-                'name'                 => 'SEO Writing',
-                'category'             => 'Marketing',
-                'priority'             => 'medium',
-                'language'             => 'en',
-                'status'               => 'active',
+                'name' => 'SEO Writing',
+                'category' => 'Marketing',
+                'priority' => 'medium',
+                'language' => 'en',
+                'status' => 'active',
                 'generation_frequency' => 'weekly',
             ]);
 
@@ -88,11 +89,11 @@ class TopicManagementTest extends TestCase
     public function test_soft_delete_and_restore_lifecycle(): void
     {
         $topic = Topic::create([
-            'name'                 => 'Deleteme',
-            'category'             => 'Trash',
-            'priority'             => 'low',
-            'language'             => 'en',
-            'status'               => 'draft',
+            'name' => 'Deleteme',
+            'category' => 'Trash',
+            'priority' => 'low',
+            'language' => 'en',
+            'status' => 'draft',
             'generation_frequency' => 'monthly',
         ]);
 
@@ -109,8 +110,8 @@ class TopicManagementTest extends TestCase
 
         $restoreResponse->assertStatus(200);
         $this->assertDatabaseHas('topics', [
-            'id'         => $topic->id,
-            'deleted_at' => null
+            'id' => $topic->id,
+            'deleted_at' => null,
         ]);
     }
 }

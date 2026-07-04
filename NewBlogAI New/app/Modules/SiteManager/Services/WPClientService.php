@@ -2,10 +2,10 @@
 
 namespace App\Modules\SiteManager\Services;
 
-use App\Modules\SiteManager\Models\Site;
+use App\Models\keys;
 use App\Modules\SiteManager\Events\SiteSyncCompleted;
 use App\Modules\SiteManager\Events\SiteSyncFailed;
-use App\Models\keys;
+use App\Modules\SiteManager\Models\Site;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -16,14 +16,12 @@ class WPClientService
     /**
      * Synchronize a site's configuration with the remote WordPress site.
      *
-     * @param Site $site
-     * @return array
      * @throws \Exception
      */
     public function sync(Site $site): array
     {
         $domain = rtrim($site->domain_url, '/');
-        if (empty($domain) || !filter_var($domain, FILTER_VALIDATE_URL)) {
+        if (empty($domain) || ! filter_var($domain, FILTER_VALIDATE_URL)) {
             $error = "Invalid target URL: {$domain}";
             event(new SiteSyncFailed($site, $error));
             throw new \InvalidArgumentException($error);
@@ -41,7 +39,7 @@ class WPClientService
         $payload = $this->configuration->build($site);
         $payload['api_key'] = $apiKey;
 
-        $wpUrl = $domain . '/wp-json/ai-news/v1/sync-data';
+        $wpUrl = $domain.'/wp-json/ai-news/v1/sync-data';
 
         Log::info("Dispatching WP sync request to: {$wpUrl}");
 
@@ -52,7 +50,7 @@ class WPClientService
 
             if ($response->successful()) {
                 $responseData = $response->json() ?? [];
-                
+
                 // Update database state
                 $site->update([
                     'last_synced_at' => now(),
@@ -68,7 +66,7 @@ class WPClientService
             $statusCode = $response->status();
             $body = $response->body();
             $error = "WordPress API returned status {$statusCode}: {$body}";
-            
+
             $site->update([
                 'last_sync_status' => 'failed',
                 'error_log' => $error,
@@ -76,10 +74,9 @@ class WPClientService
 
             event(new SiteSyncFailed($site, $error));
             throw new \RuntimeException($error);
-
         } catch (\Exception $e) {
-            $error = "Sync exception: " . $e->getMessage();
-            
+            $error = 'Sync exception: '.$e->getMessage();
+
             $site->update([
                 'last_sync_status' => 'failed',
                 'error_log' => $error,
@@ -92,32 +89,30 @@ class WPClientService
 
     /**
      * Validate the connection to the remote WordPress site.
-     *
-     * @param Site $site
-     * @return bool
      */
     public function validateConnection(Site $site): bool
     {
         $domain = rtrim($site->domain_url, '/');
-        if (empty($domain) || !filter_var($domain, FILTER_VALIDATE_URL)) {
+        if (empty($domain) || ! filter_var($domain, FILTER_VALIDATE_URL)) {
             $site->update([
                 'status' => 'error',
-                'error_log' => "Invalid target URL: {$domain}"
+                'error_log' => "Invalid target URL: {$domain}",
             ]);
+
             return false;
         }
 
         $apiKey = $this->resolveApiKey($site);
-        $wpUrl = $domain . '/wp-json/ai-news/v1/ping';
+        $wpUrl = $domain.'/wp-json/ai-news/v1/ping';
 
         try {
             $response = Http::timeout(10)
                 ->withoutVerifying()
                 ->withHeaders([
-                    'Authorization' => 'Bearer ' . $apiKey
+                    'Authorization' => 'Bearer '.$apiKey,
                 ])
                 ->post($wpUrl, [
-                    'api_key' => $apiKey
+                    'api_key' => $apiKey,
                 ]);
 
             if ($response->successful()) {
@@ -133,19 +128,21 @@ class WPClientService
                 return true;
             }
 
-            $error = "WP connection check status {$response->status()}: " . $response->body();
+            $error = "WP connection check status {$response->status()}: ".$response->body();
             $site->update([
                 'status' => 'error',
                 'error_log' => $error,
             ]);
+
             return false;
 
         } catch (\Exception $e) {
-            $error = "WP connection exception: " . $e->getMessage();
+            $error = 'WP connection exception: '.$e->getMessage();
             $site->update([
                 'status' => 'error',
                 'error_log' => $error,
             ]);
+
             return false;
         }
     }
@@ -153,16 +150,12 @@ class WPClientService
     /**
      * Publish or update a post on remote WordPress site.
      *
-     * @param Site $site
-     * @param string $title
-     * @param string $content
-     * @param string $status (draft, publish, pending, future)
-     * @param string|null $scheduledAt
-     * @param int|null $wpPostId
+     * @param  string  $status  (draft, publish, pending, future)
      * @return array [
-     *    'id'   => int (WP Post ID),
-     *    'link' => string (Published URL)
-     * ]
+     *               'id'   => int (WP Post ID),
+     *               'link' => string (Published URL)
+     *               ]
+     *
      * @throws \Exception
      */
     public function publishPost(Site $site, string $title, string $content, string $status = 'draft', ?string $scheduledAt = null, ?int $wpPostId = null): array
@@ -175,14 +168,14 @@ class WPClientService
         }
 
         // Determine correct endpoint
-        $endpoint = $wpPostId 
+        $endpoint = $wpPostId
             ? "{$domain}/wp-json/wp/v2/posts/{$wpPostId}"
             : "{$domain}/wp-json/wp/v2/posts";
 
         $payload = [
-            'title'   => $title,
+            'title' => $title,
             'content' => $content,
-            'status'  => $status,
+            'status' => $status,
         ];
 
         if ($status === 'future' && $scheduledAt) {
@@ -193,32 +186,28 @@ class WPClientService
             $response = Http::timeout(20)
                 ->withoutVerifying()
                 ->withHeaders([
-                    'Authorization' => 'Bearer ' . $apiKey
+                    'Authorization' => 'Bearer '.$apiKey,
                 ])
                 ->post($endpoint, $payload);
 
             if ($response->successful()) {
                 $data = $response->json();
+
                 return [
-                    'id'   => $data['id'] ?? null,
+                    'id' => $data['id'] ?? null,
                     'link' => $data['link'] ?? null,
                 ];
             }
 
-            throw new \RuntimeException("WordPress REST API error ({$response->status()}): " . $response->body());
-
+            throw new \RuntimeException("WordPress REST API error ({$response->status()}): ".$response->body());
         } catch (\Exception $e) {
-            Log::error("WordPress publishing failed: " . $e->getMessage());
+            Log::error('WordPress publishing failed: '.$e->getMessage());
             throw $e;
         }
     }
 
     /**
      * Retrieve post details from remote WordPress site to sync status.
-     *
-     * @param Site $site
-     * @param int $wpPostId
-     * @return array|null
      */
     public function getPost(Site $site, int $wpPostId): ?array
     {
@@ -230,7 +219,7 @@ class WPClientService
             $response = Http::timeout(10)
                 ->withoutVerifying()
                 ->withHeaders([
-                    'Authorization' => 'Bearer ' . $apiKey
+                    'Authorization' => 'Bearer '.$apiKey,
                 ])
                 ->get($endpoint);
 
@@ -243,28 +232,27 @@ class WPClientService
                 return null;
             }
 
-            Log::warning("WordPress post retrieval failed with status {$response->status()}: " . $response->body());
+            Log::warning("WordPress post retrieval failed with status {$response->status()}: ".$response->body());
+
             return null;
 
         } catch (\Exception $e) {
-            Log::error("WordPress post retrieval exception: " . $e->getMessage());
+            Log::error('WordPress post retrieval exception: '.$e->getMessage());
+
             return null;
         }
     }
 
     /**
      * Resolve the active API key for the site.
-     *
-     * @param Site $site
-     * @return string|null
      */
     protected function resolveApiKey(Site $site): ?string
     {
-        if (!empty($site->api_key)) {
+        if (! empty($site->api_key)) {
             return $site->api_key;
         }
 
-        if (!empty($site->key_id)) {
+        if (! empty($site->key_id)) {
             $keyRecord = keys::find($site->key_id);
             if ($keyRecord) {
                 return $keyRecord->key;
@@ -272,7 +260,7 @@ class WPClientService
         }
 
         if (is_numeric($site->api_key)) {
-            $keyRecord = keys::find((int)$site->api_key);
+            $keyRecord = keys::find((int) $site->api_key);
             if ($keyRecord) {
                 return $keyRecord->key;
             }

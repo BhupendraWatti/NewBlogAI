@@ -2,17 +2,18 @@
 
 namespace App\Modules\CustomerManager\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Modules\CustomerManager\Observers\CustomerObserver;
+use App\Modules\SiteManager\Models\Site;
+use App\Modules\SubscriptionManager\Models\Subscription;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-
-use App\Modules\CustomerManager\Observers\CustomerObserver;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Customer extends Model
 {
-    use SoftDeletes, HasUuids;
+    use HasUuids, SoftDeletes;
 
     protected static function boot()
     {
@@ -37,7 +38,7 @@ class Customer extends Model
         'tags',
         'health_score',
         'last_login_at',
-        'last_activity_at'
+        'last_activity_at',
     ];
 
     /**
@@ -74,7 +75,7 @@ class Customer extends Model
      */
     public function subscription(): HasOne
     {
-        return $this->hasOne(\App\Modules\SubscriptionManager\Models\Subscription::class, 'customer_id');
+        return $this->hasOne(Subscription::class, 'customer_id');
     }
 
     /**
@@ -82,6 +83,6 @@ class Customer extends Model
      */
     public function sites(): HasMany
     {
-        return $this->hasMany(\App\Modules\SiteManager\Models\Site::class, 'customer_id');
+        return $this->hasMany(Site::class, 'customer_id');
     }
 }

@@ -16,7 +16,7 @@ class TestConnectionRequest extends FormRequest
     {
         return [
             'api_key' => ['sometimes', 'required', 'string'],
-            'model'   => ['sometimes', 'nullable', 'string', 'max:255'],
+            'model' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
     }
 }

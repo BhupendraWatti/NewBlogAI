@@ -3,13 +3,13 @@
 namespace App\Modules\SiteManager\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\SiteManager\Events\SiteCreated;
+use App\Modules\SiteManager\Jobs\SyncSiteDataJob;
 use App\Modules\SiteManager\Models\Site;
 use App\Modules\SiteManager\Requests\StoreSiteRequest;
 use App\Modules\SiteManager\Requests\UpdateSiteRequest;
 use App\Modules\SiteManager\Resources\SiteResource;
 use App\Modules\SiteManager\Services\SiteService;
-use App\Modules\SiteManager\Jobs\SyncSiteDataJob;
-use App\Modules\SiteManager\Events\SiteCreated;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -31,11 +31,11 @@ class SiteController extends Controller
 
         $query = Site::with('promt')->latest();
 
-        if (!empty($search)) {
-            $query->where('domain_url', 'like', '%' . $search . '%');
+        if (! empty($search)) {
+            $query->where('domain_url', 'like', '%'.$search.'%');
         }
 
-        if (!empty($status)) {
+        if (! empty($status)) {
             $query->where('status', $status);
         }
 
@@ -67,6 +67,7 @@ class SiteController extends Controller
     public function show(string $id): SiteResource
     {
         $site = Site::with('promt')->findOrFail($id);
+
         return new SiteResource($site);
     }
 
@@ -96,14 +97,14 @@ class SiteController extends Controller
 
         if ($site->is_default) {
             return response()->json([
-                'message' => 'Cannot delete default site. Set another website as default first.'
+                'message' => 'Cannot delete default site. Set another website as default first.',
             ], 422);
         }
 
         $this->siteService->deleteSite($site);
 
         return response()->json([
-            'message' => 'Site configuration deleted successfully.'
+            'message' => 'Site configuration deleted successfully.',
         ]);
     }
 
@@ -119,7 +120,7 @@ class SiteController extends Controller
 
         return response()->json([
             'message' => 'Synchronization queued successfully.',
-            'status' => 'syncing'
+            'status' => 'syncing',
         ], 202);
     }
 
@@ -155,7 +156,7 @@ class SiteController extends Controller
         $this->siteService->setDefault($site);
 
         return response()->json([
-            'message' => 'Website is now set as the default destination.'
+            'message' => 'Website is now set as the default destination.',
         ]);
     }
 }

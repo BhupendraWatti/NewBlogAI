@@ -2,6 +2,7 @@
 
 namespace App\Modules\PromptManager\Models;
 
+use App\Modules\TopicManager\Models\Topic;
 use Illuminate\Database\Eloquent\Model;
 
 class Prompt extends Model
@@ -33,6 +34,6 @@ class Prompt extends Model
 
     public function topic()
     {
-        return $this->belongsTo(\App\Modules\TopicManager\Models\Topic::class, 'topic_id');
+        return $this->belongsTo(Topic::class, 'topic_id');
     }
 }

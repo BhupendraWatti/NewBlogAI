@@ -1,59 +1,68 @@
 <?php
+
 namespace NewsBlogify;
 
-if ( ! defined( 'ABSPATH' ) ) {
+if (! defined('ABSPATH')) {
     exit;
 }
 
-class Config {
+class Config
+{
     private static $option_name = 'newsblogify_settings';
 
     /**
      * Retrieve a setting by key.
      *
-     * @param string $key Settings key.
-     * @param mixed  $default Default value if setting not found.
+     * @param  string  $key  Settings key.
+     * @param  mixed  $default  Default value if setting not found.
      * @return mixed Setting value.
      */
-    public static function get( $key, $default = '' ) {
-        $settings = get_option( self::$option_name, [] );
-        if ( ! is_array( $settings ) ) {
+    public static function get($key, $default = '')
+    {
+        $settings = get_option(self::$option_name, []);
+        if (! is_array($settings)) {
             $settings = [];
         }
-        return isset( $settings[ $key ] ) ? $settings[ $key ] : $default;
+
+        return isset($settings[$key]) ? $settings[$key] : $default;
     }
 
     /**
      * Update/insert a setting by key.
      *
-     * @param string $key Settings key.
-     * @param mixed  $value Setting value.
+     * @param  string  $key  Settings key.
+     * @param  mixed  $value  Setting value.
      * @return bool True if value changed, false otherwise.
      */
-    public static function update( $key, $value ) {
-        $settings = get_option( self::$option_name, [] );
-        if ( ! is_array( $settings ) ) {
+    public static function update($key, $value)
+    {
+        $settings = get_option(self::$option_name, []);
+        if (! is_array($settings)) {
             $settings = [];
         }
-        $settings[ $key ] = $value;
-        return update_option( self::$option_name, $settings );
+        $settings[$key] = $value;
+
+        return update_option(self::$option_name, $settings);
     }
 
     /**
      * Delete a setting key.
      *
-     * @param string $key Settings key.
+     * @param  string  $key  Settings key.
      * @return bool True if key existed and was deleted, false otherwise.
      */
-    public static function delete( $key ) {
-        $settings = get_option( self::$option_name, [] );
-        if ( ! is_array( $settings ) ) {
+    public static function delete($key)
+    {
+        $settings = get_option(self::$option_name, []);
+        if (! is_array($settings)) {
             $settings = [];
         }
-        if ( isset( $settings[ $key ] ) ) {
-            unset( $settings[ $key ] );
-            return update_option( self::$option_name, $settings );
+        if (isset($settings[$key])) {
+            unset($settings[$key]);
+
+            return update_option(self::$option_name, $settings);
         }
+
         return false;
     }
 
@@ -62,7 +71,8 @@ class Config {
      *
      * @return bool True if option deleted successfully, false otherwise.
      */
-    public static function clear() {
-        return delete_option( self::$option_name );
+    public static function clear()
+    {
+        return delete_option(self::$option_name);
     }
 }

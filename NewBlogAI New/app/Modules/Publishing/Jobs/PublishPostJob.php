@@ -38,19 +38,21 @@ class PublishPostJob implements ShouldQueue
     public function handle(PublishingService $publishingService): void
     {
         $logRecord = PublishingLog::with(['content', 'site'])->find($this->logId);
-        if (!$logRecord) {
+        if (! $logRecord) {
             Log::error("PublishPostJob failed: Publishing log ID {$this->logId} not found.");
+
             return;
         }
 
         if ($logRecord->status === 'cancelled') {
             Log::info("PublishPostJob ID {$this->logId} was cancelled. Aborting.");
+
             return;
         }
 
         try {
             $logRecord->update([
-                'status'     => 'processing',
+                'status' => 'processing',
                 'started_at' => now(),
             ]);
 
@@ -58,23 +60,23 @@ class PublishPostJob implements ShouldQueue
             $publishingService->executePublish($logRecord);
 
         } catch (\Exception $e) {
-            Log::error("PublishPostJob failed for log ID {$this->logId}: " . $e->getMessage());
+            Log::error("PublishPostJob failed for log ID {$this->logId}: ".$e->getMessage());
 
             $attempts = $this->attempts();
             if ($attempts < $this->tries) {
                 $logRecord->update([
-                    'status'        => 'retrying',
-                    'retry_count'   => $attempts,
-                    'error_message' => "Attempt {$attempts} failed: " . $e->getMessage(),
+                    'status' => 'retrying',
+                    'retry_count' => $attempts,
+                    'error_message' => "Attempt {$attempts} failed: ".$e->getMessage(),
                 ]);
 
                 // Re-queue with delay
                 $this->release($this->backoff);
             } else {
                 $logRecord->update([
-                    'status'        => 'failed',
-                    'completed_at'  => now(),
-                    'error_message' => "All {$this->tries} attempts failed. Error: " . $e->getMessage(),
+                    'status' => 'failed',
+                    'completed_at' => now(),
+                    'error_message' => "All {$this->tries} attempts failed. Error: ".$e->getMessage(),
                 ]);
 
                 $logRecord->content->update(['status' => 'draft']); // fall back to draft

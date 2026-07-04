@@ -19,30 +19,31 @@ class PaymentGatewayStub implements PaymentGatewayInterface
 {
     public function charge(string $customerEmail, float $amount, ?string $token = null): array
     {
-        Log::info("Stubbing Payment Charge", [
-            'email'  => $customerEmail,
+        Log::info('Stubbing Payment Charge', [
+            'email' => $customerEmail,
             'amount' => $amount,
-            'token'  => $token ?? 'default_card'
+            'token' => $token ?? 'default_card',
         ]);
 
         usleep(100000); // 100ms
 
         if ($token === 'fail_token') {
-            throw new \RuntimeException("Payment Declined: Insufficient Funds.");
+            throw new \RuntimeException('Payment Declined: Insufficient Funds.');
         }
 
         return [
-            'transaction_id' => 'ch_' . bin2hex(random_bytes(8)),
-            'status'         => 'succeeded',
-            'amount'         => $amount,
-            'currency'       => 'usd',
-            'gateway'        => 'Stripe Mock Core'
+            'transaction_id' => 'ch_'.bin2hex(random_bytes(8)),
+            'status' => 'succeeded',
+            'amount' => $amount,
+            'currency' => 'usd',
+            'gateway' => 'Stripe Mock Core',
         ];
     }
 
     public function cancelSubscription(string $subscriptionId): bool
     {
         Log::info("Stubbing gateway cancel subscription: {$subscriptionId}");
+
         return true;
     }
 }

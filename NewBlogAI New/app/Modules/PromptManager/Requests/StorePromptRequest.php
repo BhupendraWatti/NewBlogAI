@@ -14,14 +14,14 @@ class StorePromptRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'topic_id'    => ['nullable', 'integer', 'exists:topics,id'],
-            'name'        => ['required', 'string', 'max:255'],
-            'promt'       => ['required', 'string'],
-            'category'    => ['required', 'string', 'max:255'],
-            'variables'   => ['nullable', 'array'],
+            'topic_id' => ['nullable', 'integer', 'exists:topics,id'],
+            'name' => ['required', 'string', 'max:255'],
+            'promt' => ['required', 'string'],
+            'category' => ['required', 'string', 'max:255'],
+            'variables' => ['nullable', 'array'],
             'variables.*' => ['string'],
-            'version'     => ['nullable', 'string', 'max:50'],
-            'status'      => ['nullable', 'string', 'in:active,inactive'],
+            'version' => ['nullable', 'string', 'max:50'],
+            'status' => ['nullable', 'string', 'in:active,inactive'],
         ];
     }
 }

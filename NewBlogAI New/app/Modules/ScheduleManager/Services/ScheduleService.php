@@ -24,7 +24,7 @@ class ScheduleService
         $this->entitlements->assertCanCreateSchedule($site);
 
         $data['timezone'] ??= $site->timezone ?? 'UTC';
-        $data['next_run_at'] = !empty($data['is_active'])
+        $data['next_run_at'] = ! empty($data['is_active'])
             ? $this->nextRunAt($data)
             : null;
 
@@ -41,7 +41,7 @@ class ScheduleService
         $this->assertValidConfiguration($site, $merged);
         $this->entitlements->assertCanCreateSchedule($site, $schedule->id);
 
-        $merged['next_run_at'] = !empty($merged['is_active'])
+        $merged['next_run_at'] = ! empty($merged['is_active'])
             ? $this->nextRunAt($merged)
             : null;
 
@@ -71,11 +71,11 @@ class ScheduleService
                         ->lockForUpdate()
                         ->find($schedule->id);
 
-                    if (!$locked?->is_active || !$locked->next_run_at?->lte(now())) {
+                    if (! $locked?->is_active || ! $locked->next_run_at?->lte(now())) {
                         return;
                     }
 
-                    if (!$locked->pipeline || $locked->pipeline->site_id !== $locked->site_id) {
+                    if (! $locked->pipeline || $locked->pipeline->site_id !== $locked->site_id) {
                         throw new InvalidArgumentException('A schedule must reference a pipeline owned by the same website.');
                     }
 
@@ -117,7 +117,7 @@ class ScheduleService
         }
 
         $candidate = CarbonImmutable::parse($reference->toDateString().' '.$timeOfDay, $timezone);
-        if (!$candidate->isAfter($reference)) {
+        if (! $candidate->isAfter($reference)) {
             $candidate = match ($frequency) {
                 'weekly' => $candidate->addWeek(),
                 'monthly' => $candidate->addMonthNoOverflow(),
@@ -125,9 +125,9 @@ class ScheduleService
             };
         }
 
-        if ($frequency === 'weekly' && !empty($configuration['days_of_week'])) {
+        if ($frequency === 'weekly' && ! empty($configuration['days_of_week'])) {
             $allowedDays = array_map('strtolower', $configuration['days_of_week']);
-            while (!in_array(strtolower($candidate->englishDayOfWeek), $allowedDays, true)) {
+            while (! in_array(strtolower($candidate->englishDayOfWeek), $allowedDays, true)) {
                 $candidate = $candidate->addDay();
             }
         }
@@ -137,15 +137,15 @@ class ScheduleService
 
     private function assertValidConfiguration(Site $site, array $data): void
     {
-        if (!$site->is_active) {
+        if (! $site->is_active) {
             throw new InvalidArgumentException('Schedules cannot be assigned to an inactive website.');
         }
 
         $this->entitlements->assertFrequencyAllowed($site, $data['frequency'] ?? 'daily');
 
-        if (!empty($data['pipeline_id'])) {
+        if (! empty($data['pipeline_id'])) {
             $pipelineBelongsToSite = $site->pipelines()->whereKey($data['pipeline_id'])->exists();
-            if (!$pipelineBelongsToSite) {
+            if (! $pipelineBelongsToSite) {
                 throw new InvalidArgumentException('The selected pipeline does not belong to this website.');
             }
         }

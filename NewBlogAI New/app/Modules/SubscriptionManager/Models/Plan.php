@@ -3,8 +3,8 @@
 namespace App\Modules\SubscriptionManager\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Plan extends Model
 {
@@ -29,7 +29,7 @@ class Plan extends Model
         'storage_limit',
         'analytics_access',
         'priority_support',
-        'status'
+        'status',
     ];
 
     protected $casts = [
@@ -46,7 +46,7 @@ class Plan extends Model
         'api_keys_allowed' => 'integer',
         'storage_limit' => 'integer',
         'analytics_access' => 'boolean',
-        'priority_support' => 'boolean'
+        'priority_support' => 'boolean',
     ];
 
     /**

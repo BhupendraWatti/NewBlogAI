@@ -37,7 +37,7 @@ class PluginTokenService
 
     public function authenticate(?string $plainTextToken): ?User
     {
-        if (!$plainTextToken) {
+        if (! $plainTextToken) {
             return null;
         }
 
@@ -46,7 +46,7 @@ class PluginTokenService
             ->whereNull('revoked_at')
             ->first();
 
-        if (!$credential) {
+        if (! $credential) {
             return null;
         }
 
@@ -57,7 +57,7 @@ class PluginTokenService
         }
 
         $user = $credential->user;
-        if (!$user) {
+        if (! $user) {
             return null;
         }
 

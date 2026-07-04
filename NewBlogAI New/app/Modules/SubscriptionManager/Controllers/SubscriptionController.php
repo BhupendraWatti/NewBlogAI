@@ -8,9 +8,10 @@ use App\Modules\SubscriptionManager\Models\Plan;
 use App\Modules\SubscriptionManager\Models\Subscription;
 use App\Modules\SubscriptionManager\Models\SubscriptionHistory;
 use App\Modules\SubscriptionManager\Requests\SubscribeRequest;
-use App\Modules\SubscriptionManager\Services\SubscriptionService;
-use App\Modules\SubscriptionManager\Resources\SubscriptionResource;
 use App\Modules\SubscriptionManager\Resources\SubscriptionHistoryResource;
+use App\Modules\SubscriptionManager\Resources\SubscriptionResource;
+use App\Modules\SubscriptionManager\Services\SubscriptionService;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -42,8 +43,8 @@ class SubscriptionController extends Controller
         Gate::authorize('manageSubscriptions', Subscription::class);
 
         $customer = Customer::find($customerId);
-        if (!$customer) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Customer with ID '{$customerId}' not found.");
+        if (! $customer) {
+            throw new ModelNotFoundException("Customer with ID '{$customerId}' not found.");
         }
 
         $plan = Plan::find($request->input('plan_id'));
@@ -65,8 +66,8 @@ class SubscriptionController extends Controller
         Gate::authorize('viewAny', Subscription::class);
 
         $subscription = Subscription::where('customer_id', $customerId)->first();
-        if (!$subscription) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("No subscription found for customer ID '{$customerId}'.");
+        if (! $subscription) {
+            throw new ModelNotFoundException("No subscription found for customer ID '{$customerId}'.");
         }
 
         return new SubscriptionResource($subscription->load('plan'));
@@ -80,8 +81,8 @@ class SubscriptionController extends Controller
         Gate::authorize('manageSubscriptions', Subscription::class);
 
         $subscription = Subscription::where('customer_id', $customerId)->first();
-        if (!$subscription) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Subscription not found.");
+        if (! $subscription) {
+            throw new ModelNotFoundException('Subscription not found.');
         }
 
         $newPlan = Plan::find($request->input('plan_id'));
@@ -101,8 +102,8 @@ class SubscriptionController extends Controller
         Gate::authorize('manageSubscriptions', Subscription::class);
 
         $subscription = Subscription::where('customer_id', $customerId)->first();
-        if (!$subscription) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Subscription not found.");
+        if (! $subscription) {
+            throw new ModelNotFoundException('Subscription not found.');
         }
 
         $newPlan = Plan::find($request->input('plan_id'));
@@ -121,8 +122,8 @@ class SubscriptionController extends Controller
         Gate::authorize('manageSubscriptions', Subscription::class);
 
         $subscription = Subscription::where('customer_id', $customerId)->first();
-        if (!$subscription) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Subscription not found.");
+        if (! $subscription) {
+            throw new ModelNotFoundException('Subscription not found.');
         }
 
         $this->service->pause($subscription);
@@ -138,8 +139,8 @@ class SubscriptionController extends Controller
         Gate::authorize('manageSubscriptions', Subscription::class);
 
         $subscription = Subscription::where('customer_id', $customerId)->first();
-        if (!$subscription) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Subscription not found.");
+        if (! $subscription) {
+            throw new ModelNotFoundException('Subscription not found.');
         }
 
         $this->service->resume($subscription);
@@ -155,15 +156,15 @@ class SubscriptionController extends Controller
         Gate::authorize('manageSubscriptions', Subscription::class);
 
         $subscription = Subscription::where('customer_id', $customerId)->first();
-        if (!$subscription) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException("Subscription not found.");
+        if (! $subscription) {
+            throw new ModelNotFoundException('Subscription not found.');
         }
 
         $this->service->cancel($subscription);
 
         return response()->json([
             'message' => 'Subscription cancelled successfully.',
-            'details' => 'Gateway subscription was cancelled. Service remains active until billing period ends.'
+            'details' => 'Gateway subscription was cancelled. Service remains active until billing period ends.',
         ]);
     }
 

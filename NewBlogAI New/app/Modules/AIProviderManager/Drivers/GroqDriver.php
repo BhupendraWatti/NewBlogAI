@@ -18,19 +18,21 @@ class GroqDriver implements AIProviderClientInterface
                 ->post('https://api.groq.com/openai/v1/chat/completions', [
                     'model' => $model,
                     'messages' => [
-                        ['role' => 'user', 'content' => 'ping']
+                        ['role' => 'user', 'content' => 'ping'],
                     ],
-                    'max_tokens' => 5
+                    'max_tokens' => 5,
                 ]);
 
             if ($response->successful()) {
                 return true;
             }
 
-            Log::warning("Groq test connection failed with status {$response->status()}: " . $response->body());
+            Log::warning("Groq test connection failed with status {$response->status()}: ".$response->body());
+
             return false;
         } catch (\Exception $e) {
-            Log::error("Groq test connection exception: " . $e->getMessage());
+            Log::error('Groq test connection exception: '.$e->getMessage());
+
             return false;
         }
     }
@@ -43,16 +45,16 @@ class GroqDriver implements AIProviderClientInterface
             $response = Http::withToken($apiKey)
                 ->timeout($options['timeout'] ?? 30)
                 ->post('https://api.groq.com/openai/v1/chat/completions', [
-                    'model'       => $model,
-                    'messages'    => [
-                        ['role' => 'user', 'content' => $prompt]
+                    'model' => $model,
+                    'messages' => [
+                        ['role' => 'user', 'content' => $prompt],
                     ],
                     'temperature' => $options['temperature'] ?? 0.7,
-                    'max_tokens'  => $options['max_tokens'] ?? 2000,
+                    'max_tokens' => $options['max_tokens'] ?? 2000,
                 ]);
 
-            if (!$response->successful()) {
-                throw new \RuntimeException("Groq API error: Status {$response->status()} - " . $response->body());
+            if (! $response->successful()) {
+                throw new \RuntimeException("Groq API error: Status {$response->status()} - ".$response->body());
             }
 
             $data = $response->json();
@@ -66,16 +68,16 @@ class GroqDriver implements AIProviderClientInterface
             $cost = (($promptTokens * 0.00005) + ($completionTokens * 0.00005)) / 1000;
 
             return [
-                'text'              => $text,
-                'prompt_tokens'     => $promptTokens,
+                'text' => $text,
+                'prompt_tokens' => $promptTokens,
                 'completion_tokens' => $completionTokens,
-                'total_tokens'      => $totalTokens,
-                'estimated_cost'    => $cost,
-                'raw_response'      => $data,
+                'total_tokens' => $totalTokens,
+                'estimated_cost' => $cost,
+                'raw_response' => $data,
             ];
 
         } catch (\Exception $e) {
-            Log::error("Groq generation failed: " . $e->getMessage());
+            Log::error('Groq generation failed: '.$e->getMessage());
             throw $e;
         }
     }
