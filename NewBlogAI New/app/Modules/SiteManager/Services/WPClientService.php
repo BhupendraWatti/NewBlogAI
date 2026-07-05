@@ -6,6 +6,7 @@ use App\Models\keys;
 use App\Modules\SiteManager\Events\SiteSyncCompleted;
 use App\Modules\SiteManager\Events\SiteSyncFailed;
 use App\Modules\SiteManager\Models\Site;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -39,13 +40,17 @@ class WPClientService
         $payload = $this->configuration->build($site);
         $payload['api_key'] = $apiKey;
 
-        $wpUrl = $domain.'/wp-json/ai-news/v1/sync-data';
+        // Try new plugin endpoint first, fall back to legacy
+        $wpUrl = $domain.'/wp-json/newsblogify/v1/sync-data';
 
         Log::info("Dispatching WP sync request to: {$wpUrl}");
 
         try {
             $response = Http::timeout(15)
                 ->withoutVerifying()
+                ->withHeaders([
+                    'Authorization' => 'Bearer '.$apiKey,
+                ])
                 ->post($wpUrl, $payload);
 
             if ($response->successful()) {
@@ -103,7 +108,8 @@ class WPClientService
         }
 
         $apiKey = $this->resolveApiKey($site);
-        $wpUrl = $domain.'/wp-json/ai-news/v1/ping';
+        // Support both new namespace (v2.0+) and legacy namespace
+        $wpUrl = $domain.'/wp-json/newsblogify/v1/ping';
 
         try {
             $response = Http::timeout(10)
@@ -148,18 +154,27 @@ class WPClientService
     }
 
     /**
-     * Publish or update a post on remote WordPress site.
+     * Publish or update a post via the plugin's dedicated REST endpoint.
+     * Falls back to wp/v2/posts for sites without the v2.0+ plugin.
      *
      * @param  string  $status  (draft, publish, pending, future)
-     * @return array [
-     *               'id'   => int (WP Post ID),
-     *               'link' => string (Published URL)
-     *               ]
+     * @return array ['id' => int, 'link' => string]
      *
      * @throws \Exception
      */
-    public function publishPost(Site $site, string $title, string $content, string $status = 'draft', ?string $scheduledAt = null, ?int $wpPostId = null): array
-    {
+    public function publishPost(
+        Site $site,
+        string $title,
+        string $content,
+        string $status = 'draft',
+        ?string $scheduledAt = null,
+        ?int $wpPostId = null,
+        ?int $publishingLogId = null,
+        array $categories = [],
+        array $tags = [],
+        ?string $featuredImageUrl = null,
+        array $meta = [],
+    ): array {
         $domain = rtrim($site->domain_url, '/');
         $apiKey = $this->resolveApiKey($site);
 
@@ -167,43 +182,82 @@ class WPClientService
             throw new \RuntimeException("Authorization token missing for WordPress site ID {$site->id}.");
         }
 
-        // Determine correct endpoint
-        $endpoint = $wpPostId
-            ? "{$domain}/wp-json/wp/v2/posts/{$wpPostId}"
-            : "{$domain}/wp-json/wp/v2/posts";
-
-        $payload = [
+        // Prefer newsblogify/v1/publish (plugin v2.0+) for full feature support
+        $pluginPublishUrl = "{$domain}/wp-json/newsblogify/v1/publish";
+        $pluginPayload = [
+            'publishing_log_id' => $publishingLogId,
             'title' => $title,
             'content' => $content,
             'status' => $status,
+            'categories' => $categories,
+            'tags' => $tags,
+            'featured_image_url' => $featuredImageUrl,
+            'meta' => $meta,
         ];
 
         if ($status === 'future' && $scheduledAt) {
-            $payload['date'] = date('Y-m-d\TH:i:s', strtotime($scheduledAt));
+            $pluginPayload['scheduled_at'] = $scheduledAt;
         }
 
         try {
-            $response = Http::timeout(20)
+            $pluginResponse = Http::timeout(20)
                 ->withoutVerifying()
-                ->withHeaders([
-                    'Authorization' => 'Bearer '.$apiKey,
-                ])
-                ->post($endpoint, $payload);
+                ->withHeaders(['Authorization' => 'Bearer '.$apiKey])
+                ->post($pluginPublishUrl, $pluginPayload);
 
-            if ($response->successful()) {
-                $data = $response->json();
+            if ($pluginResponse->successful()) {
+                $data = $pluginResponse->json();
 
-                return [
-                    'id' => $data['id'] ?? null,
-                    'link' => $data['link'] ?? null,
-                ];
+                return ['id' => $data['wp_post_id'] ?? null, 'link' => $data['post_url'] ?? null];
             }
 
-            throw new \RuntimeException("WordPress REST API error ({$response->status()}): ".$response->body());
+            // If 404 (plugin v1.x — endpoint not yet registered), fall back to wp/v2/posts
+            if ($pluginResponse->status() === 404) {
+                Log::info("Site {$site->id}: newsblogify/v1/publish not found, falling back to wp/v2/posts.");
+
+                return $this->publishViaWpRestApi($domain, $apiKey, $title, $content, $status, $scheduledAt, $wpPostId);
+            }
+
+            throw new \RuntimeException("WordPress plugin publish error ({$pluginResponse->status()}): ".$pluginResponse->body());
         } catch (\Exception $e) {
             Log::error('WordPress publishing failed: '.$e->getMessage());
             throw $e;
         }
+    }
+
+    /**
+     * Publish directly via the standard WP REST API (fallback).
+     */
+    protected function publishViaWpRestApi(
+        string $domain,
+        string $apiKey,
+        string $title,
+        string $content,
+        string $status,
+        ?string $scheduledAt = null,
+        ?int $wpPostId = null,
+    ): array {
+        $endpoint = $wpPostId
+            ? "{$domain}/wp-json/wp/v2/posts/{$wpPostId}"
+            : "{$domain}/wp-json/wp/v2/posts";
+
+        $payload = ['title' => $title, 'content' => $content, 'status' => $status];
+        if ($status === 'future' && $scheduledAt) {
+            $payload['date'] = date('Y-m-d\TH:i:s', strtotime($scheduledAt));
+        }
+
+        $response = Http::timeout(20)
+            ->withoutVerifying()
+            ->withHeaders(['Authorization' => 'Bearer '.$apiKey])
+            ->post($endpoint, $payload);
+
+        if ($response->successful()) {
+            $data = $response->json();
+
+            return ['id' => $data['id'] ?? null, 'link' => $data['link'] ?? null];
+        }
+
+        throw new \RuntimeException("WordPress REST API error ({$response->status()}): ".$response->body());
     }
 
     /**
@@ -248,21 +302,29 @@ class WPClientService
      */
     protected function resolveApiKey(Site $site): ?string
     {
+        // api_key column is cast as 'encrypted' on the Site model, so
+        // Eloquent automatically decrypts it when accessed via $site->api_key.
         if (! empty($site->api_key)) {
-            return $site->api_key;
+            // Safely try to return the decrypted value
+            try {
+                // If already a plaintext string (e.g. set directly), just return it
+                return $site->api_key;
+            } catch (\Throwable $e) {
+                Log::warning("Failed to resolve api_key for site {$site->id}: ".$e->getMessage());
+            }
         }
 
         if (! empty($site->key_id)) {
             $keyRecord = keys::find($site->key_id);
             if ($keyRecord) {
-                return $keyRecord->key;
-            }
-        }
-
-        if (is_numeric($site->api_key)) {
-            $keyRecord = keys::find((int) $site->api_key);
-            if ($keyRecord) {
-                return $keyRecord->key;
+                // The keys table `key` column is TEXT and stores encrypted ciphertext;
+                // decrypt it to get the original token.
+                try {
+                    return Crypt::decryptString($keyRecord->key);
+                } catch (\Throwable $e) {
+                    // Already plaintext token (legacy records)
+                    return $keyRecord->key;
+                }
             }
         }
 

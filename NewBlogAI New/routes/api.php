@@ -35,14 +35,14 @@ Route::prefix('v1')->group(function () {
             Route::put('auth/password', [AuthController::class, 'changePassword']);
         });
 
-        // System Settings Routes
-        Route::middleware('auth')->group(function () {
+        // System Settings Routes (SuperAdmin/Admin only)
+        Route::middleware(['auth', 'role:1,2,3'])->group(function () {
             Route::get('settings', [SystemSettingsController::class, 'index']);
             Route::post('settings', [SystemSettingsController::class, 'update']);
         });
 
-        // AI Providers Routes
-        Route::middleware('auth')->group(function () {
+        // AI Providers Routes (SuperAdmin/Admin only)
+        Route::middleware(['auth', 'role:1,2,3'])->group(function () {
             Route::post('providers/{provider}/test-connection', [AIProviderController::class, 'testConnection']);
             Route::post('providers/{provider}/set-default', [AIProviderController::class, 'setDefault']);
             Route::apiResource('providers', AIProviderController::class);
@@ -112,23 +112,26 @@ Route::prefix('v1')->group(function () {
         Route::middleware('auth')->group(function () {
             Route::apiResource('prompts', PromptController::class);
 
-            // Customer Management Module
-            Route::apiResource('customers', CustomerController::class);
-            Route::post('customers/{id}/restore', [CustomerController::class, 'restore']);
-            Route::post('customers/{id}/archive', [CustomerController::class, 'archive']);
-            Route::post('customers/{id}/notes', [CustomerController::class, 'storeNote']);
-            Route::get('customers/{id}/timeline', [CustomerController::class, 'timeline']);
+            // Customer & Plan Management (SuperAdmin/Support only)
+            Route::middleware('role:1,3')->group(function () {
+                // Customer Management Module
+                Route::apiResource('customers', CustomerController::class);
+                Route::post('customers/{id}/restore', [CustomerController::class, 'restore']);
+                Route::post('customers/{id}/archive', [CustomerController::class, 'archive']);
+                Route::post('customers/{id}/notes', [CustomerController::class, 'storeNote']);
+                Route::get('customers/{id}/timeline', [CustomerController::class, 'timeline']);
 
-            // Subscription & Plan Management Module
-            Route::apiResource('plans', PlanController::class);
-            Route::get('customers/{id}/subscription', [SubscriptionController::class, 'show']);
-            Route::post('customers/{id}/subscription', [SubscriptionController::class, 'store']);
-            Route::post('customers/{id}/subscription/upgrade', [SubscriptionController::class, 'upgrade']);
-            Route::post('customers/{id}/subscription/downgrade', [SubscriptionController::class, 'downgrade']);
-            Route::post('customers/{id}/subscription/pause', [SubscriptionController::class, 'pause']);
-            Route::post('customers/{id}/subscription/resume', [SubscriptionController::class, 'resume']);
-            Route::post('customers/{id}/subscription/cancel', [SubscriptionController::class, 'cancel']);
-            Route::get('customers/{id}/subscription/history', [SubscriptionController::class, 'history']);
+                // Subscription & Plan Management Module
+                Route::apiResource('plans', PlanController::class);
+                Route::get('customers/{id}/subscription', [SubscriptionController::class, 'show']);
+                Route::post('customers/{id}/subscription', [SubscriptionController::class, 'store']);
+                Route::post('customers/{id}/subscription/upgrade', [SubscriptionController::class, 'upgrade']);
+                Route::post('customers/{id}/subscription/downgrade', [SubscriptionController::class, 'downgrade']);
+                Route::post('customers/{id}/subscription/pause', [SubscriptionController::class, 'pause']);
+                Route::post('customers/{id}/subscription/resume', [SubscriptionController::class, 'resume']);
+                Route::post('customers/{id}/subscription/cancel', [SubscriptionController::class, 'cancel']);
+                Route::get('customers/{id}/subscription/history', [SubscriptionController::class, 'history']);
+            });
         });
     });
 

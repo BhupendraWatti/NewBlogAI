@@ -59,8 +59,12 @@ class AIProviderService
     {
         try {
             return DB::transaction(function () use ($provider, $data) {
-                if (array_key_exists('api_key', $data) && ($data['api_key'] === '' || is_null($data['api_key']))) {
-                    unset($data['api_key']);
+                if (array_key_exists('api_key', $data)) {
+                    $submittedKey = $data['api_key'];
+                    $currentMasked = $provider->getMaskedApiKey();
+                    if ($submittedKey === '' || is_null($submittedKey) || $submittedKey === '••••••••••••••••••••' || ($currentMasked !== null && $submittedKey === $currentMasked)) {
+                        unset($data['api_key']);
+                    }
                 }
 
                 if (! empty($data['is_default'])) {

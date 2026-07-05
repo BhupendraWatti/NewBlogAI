@@ -29,11 +29,11 @@ Route::get('/login', function () {
 
 foreach ($workspaces as $workspace) {
     $path = $workspace === 'dashboard' ? '/' : "/{$workspace}";
-    Route::get($path, function () {
+    Route::get($path, function () use ($workspace) {
         if (app()->environment() !== 'testing' && ! auth()->check()) {
             abort(401);
         }
 
-        return view('dashboard');
+        return view('dashboard', ['activeView' => $workspace]);
     })->name($workspace);
 }

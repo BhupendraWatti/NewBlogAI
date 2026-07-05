@@ -16,17 +16,17 @@ class REST_Controller
     }
 
     /**
-     * Register target endpoints under namespace ai-news/v1.
+     * Register target endpoints under namespace newsblogify/v1.
      */
     public function register_routes()
     {
-        register_rest_route('ai-news/v1', '/ping', [
+        register_rest_route('newsblogify/v1', '/ping', [
             'methods' => 'POST',
             'callback' => [$this, 'handle_ping'],
             'permission_callback' => [$this, 'verify_api_key'],
         ]);
 
-        register_rest_route('ai-news/v1', '/sync-data', [
+        register_rest_route('newsblogify/v1', '/sync-data', [
             'methods' => 'POST',
             'callback' => [$this, 'handle_sync'],
             'permission_callback' => [$this, 'verify_api_key'],
@@ -49,7 +49,7 @@ class REST_Controller
             $token = $request->get_param('api_key');
         }
 
-        $stored_token = Config::get('api_token', '');
+        $stored_token = Config::get('plugin_token', '');
 
         if (empty($stored_token)) {
             return true;
@@ -63,7 +63,7 @@ class REST_Controller
     }
 
     /**
-     * Callback for POST /wp-json/ai-news/v1/ping.
+     * Callback for POST /wp-json/newsblogify/v1/ping.
      */
     public function handle_ping(\WP_REST_Request $request)
     {
@@ -77,7 +77,7 @@ class REST_Controller
     }
 
     /**
-     * Callback for POST /wp-json/ai-news/v1/sync-data.
+     * Callback for POST /wp-json/newsblogify/v1/sync-data.
      */
     public function handle_sync(\WP_REST_Request $request)
     {
@@ -137,7 +137,7 @@ class REST_Controller
         }
 
         $stored_app_pwd = Config::get('wp_app_pwd', '');
-        $stored_api_token = Config::get('api_token', '');
+        $stored_api_token = Config::get('plugin_token', '');
         $mapped_user_id = Config::get('wp_user_id', 0);
 
         if (empty($mapped_user_id)) {

@@ -4,7 +4,7 @@
                             <h2 class="font-display font-bold text-2xl">Prompt Library</h2>
                             <p class="text-xs text-muted">Create and manage reusable prompts. Content automation pipelines select prompts directly from this library.</p>
                         </div>
-                        <button onclick="launchCreationWizard('prompt')" class="bg-accent hover:bg-accent/80 text-background font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 cyber-glow-emerald">
+                        <button onclick="openNewPromptTemplate()" class="bg-accent hover:bg-accent/80 text-background font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 cyber-glow-emerald">
                             <span class="material-symbols-outlined text-sm font-bold">add</span> Create Template
                         </button>
                     </div>

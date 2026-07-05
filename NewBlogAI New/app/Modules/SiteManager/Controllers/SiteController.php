@@ -13,6 +13,7 @@ use App\Modules\SiteManager\Services\SiteService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Auth;
 
 class SiteController extends Controller
 {
@@ -30,6 +31,11 @@ class SiteController extends Controller
         $status = $request->get('status');
 
         $query = Site::with('promt')->latest();
+
+        // Tenant Isolation: Only allow SuperAdmin to view all websites
+        if (Auth::user()->role !== 1) {
+            $query->where('customer_id', Auth::user()->customer_id);
+        }
 
         if (! empty($search)) {
             $query->where('domain_url', 'like', '%'.$search.'%');
@@ -52,6 +58,11 @@ class SiteController extends Controller
         $validated = $request->validated();
         $validated['domain_url'] = rtrim($validated['domain_url'], '/');
 
+        // Tenant Isolation: Force customer_id to match user's customer unless they are SuperAdmin/Support
+        if (Auth::user()->role !== 1 && Auth::user()->role !== 3) {
+            $validated['customer_id'] = Auth::user()->customer_id;
+        }
+
         $site = $this->siteService->createSite($validated);
 
         event(new SiteCreated($site));
@@ -66,7 +77,7 @@ class SiteController extends Controller
      */
     public function show(string $id): SiteResource
     {
-        $site = Site::with('promt')->findOrFail($id);
+        $site = $this->findSiteOrFail($id, ['promt']);
 
         return new SiteResource($site);
     }
@@ -76,11 +87,16 @@ class SiteController extends Controller
      */
     public function update(UpdateSiteRequest $request, string $id): SiteResource
     {
-        $site = Site::findOrFail($id);
+        $site = $this->findSiteOrFail($id);
         $validated = $request->validated();
 
         if (isset($validated['domain_url'])) {
             $validated['domain_url'] = rtrim($validated['domain_url'], '/');
+        }
+
+        // Tenant Isolation: Don't allow changing customer_id for non-SuperAdmins
+        if (Auth::user()->role !== 1 && Auth::user()->role !== 3) {
+            unset($validated['customer_id']);
         }
 
         $updated = $this->siteService->updateSite($site, $validated);
@@ -93,7 +109,7 @@ class SiteController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
-        $site = Site::findOrFail($id);
+        $site = $this->findSiteOrFail($id);
 
         if ($site->is_default) {
             return response()->json([
@@ -113,15 +129,14 @@ class SiteController extends Controller
      */
     public function sync(string $id): JsonResponse
     {
-        $site = Site::findOrFail($id);
+        $site = $this->findSiteOrFail($id);
 
         // Dispatch background job to Horizon queue
         SyncSiteDataJob::dispatch($site);
 
         return response()->json([
-            'message' => 'Synchronization queued successfully.',
-            'status' => 'syncing',
-        ], 202);
+            'message' => 'Synchronization job dispatched successfully.',
+        ]);
     }
 
     /**
@@ -129,7 +144,7 @@ class SiteController extends Controller
      */
     public function validateConnection(string $id): JsonResponse
     {
-        $site = Site::findOrFail($id);
+        $site = $this->findSiteOrFail($id);
         $connected = $this->siteService->validateConnection($site);
 
         if ($connected) {
@@ -152,11 +167,28 @@ class SiteController extends Controller
      */
     public function setDefault(string $id): JsonResponse
     {
-        $site = Site::findOrFail($id);
+        $site = $this->findSiteOrFail($id);
         $this->siteService->setDefault($site);
 
         return response()->json([
             'message' => 'Website is now set as the default destination.',
         ]);
+    }
+
+    /**
+     * Helper to find a site by ID while enforcing tenant isolation.
+     */
+    private function findSiteOrFail(string $id, array $relations = []): Site
+    {
+        $query = Site::query();
+        if (! empty($relations)) {
+            $query->with($relations);
+        }
+
+        if (Auth::user()->role !== 1) {
+            $query->where('customer_id', Auth::user()->customer_id);
+        }
+
+        return $query->findOrFail($id);
     }
 }

@@ -10,7 +10,7 @@ class GoogleGeminiDriver implements AIProviderClientInterface
 {
     public function testConnection(string $apiKey, ?string $model = null): bool
     {
-        $model = $model ?: 'gemini-1.5-flash';
+        $model = $model ?: 'gemini-2.5-flash';
         $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
 
         try {
@@ -43,7 +43,7 @@ class GoogleGeminiDriver implements AIProviderClientInterface
 
     public function generate(string $apiKey, string $prompt, ?string $model = null, array $options = []): array
     {
-        $model = $model ?: 'gemini-1.5-flash';
+        $model = $model ?: 'gemini-2.5-flash';
         $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
 
         try {

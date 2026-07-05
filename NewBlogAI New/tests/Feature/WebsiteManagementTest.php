@@ -68,7 +68,7 @@ class WebsiteManagementTest extends TestCase
     {
         // Mock custom WordPress plugin endpoint
         Http::fake([
-            'https://connectedwp.com/wp-json/ai-news/v1/ping' => Http::response(['version' => '1.2.3'], 200),
+            'https://connectedwp.com/wp-json/newsblogify/v1/ping' => Http::response(['version' => '1.2.3'], 200),
         ]);
 
         $site = Site::create([

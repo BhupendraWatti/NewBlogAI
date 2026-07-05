@@ -1,4 +1,4 @@
-﻿        <!-- HEADER PANEL -->
+        <!-- HEADER PANEL -->
         <header class="h-14 border-b border-border px-6 flex justify-between items-center shrink-0">
             <!-- Breadcrumbs -->
             <div class="flex items-center gap-2 text-xs font-mono text-muted">
@@ -24,9 +24,10 @@
                 <div class="h-5 w-px bg-border"></div>
 
                 <!-- Notifications Button -->
-                <button class="p-2 text-muted hover:text-text bg-white/5 rounded-xl border border-border transition relative">
+                <button onclick="switchWorkspace('notifications')" class="p-2 text-muted hover:text-text bg-white/5 rounded-xl border border-border transition relative" aria-label="Notifications">
                     <span class="material-symbols-outlined text-lg">notifications</span>
-                    <span class="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-accent rounded-full animate-ping"></span>
+                    <span id="header-notification-badge" class="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-accent rounded-full hidden"></span>
+                    <span id="header-notification-badge-ping" class="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-accent rounded-full animate-ping hidden"></span>
                 </button>
             </div>
         </header>

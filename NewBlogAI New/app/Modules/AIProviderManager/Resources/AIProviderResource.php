@@ -14,6 +14,7 @@ class AIProviderResource extends JsonResource
             'provider_key' => $this->provider_key,
             'name' => $this->name,
             'has_api_key' => ! empty($this->api_key),
+            'api_key' => $this->getMaskedApiKey(),
             'default_model' => $this->default_model,
             'is_default' => (bool) $this->is_default,
             'is_enabled' => (bool) $this->is_enabled,

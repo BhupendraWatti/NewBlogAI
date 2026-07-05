@@ -32,4 +32,26 @@ class AIProvider extends Model
             'is_enabled' => 'boolean',
         ];
     }
+
+    /**
+     * Get the masked representation of the API key.
+     */
+    public function getMaskedApiKey(): ?string
+    {
+        if (empty($this->api_key)) {
+            return null;
+        }
+
+        $key = $this->api_key;
+        $len = strlen($key);
+
+        if ($len > 12) {
+            return substr($key, 0, 8).'...'.substr($key, -3);
+        }
+        if ($len > 4) {
+            return substr($key, 0, 2).'...'.substr($key, -2);
+        }
+
+        return '...';
+    }
 }

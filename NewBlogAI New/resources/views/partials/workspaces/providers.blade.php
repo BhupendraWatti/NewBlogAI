@@ -42,7 +42,7 @@
                             <div class="space-y-1.5">
                                 <label class="block text-[10px] font-mono text-muted uppercase tracking-widest" for="modal-api-key">API Key</label>
                                 <div class="relative">
-                                    <input id="modal-api-key" type="password" class="w-full bg-background border border-border rounded-xl py-2 px-3 pr-10 text-xs font-mono text-text focus:outline-none focus:border-accent" placeholder="Paste your API key here..."/>
+                                    <input id="modal-api-key" type="password" autocomplete="new-password" class="w-full bg-background border border-border rounded-xl py-2 px-3 pr-10 text-xs font-mono text-text focus:outline-none focus:border-accent" placeholder="Paste your API key here..."/>
                                     <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-text transition" onclick="toggleKeyVisibility(this)" aria-label="Toggle key visibility">
                                         <span class="material-symbols-outlined text-sm">visibility</span>
                                     </button>
@@ -52,7 +52,7 @@
                             <!-- Model -->
                             <div class="space-y-1.5">
                                 <label class="block text-[10px] font-mono text-muted uppercase tracking-widest" for="modal-model">Model</label>
-                                <input id="modal-model" type="text" class="w-full bg-background border border-border rounded-xl py-2 px-3 text-xs font-mono text-text focus:outline-none focus:border-accent" placeholder="e.g. gemini-1.5-pro, gpt-4o, claude-3-5-sonnet..."/>
+                                <input id="modal-model" type="text" class="w-full bg-background border border-border rounded-xl py-2 px-3 text-xs font-mono text-text focus:outline-none focus:border-accent" placeholder="e.g. gemini-2.5-flash, gpt-4o, claude-3-5-sonnet..."/>
                             </div>
 
                             <!-- Error message -->
@@ -84,7 +84,7 @@
                                 <div class="space-y-1">
                                     <label class="block text-[10px] font-mono text-muted uppercase tracking-widest">API Key</label>
                                     <div class="relative">
-                                        <input type="password" class="w-full bg-background border border-border rounded-xl p-2 pr-8 text-xs font-mono text-text focus:outline-none focus:border-accent" placeholder="AIza..."/>
+                                        <input type="password" autocomplete="new-password" class="w-full bg-background border border-border rounded-xl p-2 pr-8 text-xs font-mono text-text focus:outline-none focus:border-accent" placeholder="AIza..."/>
                                         <button class="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-text" onclick="toggleKeyVisibility(this)">
                                             <span class="material-symbols-outlined text-sm">visibility</span>
                                         </button>
@@ -92,10 +92,11 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="block text-[10px] font-mono text-muted uppercase tracking-widest">Default Model</label>
-                                    <select class="w-full bg-background border border-border text-text text-xs rounded-xl py-1.5 px-2 focus:outline-none focus:border-accent">
-                                        <option>gemini-1.5-pro</option>
-                                        <option>gemini-1.5-flash</option>
-                                        <option>gemini-2.0-flash</option>
+                                    <select data-role="model" class="w-full bg-background border border-border text-text text-xs rounded-xl py-1.5 px-2 focus:outline-none focus:border-accent">
+                                        <option value="gemini-2.5-flash" selected>gemini-2.5-flash (Free Tier)</option>
+                                        <option value="gemini-2.5-pro">gemini-2.5-pro (Paid Tier)</option>
+                                        <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                                        <option value="gemini-flash-latest">gemini-flash-latest</option>
                                     </select>
                                 </div>
                                 <div class="flex items-center gap-2 pt-1">
@@ -123,7 +124,7 @@
                                 <div class="space-y-1">
                                     <label class="block text-[10px] font-mono text-muted uppercase tracking-widest">API Key</label>
                                     <div class="relative">
-                                        <input type="password" class="w-full bg-background border border-border rounded-xl p-2 pr-8 text-xs font-mono text-text focus:outline-none focus:border-accent" placeholder="sk-proj-..."/>
+                                        <input type="password" autocomplete="new-password" class="w-full bg-background border border-border rounded-xl p-2 pr-8 text-xs font-mono text-text focus:outline-none focus:border-accent" placeholder="sk-proj-..."/>
                                         <button class="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-text" onclick="toggleKeyVisibility(this)">
                                             <span class="material-symbols-outlined text-sm">visibility</span>
                                         </button>
@@ -131,10 +132,10 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="block text-[10px] font-mono text-muted uppercase tracking-widest">Default Model</label>
-                                    <select class="w-full bg-background border border-border text-text text-xs rounded-xl py-1.5 px-2 focus:outline-none focus:border-accent">
-                                        <option>gpt-4o</option>
-                                        <option>gpt-4-turbo</option>
-                                        <option>gpt-3.5-turbo</option>
+                                    <select data-role="model" class="w-full bg-background border border-border text-text text-xs rounded-xl py-1.5 px-2 focus:outline-none focus:border-accent">
+                                        <option value="gpt-4o" selected>gpt-4o</option>
+                                        <option value="gpt-4-turbo">gpt-4-turbo</option>
+                                        <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
                                     </select>
                                 </div>
                                 <div class="flex items-center gap-2 pt-1">
@@ -162,7 +163,7 @@
                                 <div class="space-y-1">
                                     <label class="block text-[10px] font-mono text-muted uppercase tracking-widest">API Key</label>
                                     <div class="relative">
-                                        <input type="password" class="w-full bg-background border border-border rounded-xl p-2 pr-8 text-xs font-mono text-text focus:outline-none focus:border-accent" placeholder="sk-ant-..."/>
+                                        <input type="password" autocomplete="new-password" class="w-full bg-background border border-border rounded-xl p-2 pr-8 text-xs font-mono text-text focus:outline-none focus:border-accent" placeholder="sk-ant-..."/>
                                         <button class="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-text" onclick="toggleKeyVisibility(this)">
                                             <span class="material-symbols-outlined text-sm">visibility</span>
                                         </button>
@@ -170,10 +171,10 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="block text-[10px] font-mono text-muted uppercase tracking-widest">Default Model</label>
-                                    <select class="w-full bg-background border border-border text-text text-xs rounded-xl py-1.5 px-2 focus:outline-none focus:border-accent">
-                                        <option>claude-3-5-sonnet-20241022</option>
-                                        <option>claude-3-haiku-20240307</option>
-                                        <option>claude-3-opus-20240229</option>
+                                    <select data-role="model" class="w-full bg-background border border-border text-text text-xs rounded-xl py-1.5 px-2 focus:outline-none focus:border-accent">
+                                        <option value="claude-3-5-sonnet-20241022" selected>claude-3-5-sonnet-20241022</option>
+                                        <option value="claude-3-haiku-20240307">claude-3-haiku-20240307</option>
+                                        <option value="claude-3-opus-20240229">claude-3-opus-20240229</option>
                                     </select>
                                 </div>
                                 <div class="flex items-center gap-2 pt-1">
@@ -201,7 +202,7 @@
                                 <div class="space-y-1">
                                     <label class="block text-[10px] font-mono text-muted uppercase tracking-widest">API Key</label>
                                     <div class="relative">
-                                        <input type="password" class="w-full bg-background border border-border rounded-xl p-2 pr-8 text-xs font-mono text-text focus:outline-none focus:border-accent" placeholder="gsk_..."/>
+                                        <input type="password" autocomplete="new-password" class="w-full bg-background border border-border rounded-xl p-2 pr-8 text-xs font-mono text-text focus:outline-none focus:border-accent" placeholder="gsk_..."/>
                                         <button class="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-text" onclick="toggleKeyVisibility(this)">
                                             <span class="material-symbols-outlined text-sm">visibility</span>
                                         </button>
@@ -209,10 +210,10 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="block text-[10px] font-mono text-muted uppercase tracking-widest">Default Model</label>
-                                    <select class="w-full bg-background border border-border text-text text-xs rounded-xl py-1.5 px-2 focus:outline-none focus:border-accent">
-                                        <option>llama-3.1-70b-versatile</option>
-                                        <option>mixtral-8x7b-32768</option>
-                                        <option>gemma-7b-it</option>
+                                    <select data-role="model" class="w-full bg-background border border-border text-text text-xs rounded-xl py-1.5 px-2 focus:outline-none focus:border-accent">
+                                        <option value="llama-3.1-70b-versatile" selected>llama-3.1-70b-versatile</option>
+                                        <option value="mixtral-8x7b-32768">mixtral-8x7b-32768</option>
+                                        <option value="gemma-7b-it">gemma-7b-it</option>
                                     </select>
                                 </div>
                                 <div class="flex items-center gap-2 pt-1">
@@ -240,7 +241,7 @@
                                 <div class="space-y-1">
                                     <label class="block text-[10px] font-mono text-muted uppercase tracking-widest">API Key</label>
                                     <div class="relative">
-                                        <input type="password" class="w-full bg-background border border-border rounded-xl p-2 pr-8 text-xs font-mono text-text focus:outline-none focus:border-accent" placeholder="sk-or-..."/>
+                                        <input type="password" autocomplete="new-password" class="w-full bg-background border border-border rounded-xl p-2 pr-8 text-xs font-mono text-text focus:outline-none focus:border-accent" placeholder="sk-or-..."/>
                                         <button class="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-text" onclick="toggleKeyVisibility(this)">
                                             <span class="material-symbols-outlined text-sm">visibility</span>
                                         </button>
@@ -248,10 +249,10 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="block text-[10px] font-mono text-muted uppercase tracking-widest">Default Model</label>
-                                    <select class="w-full bg-background border border-border text-text text-xs rounded-xl py-1.5 px-2 focus:outline-none focus:border-accent">
-                                        <option>openai/gpt-4o</option>
-                                        <option>anthropic/claude-3.5-sonnet</option>
-                                        <option>google/gemini-pro</option>
+                                    <select data-role="model" class="w-full bg-background border border-border text-text text-xs rounded-xl py-1.5 px-2 focus:outline-none focus:border-accent">
+                                        <option value="openai/gpt-4o" selected>openai/gpt-4o</option>
+                                        <option value="anthropic/claude-3.5-sonnet">anthropic/claude-3.5-sonnet</option>
+                                        <option value="google/gemini-2.5-flash">google/gemini-2.5-flash</option>
                                     </select>
                                 </div>
                                 <div class="flex items-center gap-2 pt-1">
@@ -282,7 +283,7 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="block text-[10px] font-mono text-muted uppercase tracking-widest">Default Model</label>
-                                    <input type="text" class="w-full bg-background border border-border rounded-xl p-2 text-xs font-mono text-text focus:outline-none focus:border-accent" placeholder="llama3"/>
+                                    <input type="text" data-role="model" class="w-full bg-background border border-border rounded-xl p-2 text-xs font-mono text-text focus:outline-none focus:border-accent" placeholder="llama3"/>
                                 </div>
                                 <div class="flex items-center gap-2 pt-1">
                                     <input type="checkbox" id="chk-default-ollama" class="rounded bg-background border-border text-accent focus:ring-accent/20 provider-default-chk" onchange="setDefaultProvider('ollama')"/>

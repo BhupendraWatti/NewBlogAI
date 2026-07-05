@@ -87,6 +87,7 @@ class WordPressPublishingTest extends TestCase
     {
         // Fake WordPress Post Creation response
         Http::fake([
+            'https://mockwp.com/wp-json/newsblogify/v1/publish' => Http::response([], 404),
             'https://mockwp.com/wp-json/wp/v2/posts' => Http::response([
                 'id' => 4521,
                 'link' => 'https://mockwp.com/mock-article-title/',

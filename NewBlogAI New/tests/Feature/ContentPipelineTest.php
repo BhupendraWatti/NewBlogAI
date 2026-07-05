@@ -63,7 +63,7 @@ class ContentPipelineTest extends TestCase
             'provider_key' => 'gemini',
             'name' => 'Google Gemini',
             'api_key' => 'some-encrypted-key',
-            'default_model' => 'gemini-1.5-pro',
+            'default_model' => 'gemini-2.5-flash',
             'is_enabled' => true,
         ]);
     }

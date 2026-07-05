@@ -5,6 +5,8 @@ namespace App\Modules\SiteManager\Services;
 use App\Models\keys;
 use App\Models\User;
 use App\Modules\CustomerManager\Models\Customer;
+use App\Modules\SubscriptionManager\Models\Plan;
+use App\Modules\SubscriptionManager\Models\Subscription;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
 
@@ -91,7 +93,34 @@ class PluginTokenService
 
     public function customerForUser(User $user): ?Customer
     {
-        return $user->customer
+        $customer = $user->customer
             ?? Customer::where('email', $user->email)->first();
+
+        if (! $customer) {
+            $customer = Customer::create([
+                'company_name' => ($user->name ?: 'Customer').' Company',
+                'owner_name' => $user->name ?: 'Customer Owner',
+                'email' => $user->email,
+                'status' => 'active',
+            ]);
+
+            $user->update(['customer_id' => $customer->id]);
+
+            // Seed a default subscription so the user has active entitlements immediately
+            $plan = Plan::where('status', 'active')->first();
+            if ($plan) {
+                Subscription::create([
+                    'customer_id' => $customer->id,
+                    'plan_id' => $plan->id,
+                    'status' => 'active',
+                    'billing_period' => 'monthly',
+                    'starts_at' => now()->subDay(),
+                    'ends_at' => now()->addMonth(),
+                    'limits' => $plan->toArray(),
+                ]);
+            }
+        }
+
+        return $customer;
     }
 }

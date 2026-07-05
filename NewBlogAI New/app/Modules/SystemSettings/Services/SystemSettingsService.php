@@ -54,7 +54,7 @@ class SystemSettingsService
                 'timezone' => 'UTC',
                 'language' => 'en',
                 'ai_default_provider' => 'gemini',
-                'ai_default_model' => 'gemini-1.5-pro',
+                'ai_default_model' => 'gemini-2.5-flash',
             ];
 
             foreach ($defaults as $k => $v) {
@@ -62,7 +62,10 @@ class SystemSettingsService
             }
 
             foreach ($all as $setting) {
-                $mapped[$setting->key] = $setting->value;
+                // Skip null values so DB nulls don't override safe defaults
+                if ($setting->value !== null) {
+                    $mapped[$setting->key] = $setting->value;
+                }
             }
 
             return $mapped;

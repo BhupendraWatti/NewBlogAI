@@ -46,7 +46,7 @@ class API_Client
     public function request($endpoint, $method = 'GET', $body = null, $args = [])
     {
         $backend_url = rtrim(Config::get('backend_url', 'http://127.0.0.1:8000'), '/');
-        $api_token = Config::get('api_token', '');
+        $api_token = Config::get('plugin_token', '');
 
         $url = $backend_url.'/api/plugin/'.ltrim($endpoint, '/');
 

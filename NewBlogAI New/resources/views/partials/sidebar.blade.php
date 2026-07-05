@@ -130,9 +130,12 @@
                         <span class="material-symbols-outlined text-xs transition-transform duration-200 group-open/menu:rotate-180 text-muted/60">expand_more</span>
                     </summary>
                     <div class="space-y-1 mt-2 pl-1">
-                        <button onclick="switchWorkspace('notifications')" data-node="notifications" class="w-full flex items-center gap-3 text-left px-3 py-2 rounded-xl font-medium text-sm transition-all duration-200 text-muted hover:text-text hover:bg-white/5">
-                            <span class="material-symbols-outlined text-lg">notifications</span>
-                            Notifications
+                        <button onclick="switchWorkspace('notifications')" data-node="notifications" class="w-full flex items-center justify-between text-left px-3 py-2 rounded-xl font-medium text-sm transition-all duration-200 text-muted hover:text-text hover:bg-white/5">
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-lg">notifications</span>
+                                <span>Notifications</span>
+                            </div>
+                            <span id="sidebar-notifications-count" class="hidden px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-mono font-bold leading-none animate-pulse">0</span>
                         </button>
                         <button onclick="switchWorkspace('audit')" data-node="audit" class="w-full flex items-center gap-3 text-left px-3 py-2 rounded-xl font-medium text-sm transition-all duration-200 text-muted hover:text-text hover:bg-white/5">
                             <span class="material-symbols-outlined text-lg">history</span>

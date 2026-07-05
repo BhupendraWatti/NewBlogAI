@@ -56,19 +56,19 @@ class AIProvidersTest extends TestCase
             'provider_key' => 'gemini',
             'name' => 'Google Gemini',
             'api_key' => 'initial-key',
-            'default_model' => 'gemini-1.5-flash',
+            'default_model' => 'gemini-2.5-flash',
         ]);
 
         $response = $this->actingAs($this->admin)
             ->putJson("/api/v1/providers/{$provider->id}", [
                 'name' => 'Updated Google Gemini',
                 'api_key' => 'new-secret-key',
-                'default_model' => 'gemini-1.5-pro',
+                'default_model' => 'gemini-2.5-pro',
             ]);
 
         $response->assertStatus(200)
             ->assertJsonPath('data.name', 'Updated Google Gemini')
-            ->assertJsonPath('data.default_model', 'gemini-1.5-pro');
+            ->assertJsonPath('data.default_model', 'gemini-2.5-pro');
 
         $provider->refresh();
         $this->assertEquals('new-secret-key', $provider->api_key);

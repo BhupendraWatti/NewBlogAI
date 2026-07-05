@@ -23,10 +23,17 @@ class UserController extends Controller
     {
         $query = User::query();
 
+        // Tenant Isolation: Only allow SuperAdmin to view all users
+        if (Auth::user()->role !== 1) {
+            $query->where('customer_id', Auth::user()->customer_id);
+        }
+
         if ($request->filled('search')) {
             $search = $request->input('search');
-            $query->where('name', 'like', "%{$search}%")
-                ->orWhere('email', 'like', "%{$search}%");
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
         }
 
         if ($request->filled('role')) {
@@ -43,6 +50,11 @@ class UserController extends Controller
     {
         $data = $request->validated();
         $data['password'] = Hash::make($data['password']);
+
+        // Tenant Isolation: Force user creation within the same customer tenant unless SuperAdmin/Support
+        if (Auth::user()->role !== 1 && Auth::user()->role !== 3) {
+            $data['customer_id'] = Auth::user()->customer_id;
+        }
 
         $user = User::create($data);
 
@@ -65,7 +77,7 @@ class UserController extends Controller
      */
     public function show(string $id): UserResource
     {
-        $user = User::findOrFail($id);
+        $user = $this->findUserOrFail($id);
 
         return new UserResource($user);
     }
@@ -75,13 +87,18 @@ class UserController extends Controller
      */
     public function update(UpdateUserRequest $request, string $id): UserResource
     {
-        $user = User::findOrFail($id);
+        $user = $this->findUserOrFail($id);
         $data = $request->validated();
 
         if (! empty($data['password'])) {
             $data['password'] = Hash::make($data['password']);
         } else {
             unset($data['password']);
+        }
+
+        // Tenant Isolation: Ensure customer_id cannot be changed for non-SuperAdmins
+        if (Auth::user()->role !== 1 && Auth::user()->role !== 3) {
+            unset($data['customer_id']);
         }
 
         $oldValues = $user->only(['name', 'email', 'role']);
@@ -105,7 +122,7 @@ class UserController extends Controller
      */
     public function destroy(Request $request, string $id): JsonResponse
     {
-        $user = User::findOrFail($id);
+        $user = $this->findUserOrFail($id);
 
         if ((int) $user->id === (int) Auth::id()) {
             return response()->json(['message' => 'Cannot delete your own user account.'], 422);
@@ -124,5 +141,18 @@ class UserController extends Controller
         ]);
 
         return response()->json(['message' => 'User deleted successfully.']);
+    }
+
+    /**
+     * Helper to find a user by ID while enforcing tenant isolation.
+     */
+    private function findUserOrFail(string $id): User
+    {
+        $query = User::query();
+        if (Auth::user()->role !== 1) {
+            $query->where('customer_id', Auth::user()->customer_id);
+        }
+
+        return $query->findOrFail($id);
     }
 }

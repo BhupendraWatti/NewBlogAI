@@ -529,6 +529,9 @@
             switchWorkspace(currentWorkspace);
             switchTab(currentTab);
             window.loadDashboardStats();
+            if (window.fetchSystemAlerts) {
+                window.fetchSystemAlerts();
+            }
         });
 
         // Workspace Node Router
@@ -585,6 +588,9 @@
             if (node === 'audit' && window.fetchAuditLogs) {
                 window.fetchAuditLogs();
             }
+            if (node === 'prompts' && window.fetchPromptTemplates) {
+                window.fetchPromptTemplates();
+            }
 
             // Highlight Active Sidebar Menu Option
             document.querySelectorAll('#sidebar-menu button').forEach(btn => {
@@ -613,8 +619,11 @@
             if (!tbody) return;
 
             try {
-                const response = await fetch('/api/v1/sites');
-                if (!response.ok) return;
+                const response = await apiFetch('/api/v1/sites');
+                if (!response.ok) {
+                    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-8 text-xs font-mono">⚠ Failed to load fleet data (HTTP ${response.status}). Check session / API auth.</td></tr>`;
+                    return;
+                }
                 const result = await safeParseJson(response);
                 if (!result) return;
                 const sites = result.data || result;
@@ -1138,7 +1147,7 @@
         };
 
         // Tab Switcher inside Node Workspace
-        function switchTab(tab) {
+        window.switchTab = async function(tab) {
             currentTab = tab;
             
             document.querySelectorAll('#workspace-tabs button').forEach(btn => {
@@ -1152,9 +1161,159 @@
                 }
             });
 
-            // Simulate high-density telemetry reloading
-            if (tab === 'logs') {
-                console.log("Telemetry logs reconnected.");
+            // Routing actions based on current workspace
+            if (tab === 'config') {
+                if (currentWorkspace === 'providers') {
+                    if (window.openAddProviderForm) window.openAddProviderForm();
+                } else if (currentWorkspace === 'sites') {
+                    if (window.launchCreationWizard) window.launchCreationWizard('site');
+                } else if (currentWorkspace === 'prompts') {
+                    switchWorkspace('prompts');
+                    showInfo("Configuration Mode", "Prompt templates can be selected or configured directly within the Prompt Library workspace.");
+                } else if (currentWorkspace === 'pipeline') {
+                    showInfo("Pipeline Configuration", "Select an AI Provider, Prompt Template, and Topic Cluster on the left settings panel to start generating content.");
+                } else {
+                    showInfo("Configuration Panel", `Module configuration for "${currentWorkspace.toUpperCase()}" is managed directly within its active workspace view.`);
+                }
+            } else if (tab === 'settings') {
+                switchWorkspace('settings');
+            } else if (tab === 'history' || tab === 'logs') {
+                if (currentWorkspace === 'providers') {
+                    // Fetch AI Request Logs
+                    showLoading("Retrieving AI Inference Telemetry...");
+                    try {
+                        const res = await fetch('/api/v1/ai/logs?limit=10');
+                        if (!res.ok) throw new Error("Could not retrieve AI logs");
+                        const data = await res.json();
+                        const logs = data.data || data;
+                        Swal.close();
+                        
+                        let html = `<div class="text-left font-mono text-[10px] max-h-[350px] overflow-y-auto custom-scrollbar p-1 space-y-2">`;
+                        if (logs.length === 0) {
+                            html += `<p class="text-muted text-center py-6">No AI API requests logged in the database yet.</p>`;
+                        } else {
+                            logs.forEach(l => {
+                                const date = new Date(l.created_at).toLocaleString();
+                                html += `
+                                    <div class="p-2 border border-border rounded bg-[#071018] space-y-1">
+                                        <div class="flex justify-between font-bold text-accent">
+                                            <span>PROVIDER: ${l.provider_key.toUpperCase()}</span>
+                                            <span>${date}</span>
+                                        </div>
+                                        <div><span class="text-muted">Model:</span> ${l.model_used || '—'}</div>
+                                        <div><span class="text-muted">Prompt Tokens:</span> ${l.prompt_tokens || 0} | <span class="text-muted">Completion Tokens:</span> ${l.completion_tokens || 0}</div>
+                                        <div><span class="text-muted">Status:</span> <span class="${l.response_status >= 400 ? 'text-rose-500' : 'text-emerald-500'}">${l.response_status || 200}</span></div>
+                                    </div>
+                                `;
+                            });
+                        }
+                        html += `</div>`;
+                        
+                        Swal.fire({
+                            title: 'AI Provider Inference Logs',
+                            html: html,
+                            width: '600px',
+                            confirmButtonText: 'Close',
+                            confirmButtonColor: '#059669'
+                        });
+                    } catch (err) {
+                        showError("Error", err.message || "Failed to load provider logs.");
+                    }
+                } else if (currentWorkspace === 'sites') {
+                    // Fetch Site Publishing Logs
+                    showLoading("Retrieving Publishing Engine History...");
+                    try {
+                        const res = await fetch('/api/v1/publishing/logs?limit=10');
+                        if (!res.ok) throw new Error("Could not retrieve publishing logs");
+                        const data = await res.json();
+                        const logs = data.data || data;
+                        Swal.close();
+                        
+                        let html = `<div class="text-left font-mono text-[10px] max-h-[350px] overflow-y-auto custom-scrollbar p-1 space-y-2">`;
+                        if (logs.length === 0) {
+                            html += `<p class="text-muted text-center py-6">No article publishing events recorded yet.</p>`;
+                        } else {
+                            logs.forEach(l => {
+                                const date = new Date(l.created_at).toLocaleString();
+                                const statusClass = l.status === 'published' ? 'text-emerald-500' : (l.status === 'failed' ? 'text-rose-500' : 'text-amber-500');
+                                html += `
+                                    <div class="p-2 border border-border rounded bg-[#071018] space-y-1">
+                                        <div class="flex justify-between font-bold text-secondary">
+                                            <span>SITE ID: ${l.site_id}</span>
+                                            <span>${date}</span>
+                                        </div>
+                                        <div><span class="text-muted">Post Title:</span> ${l.content?.title || 'Draft Article #' + l.generated_content_id}</div>
+                                        <div><span class="text-muted">WP Post ID:</span> ${l.wp_post_id || '—'}</div>
+                                        <div><span class="text-muted">Status:</span> <span class="${statusClass}">${l.status.toUpperCase()}</span></div>
+                                        ${l.error_message ? `<div class="text-rose-400 text-[9px] mt-1 p-1 bg-red-950/20 border border-red-900/30 rounded">${l.error_message}</div>` : ''}
+                                    </div>
+                                `;
+                            });
+                        }
+                        html += `</div>`;
+                        
+                        Swal.fire({
+                            title: 'WordPress Publishing Engine Logs',
+                            html: html,
+                            width: '600px',
+                            confirmButtonText: 'Close',
+                            confirmButtonColor: '#059669'
+                        });
+                    } catch (err) {
+                        showError("Error", err.message || "Failed to load publishing history.");
+                    }
+                } else if (currentWorkspace === 'scheduler') {
+                    // Fetch Background Job Logs
+                    if (window.fetchScheduledJobs) await window.fetchScheduledJobs();
+                } else if (currentWorkspace === 'audit') {
+                    if (window.fetchAuditLogs) await window.fetchAuditLogs();
+                } else {
+                    // Fetch operations audit logs as default history stream
+                    showLoading("Retrieving Audit Logs...");
+                    try {
+                        const res = await fetch('/api/v1/operations/audit?limit=10');
+                        if (!res.ok) throw new Error("Could not retrieve audit history");
+                        const data = await res.json();
+                        const logs = data.data || data;
+                        Swal.close();
+                        
+                        let html = `<div class="text-left font-mono text-[10px] max-h-[350px] overflow-y-auto custom-scrollbar p-1 space-y-2">`;
+                        if (logs.length === 0) {
+                            html += `<p class="text-muted text-center py-6">No platform audits recorded yet.</p>`;
+                        } else {
+                            logs.forEach(l => {
+                                const date = new Date(l.created_at).toLocaleString();
+                                html += `
+                                    <div class="p-2 border border-border rounded bg-[#071018] space-y-1">
+                                        <div class="flex justify-between font-bold text-accent">
+                                            <span>EVENT: ${l.event.toUpperCase()}</span>
+                                            <span>${date}</span>
+                                        </div>
+                                        <div><span class="text-muted">IP Address:</span> ${l.ip_address || '127.0.0.1'}</div>
+                                        <div><span class="text-muted">Details:</span> ${JSON.stringify(l.new_values || l.old_values || {})}</div>
+                                    </div>
+                                `;
+                            });
+                        }
+                        html += `</div>`;
+                        
+                        Swal.fire({
+                            title: `${currentWorkspace.toUpperCase()} Module Audit Trail`,
+                            html: html,
+                            width: '600px',
+                            confirmButtonText: 'Close',
+                            confirmButtonColor: '#059669'
+                        });
+                    } catch (err) {
+                        showError("Error", err.message || "Failed to load audit trail.");
+                    }
+                }
+            } else if (tab === 'overview') {
+                // Return to default active workspace panel
+                const activePane = document.getElementById('node-' + currentWorkspace);
+                if (activePane) {
+                    activePane.classList.remove('hidden');
+                }
             }
         }
 
@@ -1390,7 +1549,7 @@
 
         // Prompt Template selector
         let activePromptId = 'promt_001';
-        function selectPromptTemplate(id, name, category, version, status) {
+        function selectPromptTemplate(id, name, category, version, status, promt = '') {
             activePromptId = id;
             
             // Highlight selected item in list
@@ -1410,17 +1569,103 @@
             document.getElementById('prompt-edit-version').value = version;
             document.getElementById('prompt-edit-status').value = status;
             
-            let text = "";
-            const ob = '{' + '{', cb = '}' + '}';
-            if (id === 'promt_001') {
-                text = "You are a senior tech reporter. Summarize the following news details regarding " + ob + "topic" + cb + " in a professional, engaging format with key bullet points. Target keyword: " + ob + "keyword" + cb + ".";
-            } else if (id === 'promt_002') {
-                text = "Compose a structured bulletin highlighting key developments in " + ob + "topic" + cb + ". Use tone: " + ob + "tone" + cb + ". Language should target " + ob + "language" + cb + ".";
+            if (promt !== '') {
+                document.getElementById('prompt-editor-textarea').value = promt;
             } else {
-                text = "Analyze financial reports and output a trend summary for " + ob + "topic" + cb + ". Extract core indicators and model predictions.";
+                let text = "";
+                const ob = '{' + '{', cb = '}' + '}';
+                if (id === 'promt_001') {
+                    text = "You are a senior tech reporter. Summarize the following news details regarding " + ob + "topic" + cb + " in a professional, engaging format with key bullet points. Target keyword: " + ob + "keyword" + cb + ".";
+                } else if (id === 'promt_002') {
+                    text = "Compose a structured bulletin highlighting key developments in " + ob + "topic" + cb + ". Use tone: " + ob + "tone" + cb + ". Language should target " + ob + "language" + cb + ".";
+                } else {
+                    text = "Analyze financial reports and output a trend summary for " + ob + "topic" + cb + ". Extract core indicators and model predictions.";
+                }
+                document.getElementById('prompt-editor-textarea').value = text;
             }
-            document.getElementById('prompt-editor-textarea').value = text;
         }
+
+        window.openNewPromptTemplate = function() {
+            activePromptId = 'new';
+            
+            document.querySelectorAll('.prompt-list-item').forEach(item => {
+                item.classList.remove('bg-white/5', 'border-accent');
+                item.classList.add('bg-transparent', 'border-border');
+            });
+
+            document.getElementById('prompt-editor-id').innerText = "Active: New Template";
+            document.getElementById('prompt-edit-name').value = '';
+            document.getElementById('prompt-edit-category').selectedIndex = 0;
+            document.getElementById('prompt-edit-version').value = 'v1.0';
+            document.getElementById('prompt-edit-status').value = 'active';
+            document.getElementById('prompt-editor-textarea').value = '';
+        };
+
+        window.fetchPromptTemplates = async function() {
+            const listContainer = document.getElementById('prompt-templates-list');
+            if (!listContainer) return;
+
+            try {
+                const response = await fetch('/api/v1/prompts');
+                if (!response.ok) return;
+                const result = await response.json();
+                const prompts = result.data || result;
+
+                listContainer.innerHTML = '';
+
+                if (prompts.length === 0) {
+                    listContainer.innerHTML = `
+                        <div class="p-4 text-center text-xs text-muted font-mono">
+                            No prompts found. Click "Create Template" to add one.
+                        </div>
+                    `;
+                    return;
+                }
+
+                prompts.forEach((p, index) => {
+                    const div = document.createElement('div');
+                    div.id = `prompt-item-${p.id}`;
+                    
+                    const isSelected = activePromptId === p.id || (index === 0 && activePromptId === 'promt_001');
+                    if (isSelected) {
+                        activePromptId = p.id;
+                        div.className = "p-3 bg-white/5 border border-accent rounded-xl cursor-pointer hover:border-accent transition group relative prompt-list-item";
+                    } else {
+                        div.className = "p-3 bg-transparent border border-border rounded-xl cursor-pointer hover:bg-white/5 transition group relative prompt-list-item";
+                    }
+
+                    const safeName = p.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const safeCategory = p.category.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const safeVersion = (p.version || 'v1.0').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const safeStatus = (p.status || 'active').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const safePrompt = (p.content || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n');
+
+                    div.setAttribute('onclick', `selectPromptTemplate(${p.id}, '${safeName}', '${safeCategory}', '${safeVersion}', '${safeStatus}', '${safePrompt}')`);
+
+                    div.innerHTML = `
+                        <div class="flex justify-between items-center mb-1">
+                            <p class="text-xs font-semibold text-text">${p.name}</p>
+                            <span class="text-[9px] font-mono ${isSelected ? 'bg-accent/20 text-accent border border-accent/30' : 'bg-white/10 text-muted border border-border'} px-1.5 py-0.5 rounded">${p.version || 'v1.0'}</span>
+                        </div>
+                        <div class="flex justify-between items-center text-[10px] font-mono text-muted">
+                            <span>Category: ${p.category}</span>
+                            <span class="${p.status === 'active' ? 'text-success' : 'text-warning'}">${p.status || 'active'}</span>
+                        </div>
+                    `;
+
+                    listContainer.appendChild(div);
+                });
+
+                if (activePromptId && activePromptId !== 'new') {
+                    const activeP = prompts.find(p => p.id == activePromptId);
+                    if (activeP) {
+                        selectPromptTemplate(activeP.id, activeP.name, activeP.category, activeP.version || 'v1.0', activeP.status || 'active', activeP.content);
+                    }
+                }
+            } catch (err) {
+                console.error("Error fetching prompt templates:", err);
+            }
+        };
 
         // Live edit local sync logic
         function updatePromptField(field) {
@@ -1459,8 +1704,12 @@
                 promt: document.getElementById('prompt-editor-textarea')?.value || ''
             };
 
-            await apiRequest('/api/v1/prompts', {
-                method: 'POST',
+            const isNew = activePromptId === 'new' || isNaN(activePromptId);
+            const url = isNew ? '/api/v1/prompts' : `/api/v1/prompts/${activePromptId}`;
+            const method = isNew ? 'POST' : 'PUT';
+
+            await apiRequest(url, {
+                method: method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             }, {
@@ -1468,6 +1717,10 @@
                 successMessage: "Prompt template saved successfully in the Library!",
                 defaultErrorMessage: "Could not save prompt template."
             });
+
+            if (window.fetchPromptTemplates) {
+                await window.fetchPromptTemplates();
+            }
         }
 
 
@@ -1680,50 +1933,51 @@
         window.fetchSystemAlerts = async function() {
             const stream = document.getElementById('operations-timeline-stream');
             const alertCountEl = document.getElementById('notifications-count');
-            if (!stream) return;
 
             try {
                 // 1. Fetch Audit Logs
-                const auditResponse = await fetch('/api/v1/operations/audit?limit=10');
-                if (auditResponse.ok) {
-                    const auditData = await auditResponse.json();
-                    const logs = auditData.data || auditData;
+                if (stream) {
+                    const auditResponse = await fetch('/api/v1/operations/audit?limit=10');
+                    if (auditResponse.ok) {
+                        const auditData = await auditResponse.json();
+                        const logs = auditData.data || auditData;
 
-                    stream.innerHTML = '';
-                    if (logs.length === 0) {
-                        stream.innerHTML = '<div class="text-muted p-4 text-center">No system events logged in database history.</div>';
-                    } else {
-                        logs.forEach(log => {
-                            const dateStr = new Date(log.created_at).toLocaleTimeString();
-                            let icon = '✓';
-                            let iconClass = 'bg-success/20 border-success/40 text-success';
-                            let title = log.event.replace(/_/g, ' ').toUpperCase();
+                        stream.innerHTML = '';
+                        if (logs.length === 0) {
+                            stream.innerHTML = '<div class="text-muted p-4 text-center">No system events logged in database history.</div>';
+                        } else {
+                            logs.forEach(log => {
+                                const dateStr = new Date(log.created_at).toLocaleTimeString();
+                                let icon = '✓';
+                                let iconClass = 'bg-success/20 border-success/40 text-success';
+                                let title = log.event.replace(/_/g, ' ').toUpperCase();
 
-                            if (log.event.includes('failed') || log.event.includes('error') || log.event.includes('disconnect')) {
-                                icon = '!';
-                                iconClass = 'bg-danger/20 border-danger/40 text-danger';
-                            } else if (log.event.includes('warning') || log.event.includes('retry')) {
-                                icon = '?';
-                                iconClass = 'bg-warning/20 border-warning/40 text-warning';
-                            }
+                                if (log.event.includes('failed') || log.event.includes('error') || log.event.includes('disconnect')) {
+                                    icon = '!';
+                                    iconClass = 'bg-danger/20 border-danger/40 text-danger';
+                                } else if (log.event.includes('warning') || log.event.includes('retry')) {
+                                    icon = '?';
+                                    iconClass = 'bg-warning/20 border-warning/40 text-warning';
+                                }
 
-                            const userText = log.user ? `by ${log.user.name}` : 'by System';
-                            const desc = `Event details: ${JSON.stringify(log.new_values || log.old_values || {})}`;
+                                const userText = log.user ? `by ${log.user.name}` : 'by System';
+                                const desc = `Event details: ${JSON.stringify(log.new_values || log.old_values || {})}`;
 
-                            const row = document.createElement('div');
-                            row.className = "relative";
-                            row.innerHTML = `
-                                <span class="absolute -left-[31px] top-0 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold ${iconClass}">${icon}</span>
-                                <div class="p-3 bg-white/5 border border-border rounded-xl space-y-1">
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-text font-bold">${title}</span>
-                                        <span class="text-[10px] text-muted">${dateStr}</span>
+                                const row = document.createElement('div');
+                                row.className = "relative";
+                                row.innerHTML = `
+                                    <span class="absolute -left-[31px] top-0 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold ${iconClass}">${icon}</span>
+                                    <div class="p-3 bg-white/5 border border-border rounded-xl space-y-1">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-text font-bold">${title}</span>
+                                            <span class="text-[10px] text-muted">${dateStr}</span>
+                                        </div>
+                                        <p class="text-[10px] text-muted">${userText}. ${desc}</p>
                                     </div>
-                                    <p class="text-[10px] text-muted">${userText}. ${desc}</p>
-                                </div>
-                            `;
-                            stream.appendChild(row);
-                        });
+                                `;
+                                stream.appendChild(row);
+                            });
+                        }
                     }
                 }
 
@@ -1740,6 +1994,30 @@
                             alertCountEl.className = "text-3xl font-display font-bold text-danger animate-pulse";
                         } else {
                             alertCountEl.className = "text-3xl font-display font-bold text-success";
+                        }
+                    }
+
+                    // Update header notifications icon badge
+                    const headerBadge = document.getElementById('header-notification-badge');
+                    const headerBadgePing = document.getElementById('header-notification-badge-ping');
+                    if (headerBadge && headerBadgePing) {
+                        if (failedCount > 0) {
+                            headerBadge.classList.remove('hidden');
+                            headerBadgePing.classList.remove('hidden');
+                        } else {
+                            headerBadge.classList.add('hidden');
+                            headerBadgePing.classList.add('hidden');
+                        }
+                    }
+
+                    // Update sidebar notifications count badge
+                    const sidebarBadge = document.getElementById('sidebar-notifications-count');
+                    if (sidebarBadge) {
+                        sidebarBadge.innerText = failedCount;
+                        if (failedCount > 0) {
+                            sidebarBadge.classList.remove('hidden');
+                        } else {
+                            sidebarBadge.classList.add('hidden');
                         }
                     }
                 }
@@ -2289,7 +2567,7 @@
         updateThemeUI();
 
         // ─── AI Providers: toggle API key visibility ────────────────────────
-        function toggleKeyVisibility(btn) {
+        window.toggleKeyVisibility = function(btn) {
             const input = btn.closest('.relative').querySelector('input[type="password"], input[type="text"]');
             if (!input) return;
             const icon = btn.querySelector('.material-symbols-outlined');
@@ -2300,7 +2578,7 @@
                 input.type = 'password';
                 if (icon) icon.textContent = 'visibility';
             }
-        }
+        };
 
         // ─── AI Providers: Add Provider modal ────────────────────────────────
         const _providerMeta = {
@@ -2340,7 +2618,7 @@
 
         window.fetchAIProviders = async function() {
             try {
-                const response = await fetch('/api/v1/providers');
+                const response = await apiFetch('/api/v1/providers');
                 if (!response.ok) return;
                 const result = await response.json();
                 const providers = result.data || result;
@@ -2394,14 +2672,18 @@
                             statusBadge.className = 'provider-status px-2 py-0.5 rounded bg-success/20 text-success border border-success/30 text-[9px] font-mono';
                         }
 
-                        const keyInput = card.querySelector('input[type="password"]');
+                        const keyInput = card.querySelector('input[type="password"], input[type="text"]');
                         if (keyInput) {
-                            keyInput.value = '••••••••••••••••••••';
+                            keyInput.value = p.api_key || '••••••••••••••••••••';
                         }
 
-                        const modelSelect = card.querySelector('select');
-                        if (modelSelect && p.default_model) {
-                            modelSelect.value = p.default_model;
+                        const modelEl = card.querySelector('[data-role="model"]');
+                        if (modelEl && p.default_model) {
+                            modelEl.value = p.default_model;
+                            // Warn devs if the value didn't stick (e.g. option not in list)
+                            if (modelEl.tagName === 'SELECT' && modelEl.value !== p.default_model) {
+                                console.warn(`[Providers] Model "${p.default_model}" not in dropdown options for ${p.provider_key} — option not found.`);
+                            }
                         }
 
                         const chkDefault = card.querySelector('.provider-default-chk');
@@ -2417,7 +2699,7 @@
                         // Render dynamic custom provider card
                         const meta = _providerMeta.custom;
                         const cardId = 'provider-card-custom-' + p.id;
-                        const maskedKey = '••••••••••••••••••••';
+                        const maskedKey = p.api_key || '••••••••••••••••••••';
                         
                         const cardHTML = `
                             <div class="glass-surface rounded-2xl p-5 space-y-4 border border-border hover:border-accent transition" id="${cardId}" data-db-id="${p.id}">
@@ -2458,12 +2740,12 @@
         window.saveProviderKey = async function(btn, providerKey) {
             const card = btn.closest('.glass-surface');
             const keyInput = card.querySelector('input[type="password"], input[type="text"]');
-            const modelSelect = card.querySelector('select');
+            const modelEl = card.querySelector('[data-role="model"]');
             const chkDefault = card.querySelector('.provider-default-chk');
             
             if (!keyInput) return;
             const api_key = keyInput.value.trim();
-            const default_model = modelSelect ? modelSelect.value : '';
+            const default_model = modelEl ? modelEl.value.trim() : '';
             const is_default = chkDefault ? chkDefault.checked : false;
 
             if (!api_key) {
@@ -2471,10 +2753,13 @@
                 return;
             }
 
+            const originalProvider = configuredProviders[providerKey];
+            const isUnmodified = originalProvider && (api_key === '••••••••••••••••••••' || api_key === originalProvider.api_key);
+
             const payload = {
                 provider_key: providerKey,
                 name: _providerMeta[providerKey] ? _providerMeta[providerKey].label : providerKey,
-                api_key: api_key === '••••••••••••••••••••' ? '' : api_key, // Only send key if modified
+                api_key: isUnmodified ? '' : api_key, // Only send key if modified
                 default_model: default_model,
                 is_default: is_default,
                 is_enabled: true
@@ -2578,7 +2863,7 @@
         window.populatePipelineSelections = async function() {
             try {
                 // 1. Fetch AI Providers
-                const providersRes = await fetch('/api/v1/providers');
+                const providersRes = await apiFetch('/api/v1/providers');
                 if (providersRes.ok) {
                     const providersResult = await providersRes.json();
                     const providers = providersResult.data || providersResult;
@@ -2728,7 +3013,7 @@
                     topic_id: parseInt(topic_id),
                     prompt_id: parseInt(prompt_id),
                     ai_provider_id: parseInt(provider),
-                    status: 'active'
+                    is_active: true
                 };
 
                 const createPipeRes = await apiFetch('/api/v1/pipelines', {
@@ -2754,23 +3039,40 @@
                 setTimeout(async () => {
                     await fetchRecentRuns();
                     
-                    const articlesRes = await fetch('/api/v1/articles');
-                    const articles = await articlesRes.json();
-                    const list = articles.data || articles;
-                    
-                    if (list.length > 0) {
-                        const latest = list.find(article => article.pipeline_id === pipeId || article.pipeline?.id === pipeId) || list[0];
-                        lastGeneratedTitle = latest.title;
-                        lastGeneratedText = latest.content;
+                    try {
+                        const articlesRes = await fetch('/api/v1/articles');
+                        if (articlesRes.ok) {
+                            const articles = await articlesRes.json();
+                            const list = articles.data || articles;
+                            
+                            if (list.length > 0) {
+                                const latest = list.find(article => article.pipeline_id === pipeId || article.pipeline?.id === pipeId) || list[0];
+                                lastGeneratedTitle = latest.title;
+                                lastGeneratedText = latest.content;
 
+                                if (output) {
+                                    output.innerHTML = `
+                                        <div class="space-y-3 font-sans">
+                                            <h3 class="text-sm font-bold text-accent">${latest.title}</h3>
+                                            <div class="text-xs text-text leading-relaxed max-h-[250px] overflow-y-auto custom-scrollbar pr-2">${latest.content}</div>
+                                            <p class="text-[10px] text-muted border-t border-border pt-2 font-mono">Database Log ID: ${latest.id} | Status: ${latest.status}</p>
+                                        </div>
+                                    `;
+                                }
+                            } else {
+                                // No articles found — clear spinner with a message
+                                if (output) {
+                                    output.innerHTML = `<div class="text-xs text-warning flex items-center gap-2"><span class="material-symbols-outlined text-sm">warning</span><span>Generation completed but no article was saved. Check AI provider configuration and Laravel logs.</span></div>`;
+                                }
+                            }
+                        } else {
+                            if (output) {
+                                output.innerHTML = `<div class="text-xs text-danger flex items-center gap-2"><span class="material-symbols-outlined text-sm">error</span><span>Could not retrieve generated articles. Server returned ${articlesRes.status}.</span></div>`;
+                            }
+                        }
+                    } catch (fetchErr) {
                         if (output) {
-                            output.innerHTML = `
-                                <div class="space-y-3 font-sans">
-                                    <h3 class="text-sm font-bold text-accent">${latest.title}</h3>
-                                    <div class="text-xs text-text leading-relaxed max-h-[250px] overflow-y-auto custom-scrollbar pr-2">${latest.content}</div>
-                                    <p class="text-[10px] text-muted border-t border-border pt-2 font-mono">Database Log ID: ${latest.id} | Status: ${latest.status}</p>
-                                </div>
-                            `;
+                            output.innerHTML = `<div class="text-xs text-danger flex items-center gap-2"><span class="material-symbols-outlined text-sm">error</span><span>Error loading article preview: ${fetchErr.message}</span></div>`;
                         }
                     }
 
@@ -2783,7 +3085,7 @@
                         await window.refreshDashboardStats();
                     }
                     showSuccess("Content Generated", "Content generation completed and saved to database.");
-                }, 2500);
+                }, 5000);
 
             } catch (err) {
                 console.error("Error generating content:", err);
@@ -2862,6 +3164,39 @@
             const topic    = document.getElementById('gen-topic')?.value;
             const btn      = document.getElementById('generate-btn');
             if (btn) btn.disabled = !(provider && prompt && topic);
+        });
+
+        // Insert prompt placeholder variable chip into textarea at current cursor position
+        document.addEventListener('click', function(e) {
+            const chip = e.target.closest('.prompt-var-chip');
+            if (!chip) return;
+            
+            const varName = chip.getAttribute('data-var');
+            const placeholder = '{{' + varName + '}}';
+            const textarea = document.getElementById('prompt-editor-textarea');
+            
+            if (textarea) {
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const value = textarea.value;
+                
+                textarea.value = value.substring(0, start) + placeholder + value.substring(end);
+                textarea.focus();
+                
+                // Position cursor right after the inserted placeholder
+                const newPos = start + placeholder.length;
+                textarea.setSelectionRange(newPos, newPos);
+                
+                // Trigger input event to update prompt preview or state
+                textarea.dispatchEvent(new Event('input'));
+            }
+            
+            // Also copy to clipboard
+            navigator.clipboard.writeText(placeholder).then(() => {
+                showSuccess("Variable Copied", `"${placeholder}" copied to clipboard.`);
+            }).catch(err => {
+                console.error("Clipboard copy failed: ", err);
+            });
         });
 
         // Enable Save Settings button when input/select changes in AI Providers cards
@@ -2984,7 +3319,7 @@
                 });
 
                 // 4. Providers
-                const providersRes = await fetch('/api/v1/providers');
+                const providersRes = await apiFetch('/api/v1/providers');
                 const providers = await providersRes.json();
                 const providersList = providers.data || providers;
                 const providerSelect = document.getElementById('workflow-provider');
@@ -3066,8 +3401,11 @@
             if (!tbody) return;
 
             try {
-                const response = await fetch('/api/v1/sites');
-                if (!response.ok) return;
+                const response = await apiFetch('/api/v1/sites');
+                if (!response.ok) {
+                    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-8 text-xs font-mono">⚠ Failed to load sites (HTTP ${response.status}). Check session / API auth.</td></tr>`;
+                    return;
+                }
                 const result = await response.json();
                 const sites = result.data || result;
 
