@@ -4,6 +4,7 @@ namespace App\Modules\ContentPipeline\Jobs;
 
 use App\Modules\ContentGeneration\Services\ContentGenerationService;
 use App\Modules\ContentPipeline\Models\PipelineRun;
+use App\Modules\MediaManager\Services\ContentPostProcessor;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -53,7 +54,11 @@ class ProcessPipelineJob implements ShouldQueue
             Log::info("Content Pipeline ID {$pipeline->id} execution started (Run ID {$this->runId}).");
 
             // Perform AI Content Generation using interchangeable drivers
-            $generationService->generateContentForRun($run);
+            $generatedContent = $generationService->generateContentForRun($run);
+
+            // Post-process the generated content (Markdown to HTML, featured image generation)
+            $postProcessor = app(ContentPostProcessor::class);
+            $postProcessor->process($generatedContent);
 
             Log::info("Content Pipeline ID {$pipeline->id} completed successfully via Generation Engine.");
 
