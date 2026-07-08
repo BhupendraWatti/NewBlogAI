@@ -73,6 +73,9 @@ class NewsDiscoveryService
                 null,
             );
 
+            $site->loadMissing('customer');
+            $country = $site->customer?->country ?? null;
+
             $category = strtolower($pipeline->news_category ?? 'global');
             $language = $pipeline->language ?: 'en';
 
@@ -86,7 +89,7 @@ class NewsDiscoveryService
                 $promptText = $this->buildDiscoveryPrompt($category, $language, $needed, array_merge(
                     $excludedTitles,
                     array_column($unique, 'title'),
-                ));
+                ), $country);
 
                 $driver = $this->providerService->getDriver($provider->provider_key);
                 $result = $driver->generate($provider->api_key, $promptText, $provider->default_model);
@@ -178,7 +181,7 @@ class NewsDiscoveryService
      *
      * @param array<int, string> $excludedTitles
      */
-    protected function buildDiscoveryPrompt(string $category, string $language, int $count, array $excludedTitles): string
+    protected function buildDiscoveryPrompt(string $category, string $language, int $count, array $excludedTitles, ?string $country = null): string
     {
         $today = now()->format('F j, Y');
         $exclusions = '';
@@ -188,10 +191,12 @@ class NewsDiscoveryService
                 .implode("\n- ", array_slice($excludedTitles, 0, 40));
         }
 
+        $regionContext = $country ? " focusing specifically on national news events relevant to or occurring in {$country}" : '';
+
         return <<<PROMPT
 You are a newsroom research editor. Today is {$today}.
 
-Research the most significant CURRENT real-world news events in the "{$category}" category from the last 48 hours and identify exactly {$count} DIFFERENT events. Each item must describe a DISTINCT real-world event — no two items may cover the same story, announcement, match, or incident.
+Research the most significant CURRENT real-world news events in the "{$category}" category from the last 48 hours{$regionContext} and identify exactly {$count} DIFFERENT events. Each item must describe a DISTINCT real-world event — no two items may cover the same story, announcement, match, or incident.
 
 Write the "title" and "summary" of each item in this language: {$language}.
 
