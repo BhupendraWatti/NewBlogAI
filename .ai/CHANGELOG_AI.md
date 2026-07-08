@@ -22,6 +22,8 @@
   - Aligned `PromptEngine` system instructions to news reporting and journalism styles, configuring raw markdown formatting defaults.
 
 ### Fixed
+- **Coverage selection race condition**: `CandidateSelectionService::select()` guards now run inside a single transaction with `lockForUpdate` on the candidate and discovery run rows, preventing two employees from concurrently selecting candidates on the same coverage run. Duplicate marking at selection time is committed before the rejection is thrown.
+- **Coverage traceability**: `PublishingQueueService` now persists `selected_news` and `pipeline_run_id` into `GeneratedContent.metadata`, preserving candidate → article lineage for analytics and audit history.
 - **CoverageService category freshness runtime crash**: `getCategoryStatus()` still queried the removed `topic` relation on `GeneratedContent` (throwing `RelationNotFoundException` at runtime). Rewritten to join `content_pipelines.news_category` (case-insensitive), consistent with `getRecommendations()`. `CoverageFreshnessTest` rewritten to the category-driven domain model (it previously created pipelines with the dropped `topic_id` column). Backward compatible: method signatures and return values unchanged.
 - **Database & UI Exceptions**
   - **Blade 500 error**: Fixed Blade compiler crash (`Undefined constant "category"`) in `prompts.blade.php` by escaping variables (e.g., `@{{category}}`, `@{{tone}}`, etc.) inside the default textarea component.
