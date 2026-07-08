@@ -2,7 +2,7 @@
 
 namespace App\Modules\SiteManager\Services;
 
-use App\Models\keys;
+use App\Models\Key;
 use App\Models\User;
 use App\Modules\CustomerManager\Models\Customer;
 use App\Modules\SubscriptionManager\Models\Plan;
@@ -16,12 +16,12 @@ class PluginTokenService
     {
         $plainTextToken = Str::random(60);
 
-        keys::query()
+        Key::query()
             ->where('user_id', $user->id)
             ->whereNull('revoked_at')
             ->update(['revoked_at' => now()]);
 
-        keys::updateOrCreate(
+        Key::updateOrCreate(
             ['name' => 'plugin-token-'.$user->id],
             [
                 'user_id' => $user->id,
@@ -43,7 +43,7 @@ class PluginTokenService
             return null;
         }
 
-        $credential = keys::query()
+        $credential = Key::query()
             ->where('key_hash', hash('sha256', $plainTextToken))
             ->whereNull('revoked_at')
             ->first();
@@ -70,7 +70,7 @@ class PluginTokenService
 
     public function revoke(User $user): void
     {
-        keys::query()
+        Key::query()
             ->where(function ($query) use ($user): void {
                 $query->where('user_id', $user->id)
                     ->orWhere('name', 'plugin-token-'.$user->id);
@@ -86,7 +86,7 @@ class PluginTokenService
             ->orWhere('email', $customer->email)
             ->pluck('id');
 
-        keys::whereIn('user_id', $userIds)
+        Key::whereIn('user_id', $userIds)
             ->whereNull('revoked_at')
             ->update(['revoked_at' => now()]);
     }

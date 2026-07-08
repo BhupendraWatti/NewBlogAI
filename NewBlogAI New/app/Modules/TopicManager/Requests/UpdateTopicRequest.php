@@ -24,7 +24,7 @@ class UpdateTopicRequest extends FormRequest
             'generation_frequency' => ['sometimes', 'required', 'string', 'max:255'],
             'tags' => ['sometimes', 'nullable', 'array'],
             'tags.*' => ['string'],
-            'prompt_id' => ['sometimes', 'nullable', 'integer', 'exists:promts,id'],
+            'prompt_id' => ['sometimes', 'nullable', 'integer', 'exists:prompts,id'],
         ];
     }
 }

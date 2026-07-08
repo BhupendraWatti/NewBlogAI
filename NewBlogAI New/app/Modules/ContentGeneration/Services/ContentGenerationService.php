@@ -39,6 +39,12 @@ class ContentGenerationService
             });
         }
 
+        if (! empty($filters['customer_id'])) {
+            $query->whereHas('site', function ($q) use ($filters) {
+                $q->where('customer_id', $filters['customer_id']);
+            });
+        }
+
         return $query->latest()->paginate($limit);
     }
 
@@ -74,104 +80,115 @@ class ContentGenerationService
             throw new InvalidArgumentException('Pipeline configuration dependencies are incomplete.');
         }
 
-        $this->entitlements->assertProviderAvailable($site, $provider->provider_key);
-        $reservation = $this->entitlements->reserveGeneration(
-            $site,
-            $provider->provider_key,
-            $provider->default_model ?? 'unknown',
-            $promptTemplate->id,
-            $topic->id,
-        );
-
-        // 2. Prepare variables map
-        $variables = [
-            'topic' => $topic->name,
-            'category' => $topic->category ?? '',
-            'language' => $pipeline->language,
-            'website' => $site->domain_url,
-        ];
-
-        $compiledPrompt = $this->compilePrompt($promptTemplate->promt, $variables);
-
-        // 3. Trigger provider execution
         $startTime = microtime(true);
+        $reservation = null;
 
         try {
-            $client = $this->providerService->getDriver($provider->provider_key);
+            // Assert subscription entitlements and quotas before starting
+            $this->entitlements->assertCanRunPipeline($site, $pipeline, $run->properties ?? []);
 
-            // Decrypt key
-            $apiKey = $provider->api_key;
-            if (empty($apiKey)) {
-                throw new \RuntimeException("API key for provider '{$provider->name}' is missing.");
+            $this->entitlements->assertProviderAvailable($site, $provider->provider_key);
+            $reservation = $this->entitlements->reserveGeneration(
+                $site,
+                $provider->provider_key,
+                $provider->default_model ?? 'unknown',
+                $promptTemplate->id,
+                $topic->id,
+            );
+
+            // 2. Create a PipelineContext using the PipelineRun
+            $context = new \App\Modules\ContentPipeline\DTOs\PipelineContext($run, $pipeline);
+            $context->metadata['reservation'] = $reservation;
+
+            // Run Laravel pipeline sequentially through the 7 stages
+            $context = \Illuminate\Support\Facades\Pipeline::send($context)
+                ->through([
+                    function (\App\Modules\ContentPipeline\DTOs\PipelineContext $context, \Closure $next) {
+                        if ($context->hasErrors()) {
+                            return $next($context);
+                        }
+                        $context = app(\App\Modules\ContentPipeline\Contracts\TopicResolverInterface::class)->handle($context);
+                        return $next($context);
+                    },
+                    function (\App\Modules\ContentPipeline\DTOs\PipelineContext $context, \Closure $next) {
+                        if ($context->hasErrors()) {
+                            return $next($context);
+                        }
+                        $context = app(\App\Modules\ContentPipeline\Contracts\ResearchServiceInterface::class)->handle($context);
+                        return $next($context);
+                    },
+                    function (\App\Modules\ContentPipeline\DTOs\PipelineContext $context, \Closure $next) {
+                        if ($context->hasErrors()) {
+                            return $next($context);
+                        }
+                        $context = app(\App\Modules\ContentPipeline\Contracts\SourceCollectorInterface::class)->handle($context);
+                        return $next($context);
+                    },
+                    function (\App\Modules\ContentPipeline\DTOs\PipelineContext $context, \Closure $next) {
+                        if ($context->hasErrors()) {
+                            return $next($context);
+                        }
+                        $context = app(\App\Modules\ContentPipeline\Contracts\FactExtractorInterface::class)->handle($context);
+                        return $next($context);
+                    },
+                    function (\App\Modules\ContentPipeline\DTOs\PipelineContext $context, \Closure $next) {
+                        if ($context->hasErrors()) {
+                            return $next($context);
+                        }
+                        $context = app(\App\Modules\ContentPipeline\Contracts\ContentGeneratorInterface::class)->handle($context);
+                        return $next($context);
+                    },
+                    function (\App\Modules\ContentPipeline\DTOs\PipelineContext $context, \Closure $next) {
+                        if ($context->hasErrors()) {
+                            return $next($context);
+                        }
+                        $context = app(\App\Modules\ContentPipeline\Contracts\TranslationInterface::class)->handle($context);
+                        return $next($context);
+                    },
+                    function (\App\Modules\ContentPipeline\DTOs\PipelineContext $context, \Closure $next) {
+                        if ($context->hasErrors()) {
+                            return $next($context);
+                        }
+                        $context = app(\App\Modules\ContentPipeline\Contracts\FactAuditorInterface::class)->handle($context);
+                        return $next($context);
+                    },
+                    function (\App\Modules\ContentPipeline\DTOs\PipelineContext $context, \Closure $next) {
+                        if ($context->hasErrors()) {
+                            return $next($context);
+                        }
+                        $context = app(\App\Modules\ContentPipeline\Contracts\SEOServiceInterface::class)->handle($context);
+                        return $next($context);
+                    },
+                    function (\App\Modules\ContentPipeline\DTOs\PipelineContext $context, \Closure $next) {
+                        if ($context->hasErrors()) {
+                            return $next($context);
+                        }
+                        $context = app(\App\Modules\ContentPipeline\Contracts\MediaPreparatorInterface::class)->handle($context);
+                        return $next($context);
+                    },
+                    function (\App\Modules\ContentPipeline\DTOs\PipelineContext $context, \Closure $next) {
+                        if ($context->hasErrors()) {
+                            return $next($context);
+                        }
+                        $context = app(\App\Modules\ContentPipeline\Contracts\PublishingQueueInterface::class)->handle($context);
+                        return $next($context);
+                    },
+                ])
+                ->then(function ($context) {
+                    if ($context->hasErrors()) {
+                        $allErrors = array_merge(...array_values($context->errors));
+                        throw new \RuntimeException('Pipeline execution failed: ' . implode(', ', $allErrors));
+                    }
+                    return $context;
+                });
+
+            // Extract the generated content model from the context
+            $generatedContent = $context->metadata['generated_content_model'] ?? null;
+            if (!$generatedContent instanceof GeneratedContent) {
+                throw new \RuntimeException('Pipeline completed but GeneratedContent model was not resolved or stored in context.');
             }
 
-            // Run generation
-            $result = $client->generate($apiKey, $compiledPrompt, $provider->default_model);
-
-            $executionTimeMs = (int) ((microtime(true) - $startTime) * 1000);
-
-            return DB::transaction(function () use ($pipeline, $topic, $site, $promptTemplate, $provider, $result, $executionTimeMs, $run, $reservation) {
-                // Determine title from prompt/content or default to Topic + Date
-                $title = "Article: {$topic->name} - ".now()->format('Y-m-d');
-                $content = $result['text'];
-
-                // 4. Create Generated Content record
-                $generatedContent = GeneratedContent::create([
-                    'pipeline_id' => $pipeline->id,
-                    'site_id' => $site->id,
-                    'topic_id' => $topic->id,
-                    'title' => $title,
-                    'content' => $content,
-                    'status' => 'draft', // draft by default for human review
-                    'metadata' => [
-                        'prompt_id' => $promptTemplate->id,
-                        'prompt_tokens' => $result['prompt_tokens'],
-                        'completion_tokens' => $result['completion_tokens'],
-                        'total_tokens' => $result['total_tokens'],
-                        'cost' => $result['estimated_cost'],
-                    ],
-                ]);
-
-                // 5. Save initial content revision
-                ContentRevision::create([
-                    'generated_content_id' => $generatedContent->id,
-                    'title' => $title,
-                    'content' => $content,
-                    'user_id' => null, // generated by system
-                ]);
-
-                // 6. Log AI request history
-                $requestLogData = [
-                    'customer_id' => $site->customer_id,
-                    'subscription_id' => $reservation?->subscription_id,
-                    'site_id' => $site->id,
-                    'provider' => $provider->provider_key,
-                    'model' => $provider->default_model ?? 'unknown',
-                    'prompt_id' => $promptTemplate->id,
-                    'topic_id' => $topic->id,
-                    'execution_time_ms' => $executionTimeMs,
-                    'prompt_tokens' => $result['prompt_tokens'],
-                    'completion_tokens' => $result['completion_tokens'],
-                    'total_tokens' => $result['total_tokens'],
-                    'estimated_cost' => $result['estimated_cost'],
-                    'status' => 'success',
-                    'response_metadata' => $result['raw_response'],
-                    'error_log' => null,
-                ];
-
-                $reservation
-                    ? $reservation->update($requestLogData)
-                    : AIRequestLog::create($requestLogData);
-
-                // Update run status
-                $run->update([
-                    'status' => 'completed',
-                    'completed_at' => now(),
-                ]);
-                $pipeline->update(['status' => 'completed']);
-
-                return $generatedContent;
-            });
+            return $generatedContent;
 
         } catch (\Exception $e) {
             $executionTimeMs = (int) ((microtime(true) - $startTime) * 1000);
@@ -179,7 +196,7 @@ class ContentGenerationService
             // Log failed AI request
             $requestLogData = [
                 'customer_id' => $site->customer_id,
-                'subscription_id' => $reservation?->subscription_id,
+                'subscription_id' => $reservation?->subscription_id ?? ($this->entitlements->subscriptionForSite($site)?->id ?? null),
                 'site_id' => $site->id,
                 'provider' => $provider->provider_key,
                 'model' => $provider->default_model ?? 'unknown',
@@ -190,9 +207,11 @@ class ContentGenerationService
                 'error_log' => $e->getMessage(),
             ];
 
-            $reservation
-                ? $reservation->update($requestLogData)
-                : AIRequestLog::create($requestLogData);
+            if ($reservation) {
+                $reservation->update($requestLogData);
+            } else {
+                AIRequestLog::create($requestLogData);
+            }
 
             $run->update([
                 'status' => 'failed',

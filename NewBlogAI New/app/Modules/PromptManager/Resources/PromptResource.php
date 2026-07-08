@@ -12,7 +12,7 @@ class PromptResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
-            'content' => $this->promt,
+            'content' => $this->prompt,
             'category' => $this->category,
             'variables' => $this->variables ?? [],
             'version' => $this->version,

@@ -51,7 +51,7 @@ class ClaudeDriver implements AIProviderClientInterface
                 'anthropic-version' => '2023-06-01',
                 'content-type' => 'application/json',
             ])
-                ->timeout($options['timeout'] ?? 30)
+                ->timeout($options['timeout'] ?? 90)
                 ->post('https://api.anthropic.com/v1/messages', [
                     'model' => $model,
                     'messages' => [

@@ -25,7 +25,7 @@ return new class extends Migration
 
             $table->foreign('site_id')->references('id')->on('sites')->onDelete('cascade');
             $table->foreign('topic_id')->references('id')->on('topics')->onDelete('cascade');
-            $table->foreign('prompt_id')->references('id')->on('promts')->onDelete('cascade');
+            $table->foreign('prompt_id')->references('id')->on('prompts')->onDelete('cascade');
             $table->foreign('ai_provider_id')->references('id')->on('ai_providers')->onDelete('cascade');
 
             $table->index('status');

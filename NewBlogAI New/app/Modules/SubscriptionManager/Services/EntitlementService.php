@@ -3,6 +3,7 @@
 namespace App\Modules\SubscriptionManager\Services;
 
 use App\Modules\ContentGeneration\Models\AIRequestLog;
+use App\Modules\ContentPipeline\Models\ContentPipeline;
 use App\Modules\CustomerManager\Models\Customer;
 use App\Modules\PromptManager\Models\Prompt;
 use App\Modules\Publishing\Models\PublishingLog;
@@ -71,6 +72,8 @@ class EntitlementService
             'ai_providers_available' => array_values(Arr::get($snapshot, 'ai_providers_available', $plan->ai_providers_available ?? [])),
             'api_keys_allowed' => (int) Arr::get($snapshot, 'api_keys_allowed', $plan->api_keys_allowed),
             'storage_limit' => (int) Arr::get($snapshot, 'storage_limit', $plan->storage_limit),
+            'max_images_per_article' => (int) Arr::get($snapshot, 'max_images_per_article', Arr::get($snapshot, 'image_limit', 5)),
+            'image_limit' => (int) Arr::get($snapshot, 'image_limit', Arr::get($snapshot, 'max_images_per_article', 5)),
             'minimum_publishing_frequency' => (string) Arr::get(
                 $snapshot,
                 'minimum_publishing_frequency',
@@ -105,6 +108,79 @@ class EntitlementService
                 ->whereNotIn('status', ['failed', 'cancelled'])
                 ->count(),
         ];
+    }
+
+    public function assertCanRunPipeline(Site $site, ContentPipeline $pipeline, array $contextData = []): void
+    {
+        // 1. Asserts that the site is active
+        if (! $site->is_active) {
+            throw new EntitlementDeniedException(
+                'The site must be active to run the pipeline.',
+                'site_active',
+            );
+        }
+
+        // If site doesn't have a customer associated, we bypass subscription checks
+        if (! $site->customer_id) {
+            return;
+        }
+
+        // 2. Asserts that the customer has an active subscription
+        $subscription = $this->activeSubscription($site->customer_id);
+
+        // 3. Validates monthly article generation quota
+        $this->assertCanGenerate($site);
+
+        // 4. Validates daily publishing quota
+        $this->assertCanPublish($site);
+
+        // 5. Validates image limit: check if the planned image count (featured + inline placeholders) exceeds allowed limit
+        $limits = $this->limits($subscription);
+        $imageLimit = (int) ($limits['max_images_per_article'] ?? $limits['image_limit'] ?? 5);
+
+        $plannedImageCount = 0;
+        if (isset($contextData['image_count'])) {
+            $plannedImageCount = (int) $contextData['image_count'];
+        } else {
+            $featured = isset($contextData['featured_image']) ? (int) $contextData['featured_image'] : 0;
+            $inline = isset($contextData['inline_placeholders']) ? (int) $contextData['inline_placeholders'] : 0;
+            $plannedImageCount = $featured + $inline;
+        }
+
+        if ($imageLimit >= 0 && $plannedImageCount > $imageLimit) {
+            throw new EntitlementDeniedException(
+                "The planned image count ({$plannedImageCount}) exceeds the allowed limit per article of {$imageLimit}.",
+                'max_images_per_article',
+                $imageLimit,
+                $plannedImageCount,
+            );
+        }
+
+        // 6. Validates API key limits: check if total API keys used by customer is under limit (api_keys_allowed)
+        $apiKeyLimit = (int) ($limits['api_keys_allowed'] ?? 0);
+        $userIds = \App\Models\User::where('customer_id', $site->customer_id)->pluck('id');
+        $apiKeyUsage = \App\Models\Key::whereIn('user_id', $userIds)
+            ->whereNull('revoked_at')
+            ->count();
+        
+        $this->assertBelowLimit('api_keys_allowed', $apiKeyUsage, $apiKeyLimit);
+
+        // 7. Validates Feature Access: checks if feature flags (like localization, advanced_seo, media_preparation) are enabled
+        $requestedFeatures = $contextData['requested_features'] ?? [];
+        foreach (['localization', 'advanced_seo', 'media_preparation'] as $flag) {
+            if ($contextData[$flag] ?? false) {
+                $requestedFeatures[] = $flag;
+            }
+        }
+        $requestedFeatures = array_unique($requestedFeatures);
+
+        foreach ($requestedFeatures as $feature) {
+            // Find the customer object to assert
+            $site->loadMissing('customer');
+            if ($site->customer) {
+                $this->assertFeatureEnabled($site->customer, $feature);
+            }
+        }
     }
 
     public function assertCanRegisterSite(Customer $customer, ?int $excludingSiteId = null): Subscription
@@ -285,10 +361,12 @@ class EntitlementService
     {
         $subscription = $this->activeSubscription($customer);
         $limits = $this->limits($subscription);
+        $flags = $limits['feature_flags'] ?? [];
+
         $enabled = match ($feature) {
             'analytics' => $limits['analytics_access'],
             'priority_support' => $limits['priority_support'],
-            default => (bool) ($limits['feature_flags'][$feature] ?? false),
+            default => isset($flags[$feature]) ? (bool) $flags[$feature] : in_array($feature, $flags, true),
         };
 
         if (! $enabled) {

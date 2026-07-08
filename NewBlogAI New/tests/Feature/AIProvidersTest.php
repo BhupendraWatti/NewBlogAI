@@ -111,4 +111,24 @@ class AIProvidersTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonPath('message', 'Connection test successful!');
     }
+
+    public function test_ai_provider_driver_timeouts_are_ninety_seconds(): void
+    {
+        $drivers = [
+            'OpenAIDriver.php',
+            'GoogleGeminiDriver.php',
+            'ClaudeDriver.php',
+            'GroqDriver.php',
+            'OllamaDriver.php',
+            'OpenRouterDriver.php',
+        ];
+
+        foreach ($drivers as $driver) {
+            $path = app_path("Modules/AIProviderManager/Drivers/{$driver}");
+            $this->assertFileExists($path);
+            $content = file_get_contents($path);
+            $this->assertStringContainsString('timeout', $content);
+            $this->assertStringContainsString('90', $content);
+        }
+    }
 }

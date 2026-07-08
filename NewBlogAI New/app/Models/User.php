@@ -54,4 +54,17 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Customer::class, 'customer_id');
     }
+
+    public function workspaceEmployees(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Modules\CustomerManager\Models\Employee::class, 'user_id');
+    }
+
+    public function workspaces(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(\App\Modules\CustomerManager\Models\Workspace::class, 'workspace_employees', 'user_id', 'workspace_id')
+            ->withPivot('role')
+            ->withTimestamps();
+    }
 }
+

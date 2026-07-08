@@ -27,7 +27,7 @@ return new class extends Migration
             $table->text('error_log')->nullable();
             $table->timestamp('created_at')->useCurrent();
 
-            $table->foreign('prompt_id')->references('id')->on('promts')->onDelete('set null');
+            $table->foreign('prompt_id')->references('id')->on('prompts')->onDelete('set null');
             $table->foreign('topic_id')->references('id')->on('topics')->onDelete('set null');
 
             $table->index('provider');

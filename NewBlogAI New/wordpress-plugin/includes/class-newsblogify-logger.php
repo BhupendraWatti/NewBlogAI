@@ -84,8 +84,28 @@ class Logger
     private function __construct()
     {
         $this->log_dir = $this->resolve_log_dir();
-        $this->log_file = $this->log_dir.'/'.self::LOG_FILE;
-        $this->activity_file = $this->log_dir.'/'.self::ACTIVITY_FILE;
+
+        $hash = '';
+        if (function_exists('get_option')) {
+            $hash = get_option('newsblogify_log_hash');
+            if (empty($hash)) {
+                if (function_exists('wp_generate_password')) {
+                    $hash = wp_generate_password(16, false);
+                } else {
+                    $hash = bin2hex(random_bytes(8));
+                }
+                update_option('newsblogify_log_hash', $hash);
+            }
+        }
+
+        if (! empty($hash)) {
+            $this->log_file = $this->log_dir.'/newsblogify-'.$hash.'.log';
+            $this->activity_file = $this->log_dir.'/activity-'.$hash.'.jsonl';
+        } else {
+            $this->log_file = $this->log_dir.'/'.self::LOG_FILE;
+            $this->activity_file = $this->log_dir.'/'.self::ACTIVITY_FILE;
+        }
+
         $this->ensure_secure_dir();
     }
 

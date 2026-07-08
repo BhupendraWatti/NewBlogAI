@@ -31,7 +31,7 @@ class PromptLibraryTest extends TestCase
         $response = $this->actingAs($this->user)
             ->postJson('/api/v1/prompts', [
                 'name' => 'SEO Meta generator',
-                'promt' => 'Write meta tags for @{{topic}}.',
+                'prompt' => 'Write meta tags for @{{topic}}.',
                 'category' => 'SEO',
                 'variables' => ['topic'],
                 'version' => 'v1.1',
@@ -44,7 +44,7 @@ class PromptLibraryTest extends TestCase
             ->assertJsonPath('data.variables', ['topic'])
             ->assertJsonPath('data.version', 'v1.1');
 
-        $this->assertDatabaseHas('promts', [
+        $this->assertDatabaseHas('prompts', [
             'name' => 'SEO Meta generator',
             'category' => 'SEO',
         ]);
@@ -55,7 +55,7 @@ class PromptLibraryTest extends TestCase
         // Seed some prompts
         Prompt::create([
             'name' => 'A Prompt',
-            'promt' => 'Content A',
+            'prompt' => 'Content A',
             'category' => 'Tech',
             'variables' => [],
             'version' => 'v1.0',
@@ -64,7 +64,7 @@ class PromptLibraryTest extends TestCase
 
         Prompt::create([
             'name' => 'B Prompt',
-            'promt' => 'Content B',
+            'prompt' => 'Content B',
             'category' => 'Finance',
             'variables' => [],
             'version' => 'v1.0',

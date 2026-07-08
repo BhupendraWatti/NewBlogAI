@@ -44,6 +44,13 @@ class TopicService
             $query->where('language', $filters['language']);
         }
 
+        // Filter by customer_id
+        if (! empty($filters['customer_id'])) {
+            $query->whereHas('subscription', function ($q) use ($filters) {
+                $q->where('customer_id', $filters['customer_id']);
+            });
+        }
+
         // Sorting
         $sortBy = $filters['sort_by'] ?? 'created_at';
         $sortOrder = $filters['sort_order'] ?? 'desc';

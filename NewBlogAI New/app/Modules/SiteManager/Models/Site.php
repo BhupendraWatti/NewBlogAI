@@ -2,7 +2,6 @@
 
 namespace App\Modules\SiteManager\Models;
 
-use App\Models\Promt;
 use App\Modules\ContentPipeline\Models\ContentPipeline;
 use App\Modules\CustomerManager\Models\Customer;
 use App\Modules\ScheduleManager\Models\PublishingSchedule;
@@ -19,9 +18,6 @@ class Site extends Model
         'domain_url',
         'api_key',
         'key_id',
-        'selected_topics',
-        'promt_id',
-        'slot',
         'is_active',
         'status',
         'plugin_version',
@@ -33,6 +29,7 @@ class Site extends Model
         'sync_settings',
         'timezone',
         'configuration_version',
+        'workspace_id',
     ];
 
     /**
@@ -44,7 +41,6 @@ class Site extends Model
     {
         return [
             'api_key' => 'encrypted',
-            'selected_topics' => 'array',
             'last_synced_at' => 'datetime',
             'is_active' => 'boolean',
             'is_default' => 'boolean',
@@ -52,11 +48,6 @@ class Site extends Model
             'sync_settings' => 'array',
             'configuration_version' => 'integer',
         ];
-    }
-
-    public function promt()
-    {
-        return $this->belongsTo(Promt::class, 'promt_id');
     }
 
     public function customer(): BelongsTo
@@ -73,6 +64,12 @@ class Site extends Model
     {
         return $this->hasMany(PublishingSchedule::class, 'site_id');
     }
+
+    public function workspace(): BelongsTo
+    {
+        return $this->belongsTo(\App\Modules\CustomerManager\Models\Workspace::class, 'workspace_id');
+    }
+
 
     protected static function booted()
     {

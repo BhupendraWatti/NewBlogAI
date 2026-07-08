@@ -21,6 +21,38 @@
                         </div>
                     </div>
 
+                    <!-- Category Coverage Dashboard -->
+                    <div class="grid grid-cols-4 gap-4 hidden" id="category-coverage-dashboard">
+                        <div class="glass-surface rounded-2xl p-4 border border-border">
+                            <p class="text-[10px] font-mono text-muted uppercase">Fresh Categories</p>
+                            <h4 class="text-2xl font-bold text-success" id="coverage-fresh-count">—</h4>
+                            <div class="w-full bg-white/5 border border-border h-1.5 rounded-full overflow-hidden mt-2">
+                                <div class="bg-success h-full rounded-full transition-all" id="coverage-fresh-pct" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="glass-surface rounded-2xl p-4 border border-border">
+                            <p class="text-[10px] font-mono text-muted uppercase">Trending Categories</p>
+                            <h4 class="text-2xl font-bold text-accent" id="coverage-trending-count">—</h4>
+                            <div class="w-full bg-white/5 border border-border h-1.5 rounded-full overflow-hidden mt-2">
+                                <div class="bg-accent h-full rounded-full transition-all" id="coverage-trending-pct" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="glass-surface rounded-2xl p-4 border border-border">
+                            <p class="text-[10px] font-mono text-muted uppercase">Stale Categories</p>
+                            <h4 class="text-2xl font-bold text-warning" id="coverage-stale-count">—</h4>
+                            <div class="w-full bg-white/5 border border-border h-1.5 rounded-full overflow-hidden mt-2">
+                                <div class="bg-warning h-full rounded-full transition-all" id="coverage-stale-pct" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="glass-surface rounded-2xl p-4 border border-border">
+                            <p class="text-[10px] font-mono text-muted uppercase">Empty Categories</p>
+                            <h4 class="text-2xl font-bold text-danger" id="coverage-empty-count">—</h4>
+                            <div class="w-full bg-white/5 border border-border h-1.5 rounded-full overflow-hidden mt-2">
+                                <div class="bg-danger h-full rounded-full transition-all" id="coverage-empty-pct" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Search & Filter -->
                     <div class="flex flex-wrap items-center gap-3 p-3 bg-surface border border-border rounded-2xl">
                         <div class="relative w-64">

@@ -237,7 +237,7 @@
         window.refreshDashboardStats = async function() {
             try {
                 // 1. Fetch connected sites count
-                const sitesRes = await fetch('/api/v1/sites');
+                const sitesRes = await apiFetch('/api/v1/sites');
                 if (sitesRes.ok) {
                     const sites = await sitesRes.json();
                     const sitesCount = sites.data ? sites.data.length : (sites.length || 0);
@@ -268,7 +268,7 @@
                 }
 
                 // 2. Fetch content stats (published articles)
-                const contentRes = await fetch('/api/v1/analytics/content');
+                const contentRes = await apiFetch('/api/v1/analytics/content');
                 if (contentRes.ok) {
                     const contentStats = await contentRes.json();
                     const statsPublished = document.getElementById('stats-published');
@@ -282,7 +282,7 @@
                 }
 
                 // 3. Fetch active topics
-                const topicsRes = await fetch('/api/v1/topics');
+                const topicsRes = await apiFetch('/api/v1/topics');
                 if (topicsRes.ok) {
                     const topics = await topicsRes.json();
                     const topicsCount = topics.data ? topics.data.length : (topics.length || 0);
@@ -297,7 +297,7 @@
                 }
 
                 // 4. Fetch total customers
-                const customersRes = await fetch('/api/v1/customers');
+                const customersRes = await apiFetch('/api/v1/customers');
                 if (customersRes.ok) {
                     const customers = await customersRes.json();
                     const customersCount = customers.data ? customers.data.length : (customers.length || 0);
@@ -312,7 +312,7 @@
                 }
 
                 // 5. Fetch recent activity (audit logs)
-                const auditRes = await fetch('/api/v1/operations/audit?limit=5');
+                const auditRes = await apiFetch('/api/v1/operations/audit?limit=5');
                 if (auditRes.ok) {
                     const auditData = await auditRes.json();
                     const logs = auditData.data || auditData;
@@ -348,7 +348,7 @@
                 }
 
                 // 6. Fetch System Health check
-                const healthRes = await fetch('/api/v1/health');
+                const healthRes = await apiFetch('/api/v1/health');
                 if (healthRes.ok) {
                     const health = await healthRes.json();
                     const badge = document.getElementById('system-health-badge');
@@ -412,7 +412,7 @@
         window.refreshDashboardStats = async function() {
             try {
                 // 1. Fetch connected sites count
-                const sitesRes = await fetch('/api/v1/sites');
+                const sitesRes = await apiFetch('/api/v1/sites');
                 if (sitesRes.ok) {
                     const sites = await sitesRes.json();
                     const sitesCount = sites.data ? sites.data.length : (sites.length || 0);
@@ -438,7 +438,7 @@
                 }
 
                 // 2. Fetch content stats
-                const contentRes = await fetch('/api/v1/analytics/content');
+                const contentRes = await apiFetch('/api/v1/analytics/content');
                 if (contentRes.ok) {
                     const contentStats = await contentRes.json();
                     const statsPublished = document.getElementById('stats-published');
@@ -449,7 +449,7 @@
                 }
 
                 // 3. Fetch active topics
-                const topicsRes = await fetch('/api/v1/topics');
+                const topicsRes = await apiFetch('/api/v1/topics');
                 if (topicsRes.ok) {
                     const topics = await topicsRes.json();
                     const topicsCount = topics.data ? topics.data.length : (topics.length || 0);
@@ -461,7 +461,7 @@
                 }
 
                 // 4. Fetch total customers
-                const customersRes = await fetch('/api/v1/customers');
+                const customersRes = await apiFetch('/api/v1/customers');
                 if (customersRes.ok) {
                     const customers = await customersRes.json();
                     const customersCount = customers.data ? customers.data.length : (customers.length || 0);
@@ -473,7 +473,7 @@
                 }
 
                 // 5. Fetch recent activity (audit logs)
-                const auditRes = await fetch('/api/v1/operations/audit?limit=5');
+                const auditRes = await apiFetch('/api/v1/operations/audit?limit=5');
                 if (auditRes.ok) {
                     const auditData = await auditRes.json();
                     const logs = auditData.data || auditData;
@@ -578,6 +578,9 @@
             }
             if (node === 'billing' && window.fetchBillingLedger) {
                 window.fetchBillingLedger();
+            }
+            if (node === 'analytics' && window.fetchAdvancedAnalytics) {
+                window.fetchAdvancedAnalytics();
             }
             if (node === 'rules' && window.fetchRulesWorkflows) {
                 window.fetchRulesWorkflows();
@@ -709,15 +712,60 @@
 
         window.fetchTopics = async function() {
             try {
-                const response = await fetch('/api/v1/topics');
+                const response = await apiFetch('/api/v1/topics');
                 if (!response.ok) return;
                 const result = await safeParseJson(response);
                 if (!result) return;
                 allTopics = result.data || result;
                 renderTopics(allTopics);
                 populateTopicPrompts();
+                
+                await window.fetchCategoryCoverageStats();
             } catch (err) {
                 console.error("Error loading topics:", err);
+            }
+        };
+
+        window.fetchCategoryCoverageStats = async function() {
+            const dashboard = document.getElementById('category-coverage-dashboard');
+            if (!dashboard) return;
+
+            try {
+                const sitesRes = await apiFetch('/api/v1/sites');
+                if (!sitesRes.ok) return;
+                const sites = await sitesRes.json();
+                const sitesList = sites.data || sites;
+                
+                if (sitesList.length === 0) {
+                    dashboard.classList.add('hidden');
+                    return;
+                }
+
+                const activeSite = sitesList.find(s => s.is_active) || sitesList[0];
+                const siteId = activeSite.id;
+
+                const coverageRes = await apiFetch(`/api/v1/sites/${siteId}/analytics/coverage`);
+                if (!coverageRes.ok) return;
+                const coverage = await coverageRes.json();
+
+                const counts = coverage.counts || { fresh: 0, stale: 0, empty: 0, trending: 0 };
+                const percentages = coverage.percentages || { fresh: 0, stale: 0, empty: 0, trending: 0 };
+
+                document.getElementById('coverage-fresh-count').innerText = `${counts.fresh} (${percentages.fresh}%)`;
+                document.getElementById('coverage-fresh-pct').style.width = `${percentages.fresh}%`;
+
+                document.getElementById('coverage-trending-count').innerText = `${counts.trending} (${percentages.trending}%)`;
+                document.getElementById('coverage-trending-pct').style.width = `${percentages.trending}%`;
+
+                document.getElementById('coverage-stale-count').innerText = `${counts.stale} (${percentages.stale}%)`;
+                document.getElementById('coverage-stale-pct').style.width = `${percentages.stale}%`;
+
+                document.getElementById('coverage-empty-count').innerText = `${counts.empty} (${percentages.empty}%)`;
+                document.getElementById('coverage-empty-pct').style.width = `${percentages.empty}%`;
+
+                dashboard.classList.remove('hidden');
+            } catch (err) {
+                console.error("Error populating category coverage:", err);
             }
         };
 
@@ -767,7 +815,7 @@
 
         window.populateTopicPrompts = async function() {
             try {
-                const response = await fetch('/api/v1/prompts');
+                const response = await apiFetch('/api/v1/prompts');
                 if (!response.ok) return;
                 const result = await safeParseJson(response);
                 if (!result) return;
@@ -784,7 +832,8 @@
             }
         };
 
-        window.openTopicAddModal = function() {
+        window.openTopicAddModal = async function() {
+            await populateTopicPrompts();
             document.getElementById('topic-id').value = '';
             document.getElementById('topic-name').value = '';
             document.getElementById('topic-category').value = '';
@@ -844,7 +893,8 @@
 
         window.editTopic = async function(id) {
             try {
-                const response = await fetch(`/api/v1/topics/${id}`);
+                await populateTopicPrompts();
+                const response = await apiFetch(`/api/v1/topics/${id}`);
                 if (!response.ok) return;
                 const result = await safeParseJson(response);
                 if (!result) return;
@@ -892,7 +942,7 @@
 
         window.fetchCustomers = async function() {
             try {
-                const response = await fetch('/api/v1/customers');
+                const response = await apiFetch('/api/v1/customers');
                 if (!response.ok) return;
                 const result = await safeParseJson(response);
                 if (!result) return;
@@ -1000,7 +1050,7 @@
 
         window.editCustomer = async function(id) {
             try {
-                const response = await fetch(`/api/v1/customers/${id}`);
+                const response = await apiFetch(`/api/v1/customers/${id}`);
                 if (!response.ok) return;
                 const result = await safeParseJson(response);
                 if (!result) return;
@@ -1042,80 +1092,380 @@
         };
 
         // Scheduler & Background Job functions
+        // Scheduler & Background Job functions
         window.fetchScheduledJobs = async function() {
             const tbody = document.getElementById('scheduler-jobs-table-body');
             if (!tbody) return;
 
             try {
-                const response = await fetch('/api/v1/operations/jobs');
+                const response = await apiFetch('/api/v1/schedules');
                 if (!response.ok) return;
                 const result = await safeParseJson(response);
                 if (!result) return;
-                const jobs = result.data || result;
+                const schedules = result.data || result;
 
-                // Update scheduler KPI stats cards
-                const cards = document.querySelectorAll('#node-scheduler h3');
-                if (cards.length >= 4) {
-                    const failedCount = jobs.filter(j => j.status === 'failed').length;
-                    const pendingCount = jobs.filter(j => j.status === 'pending' || j.status === 'processing').length;
-                    
-                    // 1. Queue Health
-                    cards[0].innerText = failedCount > 0 ? "Degraded" : "Optimal";
-                    cards[0].className = "text-3xl font-display font-bold " + (failedCount > 0 ? "text-rose-500" : "text-accent");
-                    
-                    // 2. Scheduled Runs
-                    cards[1].innerText = jobs.length + " Jobs";
-                    
-                    // 3. Avg Posting Delay (static or mock)
-                    cards[2].innerText = "14.2s";
-                    
-                    // 4. Failed Releases
-                    cards[3].innerText = failedCount;
-                    cards[3].className = "text-3xl font-display font-bold " + (failedCount > 0 ? "text-rose-500" : "text-accent");
+                const jobsRes = await apiFetch('/api/v1/operations/jobs');
+                let jobsCount = 0;
+                let failedCount = 0;
+                if (jobsRes.ok) {
+                    const jobs = await jobsRes.json();
+                    const jobsList = jobs.data || jobs;
+                    jobsCount = jobsList.length;
+                    failedCount = jobsList.filter(j => j.status === 'failed').length;
+                }
+
+                const healthEl = document.getElementById('scheduler-kpi-health');
+                if (healthEl) {
+                    healthEl.innerText = failedCount > 0 ? "Degraded" : "Optimal";
+                    healthEl.className = "text-3xl font-display font-bold " + (failedCount > 0 ? "text-rose-500" : "text-accent");
+                }
+                const countEl = document.getElementById('scheduler-kpi-count');
+                if (countEl) {
+                    const activeSchedulesCount = schedules.filter(s => s.is_active).length;
+                    countEl.innerText = `${activeSchedulesCount} Active`;
+                }
+                const logsEl = document.getElementById('scheduler-kpi-logs');
+                if (logsEl) {
+                    logsEl.innerText = `${jobsCount} Logs`;
+                }
+                const nextEl = document.getElementById('scheduler-kpi-next');
+                if (nextEl) {
+                    const activeSchedules = schedules.filter(s => s.is_active && s.next_run_at);
+                    if (activeSchedules.length > 0) {
+                        activeSchedules.sort((a, b) => new Date(a.next_run_at) - new Date(b.next_run_at));
+                        const nextRun = new Date(activeSchedules[0].next_run_at);
+                        nextEl.innerText = nextRun.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    } else {
+                        nextEl.innerText = '—';
+                    }
                 }
 
                 tbody.innerHTML = '';
-                if (jobs.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-outline py-12">No background queue jobs found in system log.</td></tr>`;
+                if (schedules.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-outline py-12">No publishing schedules defined. Click "Create Schedule" to orchestrate releases.</td></tr>`;
                 } else {
-                    jobs.forEach(job => {
+                    schedules.forEach(sched => {
                         const tr = document.createElement('tr');
-                        tr.className = "hover:bg-white/5 transition cursor-pointer";
+                        tr.className = "hover:bg-white/5 transition border-b border-border last:border-b-0";
                         
                         let statusClass = "bg-warning/20 text-warning border-warning/30";
-                        if (job.status === 'completed') {
+                        if (sched.is_active) {
                             statusClass = "bg-success/20 text-success border-success/30";
-                        } else if (job.status === 'failed') {
+                        } else {
                             statusClass = "bg-danger/20 text-danger border-danger/30";
-                        } else if (job.status === 'processing') {
-                            statusClass = "bg-secondary/20 text-secondary border-secondary/30";
                         }
 
-                        const jobDate = job.started_at ? new Date(job.started_at).toLocaleString() : '—';
-                        const cleanJobName = job.name.replace('App\\Modules\\', '').replace('\\Jobs\\', ': ');
+                        const nextRunStr = sched.next_run_at ? new Date(sched.next_run_at).toLocaleString() : '—';
+                        const siteUrl = sched.site ? sched.site.domain_url.replace(/https?:\/\//, '') : '—';
+                        const statusLabel = sched.is_active ? 'active' : 'paused';
 
-                        let actionsHtml = `<button onclick="inspectElement('job', '${job.job_id}', '${job.status}', '${jobDate}', '${job.queue}')" class="text-secondary hover:underline">Inspect</button>`;
-                        if (job.status === 'failed') {
-                            actionsHtml = `
-                                <button onclick="retryJob(${job.id}, this)" class="text-accent hover:underline mr-3">Retry</button>
-                                ${actionsHtml}
-                            `;
+                        let freqStr = sched.frequency;
+                        if (sched.frequency === 'weekly' && sched.days_of_week) {
+                            const days = Array.isArray(sched.days_of_week) ? sched.days_of_week : JSON.parse(sched.days_of_week || '[]');
+                            if (days.length > 0) {
+                                freqStr += ` (${days.map(d => d.slice(0, 3)).join(', ')})`;
+                            }
+                        }
+                        if (sched.time_of_day) {
+                            freqStr += ` at ${sched.time_of_day}`;
                         }
 
                         tr.innerHTML = `
-                            <td class="p-3 pl-5 text-text">${job.job_id}</td>
-                            <td class="p-3 text-muted font-semibold">${cleanJobName}</td>
-                            <td class="p-3 text-muted">${job.queue}</td>
-                            <td class="p-3 text-text">${jobDate}</td>
-                            <td class="p-3"><span class="px-2 py-0.5 rounded border text-[9px] ${statusClass}">${job.status}</span></td>
-                            <td class="p-3 text-right pr-5">${actionsHtml}</td>
+                            <td class="p-3 pl-5 text-text font-medium">${sched.name}</td>
+                            <td class="p-3 text-muted font-mono">${siteUrl}</td>
+                            <td class="p-3 text-muted">${freqStr}</td>
+                            <td class="p-3 text-text font-mono">${nextRunStr}</td>
+                            <td class="p-3">
+                                <span onclick="toggleScheduleStatus(${sched.id}, ${sched.is_active})" class="px-2 py-0.5 rounded border text-[9px] cursor-pointer hover:opacity-80 transition ${statusClass}">${statusLabel}</span>
+                            </td>
+                            <td class="p-3 text-right pr-5">
+                                <button onclick="openScheduleEditModal(${sched.id})" class="text-accent hover:underline mr-3">Edit</button>
+                                <button onclick="deleteSchedule(${sched.id})" class="text-danger text-rose-500 hover:underline">Delete</button>
+                            </td>
                         `;
                         tbody.appendChild(tr);
                     });
                 }
+
+                renderScheduleCalendar(schedules);
             } catch (err) {
-                console.error("Error fetching scheduled jobs:", err);
+                console.error("Error fetching schedules:", err);
             }
+        };
+
+        window.toggleSchedulerView = function(view) {
+            const queueBtn = document.getElementById('scheduler-view-queue-btn');
+            const calBtn = document.getElementById('scheduler-view-calendar-btn');
+            const queueView = document.getElementById('scheduler-queue-view');
+            const calView = document.getElementById('scheduler-calendar-view');
+
+            if (view === 'queue') {
+                queueBtn.classList.add('bg-white/5', 'text-accent');
+                queueBtn.classList.remove('text-muted');
+                calBtn.classList.add('text-muted');
+                calBtn.classList.remove('bg-white/5', 'text-accent');
+                queueView.classList.remove('hidden');
+                calView.classList.add('hidden');
+            } else {
+                calBtn.classList.add('bg-white/5', 'text-accent');
+                calBtn.classList.remove('text-muted');
+                queueBtn.classList.add('text-muted');
+                queueBtn.classList.remove('bg-white/5', 'text-accent');
+                calView.classList.remove('hidden');
+                queueView.classList.add('hidden');
+            }
+        };
+
+        window.openScheduleAddModal = async function() {
+            document.getElementById('schedule-modal-title').innerText = "Create Publishing Schedule";
+            document.getElementById('schedule-form').reset();
+            document.getElementById('schedule-id').value = '';
+            document.getElementById('schedule-days-container').classList.add('hidden');
+            
+            await populateScheduleSitesDropdown();
+            openModal('schedule-modal');
+        };
+
+        window.openScheduleEditModal = async function(id) {
+            try {
+                document.getElementById('schedule-modal-title').innerText = "Edit Publishing Schedule";
+                await populateScheduleSitesDropdown();
+
+                const response = await apiFetch(`/api/v1/schedules/${id}`);
+                if (!response.ok) throw new Error("Could not fetch schedule details.");
+                const result = await response.json();
+                const sched = result.data || result;
+
+                document.getElementById('schedule-id').value = sched.id;
+                document.getElementById('schedule-name').value = sched.name;
+                document.getElementById('schedule-site-id').value = sched.site_id;
+                
+                await populateSchedulePipelines(sched.site_id);
+                document.getElementById('schedule-pipeline-id').value = sched.pipeline_id || '';
+                
+                document.getElementById('schedule-frequency').value = sched.frequency;
+                document.getElementById('schedule-time-of-day').value = sched.time_of_day || '09:00';
+                document.getElementById('schedule-timezone').value = sched.timezone || 'UTC';
+                document.getElementById('schedule-active').checked = sched.is_active;
+
+                toggleScheduleDaysField(sched.frequency);
+
+                if (sched.frequency === 'weekly' && sched.days_of_week) {
+                    const days = Array.isArray(sched.days_of_week) ? sched.days_of_week : JSON.parse(sched.days_of_week || '[]');
+                    document.querySelectorAll('#schedule-form input[name="days[]"]').forEach(cb => {
+                        cb.checked = days.includes(cb.value);
+                    });
+                }
+
+                openModal('schedule-modal');
+            } catch (err) {
+                console.error("Error opening edit schedule modal:", err);
+                showError("Error", err.message || "Failed to load schedule.");
+            }
+        };
+
+        window.closeScheduleModal = function() {
+            closeModal('schedule-modal');
+        };
+
+        async function populateScheduleSitesDropdown() {
+            const dropdown = document.getElementById('schedule-site-id');
+            if (!dropdown) return;
+
+            try {
+                const response = await apiFetch('/api/v1/sites');
+                if (!response.ok) return;
+                const result = await response.json();
+                const sites = result.data || result;
+
+                dropdown.innerHTML = '<option value="" disabled selected>Select WordPress site...</option>';
+                sites.forEach(site => {
+                    const cleanUrl = site.domain_url.replace(/https?:\/\//, '');
+                    dropdown.innerHTML += `<option value="${site.id}">${cleanUrl}</option>`;
+                });
+            } catch (err) {
+                console.error("Error populating scheduler sites:", err);
+            }
+        }
+
+        window.populateSchedulePipelines = async function(siteId) {
+            const dropdown = document.getElementById('schedule-pipeline-id');
+            if (!dropdown) return;
+
+            try {
+                const response = await apiFetch('/api/v1/pipelines');
+                if (!response.ok) return;
+                const result = await response.json();
+                const pipelines = result.data || result;
+
+                const filtered = pipelines.filter(p => p.site_id == siteId);
+
+                dropdown.innerHTML = '<option value="">No Pipeline (Sync Only)</option>';
+                filtered.forEach(pip => {
+                    const topicName = pip.topic ? pip.topic.name : 'Untitled Pipeline';
+                    dropdown.innerHTML += `<option value="${pip.id}">${topicName}</option>`;
+                });
+            } catch (err) {
+                console.error("Error populating scheduler pipelines:", err);
+            }
+        };
+
+        window.toggleScheduleDaysField = function(frequency) {
+            const container = document.getElementById('schedule-days-container');
+            if (frequency === 'weekly') {
+                container.classList.remove('hidden');
+            } else {
+                container.classList.add('hidden');
+            }
+        };
+
+        window.saveSchedule = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('schedule-id').value;
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `/api/v1/schedules/${id}` : '/api/v1/schedules';
+
+            const days = [];
+            document.querySelectorAll('#schedule-form input[name="days[]"]:checked').forEach(cb => {
+                days.push(cb.value);
+            });
+
+            const payload = {
+                site_id: parseInt(document.getElementById('schedule-site-id').value),
+                pipeline_id: document.getElementById('schedule-pipeline-id').value ? parseInt(document.getElementById('schedule-pipeline-id').value) : null,
+                name: document.getElementById('schedule-name').value,
+                frequency: document.getElementById('schedule-frequency').value,
+                time_of_day: document.getElementById('schedule-time-of-day').value || '09:00',
+                timezone: document.getElementById('schedule-timezone').value || 'UTC',
+                is_active: document.getElementById('schedule-active').checked
+            };
+
+            if (payload.frequency === 'weekly') {
+                payload.days_of_week = days;
+            }
+
+            await apiRequest(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }, {
+                submitBtn: e.submitter,
+                successTitle: id ? "Schedule Updated" : "Schedule Created",
+                successMessage: id ? "The publishing schedule has been updated." : "A new publishing schedule has been added.",
+                defaultErrorMessage: "Failed to save schedule.",
+                onSuccess: () => {
+                    closeScheduleModal();
+                    fetchScheduledJobs();
+                }
+            });
+        };
+
+        window.deleteSchedule = async function(id) {
+            showConfirmation(
+                "Delete Schedule",
+                "Are you sure you want to permanently delete this publishing schedule?",
+                async () => {
+                    await apiRequest(`/api/v1/schedules/${id}`, { method: 'DELETE' }, {
+                        successTitle: "Schedule Deleted",
+                        successMessage: "The publishing schedule was deleted.",
+                        defaultErrorMessage: "Could not delete schedule.",
+                        onSuccess: () => {
+                            fetchScheduledJobs();
+                        }
+                    });
+                }
+            );
+        };
+
+        window.toggleScheduleStatus = async function(id, currentStatus) {
+            const url = `/api/v1/schedules/${id}`;
+
+            try {
+                const getRes = await apiFetch(url);
+                if (!getRes.ok) return;
+                const result = await getRes.json();
+                const sched = result.data || result;
+
+                const fullPayload = {
+                    site_id: sched.site_id,
+                    pipeline_id: sched.pipeline_id,
+                    name: sched.name,
+                    frequency: sched.frequency,
+                    time_of_day: sched.time_of_day || '09:00',
+                    timezone: sched.timezone || 'UTC',
+                    is_active: !currentStatus
+                };
+
+                if (sched.frequency === 'weekly') {
+                    fullPayload.days_of_week = Array.isArray(sched.days_of_week) ? sched.days_of_week : JSON.parse(sched.days_of_week || '[]');
+                }
+
+                await apiRequest(url, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(fullPayload)
+                }, {
+                    successTitle: "Status Updated",
+                    successMessage: `Schedule has been ${!currentStatus ? 'activated' : 'paused'}.`,
+                    onSuccess: () => {
+                        fetchScheduledJobs();
+                    }
+                });
+            } catch (err) {
+                console.error("Error toggling schedule status:", err);
+            }
+        };
+
+        window.renderScheduleCalendar = function(schedules) {
+            const grid = document.getElementById('calendar-days-grid');
+            const monthTitle = document.getElementById('calendar-month-title');
+            const eventsCount = document.getElementById('calendar-events-count');
+            if (!grid) return;
+
+            grid.innerHTML = '';
+            
+            const date = new Date(2026, 6, 1);
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            
+            if (monthTitle) monthTitle.innerText = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+
+            const offset = 2;
+            for (let i = 0; i < offset; i++) {
+                const blank = document.createElement('div');
+                blank.className = "p-4 bg-transparent border border-transparent";
+                grid.appendChild(blank);
+            }
+
+            const totalDays = 31;
+            let activeEvents = 0;
+
+            for (let day = 1; day <= totalDays; day++) {
+                const hasEvent = schedules.some(sched => {
+                    if (!sched.is_active) return false;
+                    if (sched.next_run_at) {
+                        const runDate = new Date(sched.next_run_at);
+                        return runDate.getFullYear() === 2026 && runDate.getMonth() === 6 && runDate.getDate() === day;
+                    }
+                    return false;
+                });
+
+                const cell = document.createElement('div');
+                if (hasEvent) {
+                    activeEvents++;
+                    cell.className = "p-4 bg-white/5 border border-accent rounded-xl relative hover:border-accent transition group cursor-pointer";
+                    cell.innerHTML = `
+                        <span class="text-text font-bold">${day}</span>
+                        <span class="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span>
+                    `;
+                } else {
+                    cell.className = "p-4 bg-white/5 border border-border rounded-xl hover:border-accent transition cursor-pointer";
+                    cell.innerText = day;
+                }
+                
+                grid.appendChild(cell);
+            }
+
+            if (eventsCount) eventsCount.innerText = `${activeEvents} Scheduled Events`;
         };
 
         window.retryJob = async function(id, element) {
@@ -1182,7 +1532,7 @@
                     // Fetch AI Request Logs
                     showLoading("Retrieving AI Inference Telemetry...");
                     try {
-                        const res = await fetch('/api/v1/ai/logs?limit=10');
+                        const res = await apiFetch('/api/v1/ai/logs?limit=10');
                         if (!res.ok) throw new Error("Could not retrieve AI logs");
                         const data = await res.json();
                         const logs = data.data || data;
@@ -1223,7 +1573,7 @@
                     // Fetch Site Publishing Logs
                     showLoading("Retrieving Publishing Engine History...");
                     try {
-                        const res = await fetch('/api/v1/publishing/logs?limit=10');
+                        const res = await apiFetch('/api/v1/publishing/logs?limit=10');
                         if (!res.ok) throw new Error("Could not retrieve publishing logs");
                         const data = await res.json();
                         const logs = data.data || data;
@@ -1271,7 +1621,7 @@
                     // Fetch operations audit logs as default history stream
                     showLoading("Retrieving Audit Logs...");
                     try {
-                        const res = await fetch('/api/v1/operations/audit?limit=10');
+                        const res = await apiFetch('/api/v1/operations/audit?limit=10');
                         if (!res.ok) throw new Error("Could not retrieve audit history");
                         const data = await res.json();
                         const logs = data.data || data;
@@ -1606,7 +1956,7 @@
             if (!listContainer) return;
 
             try {
-                const response = await fetch('/api/v1/prompts');
+                const response = await apiFetch('/api/v1/prompts');
                 if (!response.ok) return;
                 const result = await response.json();
                 const prompts = result.data || result;
@@ -1832,7 +2182,7 @@
             if (!tbody) return;
 
             try {
-                const response = await fetch('/api/v1/articles');
+                const response = await apiFetch('/api/v1/articles');
                 if (!response.ok) return;
                 const result = await response.json();
                 const articles = result.data || result;
@@ -1937,7 +2287,7 @@
             try {
                 // 1. Fetch Audit Logs
                 if (stream) {
-                    const auditResponse = await fetch('/api/v1/operations/audit?limit=10');
+                    const auditResponse = await apiFetch('/api/v1/operations/audit?limit=10');
                     if (auditResponse.ok) {
                         const auditData = await auditResponse.json();
                         const logs = auditData.data || auditData;
@@ -1982,7 +2332,7 @@
                 }
 
                 // 2. Fetch Job Logs to count failed jobs
-                const jobsResponse = await fetch('/api/v1/operations/jobs');
+                const jobsResponse = await apiFetch('/api/v1/operations/jobs');
                 if (jobsResponse.ok) {
                     const jobsResult = await jobsResponse.json();
                     const jobs = jobsResult.data || jobsResult;
@@ -2028,7 +2378,7 @@
 
         window.triggerNotificationClearSimulation = async function() {
             try {
-                const response = await fetch('/api/v1/operations/jobs');
+                const response = await apiFetch('/api/v1/operations/jobs');
                 if (!response.ok) return;
                 const result = await response.json();
                 const jobs = result.data || result;
@@ -2069,7 +2419,7 @@
             if (!tbody) return;
 
             try {
-                const response = await fetch('/api/v1/users');
+                const response = await apiFetch('/api/v1/users');
                 if (!response.ok) return;
                 const result = await response.json();
                 const users = result.data || result;
@@ -2225,14 +2575,14 @@
 
             try {
                 // 1. Fetch subscriptions from database
-                const subResponse = await fetch('/api/v1/subscriptions');
+                const subResponse = await apiFetch('/api/v1/subscriptions');
                 if (!subResponse.ok) return;
                 const subResult = await subResponse.json();
                 const subscriptions = subResult.data || subResult;
 
                 // 2. Fetch AI logs to calculate actual spend
                 let totalCost = 0.00;
-                const logsRes = await fetch('/api/v1/ai/logs');
+                const logsRes = await apiFetch('/api/v1/ai/logs');
                 if (logsRes.ok) {
                     const logsResult = await logsRes.json();
                     const logs = logsResult.data || logsResult;
@@ -2278,6 +2628,25 @@
                             statusClass = "bg-danger/20 text-danger border-danger/30";
                         }
 
+                        let actionsHtml = '';
+                        if (sub.status === 'active' || sub.status === 'trial') {
+                            actionsHtml += `
+                                <button onclick="changePlanSubscription('${sub.customer_id}', ${sub.plan_id})" class="text-accent hover:underline mr-3">Change Plan</button>
+                                <button onclick="pauseSubscription('${sub.customer_id}')" class="text-warning hover:underline mr-3">Pause</button>
+                                <button onclick="cancelSubscription('${sub.customer_id}')" class="text-danger text-rose-500 hover:underline mr-3">Cancel</button>
+                            `;
+                        } else if (sub.status === 'paused') {
+                            actionsHtml += `
+                                <button onclick="resumeSubscription('${sub.customer_id}')" class="text-success hover:underline mr-3">Resume</button>
+                                <button onclick="cancelSubscription('${sub.customer_id}')" class="text-danger text-rose-500 hover:underline mr-3">Cancel</button>
+                            `;
+                        } else {
+                            actionsHtml += `
+                                <button onclick="changePlanSubscription('${sub.customer_id}', ${sub.plan_id})" class="text-accent hover:underline mr-3">Resubscribe</button>
+                            `;
+                        }
+                        actionsHtml += `<button onclick="syncClientBilling(${sub.id}, this)" class="text-secondary hover:underline">Sync Gateway</button>`;
+
                         const tr = document.createElement('tr');
                         tr.className = "hover:bg-white/5 transition border-b border-border last:border-b-0";
                         tr.innerHTML = `
@@ -2287,7 +2656,7 @@
                             <td class="p-3 text-accent font-bold font-mono">$${price.toFixed(2)}</td>
                             <td class="p-3"><span class="px-2 py-0.5 rounded border text-[9px] ${statusClass}">${sub.status}</span></td>
                             <td class="p-3 text-right pr-5">
-                                <button onclick="syncClientBilling(${sub.id}, this)" class="text-secondary hover:underline mr-3">Sync Gateway</button>
+                                ${actionsHtml}
                             </td>
                         `;
                         tbody.appendChild(tr);
@@ -2315,6 +2684,139 @@
             }, 1000);
         };
 
+        // Subscription Management Controls
+        window.pauseSubscription = async function(customerId) {
+            showConfirmation(
+                "Pause Subscription",
+                "Are you sure you want to pause this subscription?",
+                async () => {
+                    await apiRequest(`/api/v1/customers/${customerId}/subscription/pause`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    }, {
+                        successTitle: "Subscription Paused",
+                        successMessage: "Customer subscription has been successfully paused.",
+                        defaultErrorMessage: "Could not pause subscription.",
+                        onSuccess: async () => {
+                            await fetchBillingLedger();
+                        }
+                    });
+                }
+            );
+        };
+
+        window.resumeSubscription = async function(customerId) {
+            showConfirmation(
+                "Resume Subscription",
+                "Are you sure you want to resume this subscription?",
+                async () => {
+                    await apiRequest(`/api/v1/customers/${customerId}/subscription/resume`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    }, {
+                        successTitle: "Subscription Resumed",
+                        successMessage: "Customer subscription has been successfully resumed.",
+                        defaultErrorMessage: "Could not resume subscription.",
+                        onSuccess: async () => {
+                            await fetchBillingLedger();
+                        }
+                    });
+                }
+            );
+        };
+
+        window.cancelSubscription = async function(customerId) {
+            showConfirmation(
+                "Cancel Subscription",
+                "Are you sure you want to cancel this subscription?",
+                async () => {
+                    await apiRequest(`/api/v1/customers/${customerId}/subscription/cancel`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    }, {
+                        successTitle: "Subscription Cancelled",
+                        successMessage: "Customer subscription has been cancelled.",
+                        defaultErrorMessage: "Could not cancel subscription.",
+                        onSuccess: async () => {
+                            await fetchBillingLedger();
+                        }
+                    });
+                }
+            );
+        };
+
+        window.changePlanSubscription = async function(customerId, currentPlanId) {
+            try {
+                // Fetch all plans
+                const res = await apiFetch('/api/v1/plans');
+                if (!res.ok) throw new Error("Could not load pricing plans.");
+                const result = await res.json();
+                const plans = result.data || result;
+
+                let planOptionsHtml = '';
+                plans.forEach(plan => {
+                    const selected = plan.id == currentPlanId ? 'selected' : '';
+                    planOptionsHtml += `<option value="${plan.id}" ${selected}>${plan.name} ($${parseFloat(plan.price).toFixed(2)})</option>`;
+                });
+
+                Swal.fire({
+                    title: 'Modify Subscription Plan',
+                    html: `
+                        <div class="text-left space-y-4">
+                            <div>
+                                <label class="block text-xs font-mono mb-1 text-muted uppercase">Select Plan</label>
+                                <select id="change-plan-select" class="w-full bg-[#071018] border border-border rounded-xl p-2.5 text-xs text-text font-mono focus:outline-none focus:border-accent">
+                                    ${planOptionsHtml}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-mono mb-1 text-muted uppercase">Billing Period</label>
+                                <select id="change-plan-billing-period" class="w-full bg-[#071018] border border-border rounded-xl p-2.5 text-xs text-text font-mono focus:outline-none focus:border-accent">
+                                    <option value="monthly" selected>Monthly</option>
+                                    <option value="yearly">Yearly</option>
+                                </select>
+                            </div>
+                        </div>
+                    `,
+                    showCancelButton: true,
+                    confirmButtonText: 'Update Plan',
+                    confirmButtonColor: '#059669',
+                    cancelButtonColor: '#ef4444',
+                    background: document.documentElement.classList.contains('dark') ? '#0f172a' : '#ffffff',
+                    color: document.documentElement.classList.contains('dark') ? '#f8fafc' : '#0f172a',
+                    preConfirm: () => {
+                        return {
+                            plan_id: document.getElementById('change-plan-select').value,
+                            billing_period: document.getElementById('change-plan-billing-period').value,
+                            payment_token: 'dummy-token'
+                        };
+                    }
+                }).then(async (dialogResult) => {
+                    if (dialogResult.isConfirmed) {
+                        const payload = dialogResult.value;
+                        const isUpgrade = parseInt(payload.plan_id) > parseInt(currentPlanId);
+                        const endpoint = isUpgrade ? 'upgrade' : 'downgrade';
+
+                        await apiRequest(`/api/v1/customers/${customerId}/subscription/${endpoint}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        }, {
+                            successTitle: "Subscription Updated",
+                            successMessage: `Plan successfully ${endpoint}d!`,
+                            defaultErrorMessage: `Could not ${endpoint} subscription.`,
+                            onSuccess: async () => {
+                                await fetchBillingLedger();
+                            }
+                        });
+                    }
+                });
+            } catch (err) {
+                console.error("Error setting up plan change dialog:", err);
+                showError("Error", err.message || "Failed to load plans.");
+            }
+        };
+
         window.triggerInvoiceSyncSimulation = async function() {
             const gross = document.getElementById('billing-gross-volume');
             if (gross) {
@@ -2329,6 +2831,137 @@
 
         window.triggerBillingLockSimulation = function() {
             showInfo("Overage Protection Active", "Billing lock constraints verified. API usage quotas are synchronized with MySQL plans restrictions.");
+        };
+
+        // ─── Advanced Analytics & Reports ────────────────────────────────────
+        window.fetchAdvancedAnalytics = async function() {
+            const customersEl = document.getElementById('analytics-total-customers');
+            const articlesEl = document.getElementById('analytics-total-articles');
+            const requestsEl = document.getElementById('analytics-total-requests');
+            const sitesEl = document.getElementById('analytics-active-sites');
+            
+            const emptyState = document.getElementById('analytics-empty-state');
+            const contentGrid = document.getElementById('analytics-content-grid');
+            
+            const providerContainer = document.getElementById('analytics-provider-breakdown-container');
+            const statusContainer = document.getElementById('analytics-status-breakdown-container');
+
+            if (!customersEl) return;
+
+            try {
+                // Fetch connected sites
+                const sitesRes = await apiFetch('/api/v1/sites');
+                let sitesCount = 0;
+                if (sitesRes.ok) {
+                    const sites = await sitesRes.json();
+                    sitesCount = sites.data ? sites.data.length : (sites.length || 0);
+                }
+
+                // Fetch total customers
+                const customersRes = await apiFetch('/api/v1/customers');
+                let customersCount = 0;
+                if (customersRes.ok) {
+                    const customers = await customersRes.json();
+                    customersCount = customers.data ? customers.data.length : (customers.length || 0);
+                }
+
+                // Fetch AI statistics
+                const aiRes = await apiFetch('/api/v1/analytics/ai');
+                let totalRequests = 0;
+                let providerData = [];
+                if (aiRes.ok) {
+                    const aiStats = await aiRes.json();
+                    totalRequests = aiStats.total_requests || 0;
+                    providerData = aiStats.providers || [];
+                }
+
+                // Fetch content statistics
+                const contentRes = await apiFetch('/api/v1/analytics/content');
+                let totalArticles = 0;
+                let statusBreakdown = {};
+                if (contentRes.ok) {
+                    const contentStats = await contentRes.json();
+                    totalArticles = contentStats.total_articles || 0;
+                    statusBreakdown = contentStats.status_breakdown || {};
+                }
+
+                // Update KPI elements
+                customersEl.innerText = customersCount;
+                customersEl.className = "text-3xl font-display font-bold text-accent";
+                articlesEl.innerText = totalArticles;
+                articlesEl.className = "text-3xl font-display font-bold text-accent";
+                requestsEl.innerText = totalRequests;
+                requestsEl.className = "text-3xl font-display font-bold text-accent";
+                sitesEl.innerText = sitesCount;
+                sitesEl.className = "text-3xl font-display font-bold text-accent";
+
+                const hasData = totalArticles > 0 || totalRequests > 0;
+                if (hasData) {
+                    if (emptyState) emptyState.classList.add('hidden');
+                    if (contentGrid) contentGrid.classList.remove('hidden');
+
+                    // Render provider breakdown
+                    if (providerContainer) {
+                        providerContainer.innerHTML = '';
+                        if (providerData.length === 0) {
+                            providerContainer.innerHTML = '<p class="text-xs text-muted font-mono">No AI requests logged in database.</p>';
+                        } else {
+                            const maxCount = Math.max(...providerData.map(p => p.count || 0), 1);
+                            providerData.forEach(prov => {
+                                const name = prov.provider.toUpperCase();
+                                const count = prov.count || 0;
+                                const cost = parseFloat(prov.cost || 0).toFixed(2);
+                                const pct = Math.round((count / maxCount) * 100);
+                                
+                                providerContainer.innerHTML += `
+                                    <div class="space-y-1">
+                                        <div class="flex justify-between text-xs font-mono">
+                                            <span class="text-text font-bold">${name}</span>
+                                            <span class="text-muted">${count} requests ($${cost})</span>
+                                        </div>
+                                        <div class="w-full bg-white/5 border border-border h-2.5 rounded-full overflow-hidden">
+                                            <div class="bg-accent h-full rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                        }
+                    }
+
+                    // Render status breakdown
+                    if (statusContainer) {
+                        statusContainer.innerHTML = '';
+                        const statuses = Object.keys(statusBreakdown);
+                        if (statuses.length === 0) {
+                            statusContainer.innerHTML = '<p class="text-xs text-muted font-mono">No articles found in library.</p>';
+                        } else {
+                            const maxVal = Math.max(...Object.values(statusBreakdown), 1);
+                            statuses.forEach(status => {
+                                const count = statusBreakdown[status] || 0;
+                                const pct = Math.round((count / maxVal) * 100);
+                                const statusLabel = status.toUpperCase();
+
+                                statusContainer.innerHTML += `
+                                    <div class="space-y-1">
+                                        <div class="flex justify-between text-xs font-mono">
+                                            <span class="text-text font-bold">${statusLabel}</span>
+                                            <span class="text-muted">${count} drafts</span>
+                                        </div>
+                                        <div class="w-full bg-white/5 border border-border h-2.5 rounded-full overflow-hidden">
+                                            <div class="bg-secondary h-full rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                        }
+                    }
+                } else {
+                    if (emptyState) emptyState.classList.remove('hidden');
+                    if (contentGrid) contentGrid.classList.add('hidden');
+                }
+            } catch (err) {
+                console.error("Error populating advanced analytics:", err);
+            }
         };
 
         // Settings inner tab switcher
@@ -2365,7 +2998,7 @@
             if (!tbody) return;
 
             try {
-                const response = await fetch('/api/v1/operations/audit');
+                const response = await apiFetch('/api/v1/operations/audit');
                 if (!response.ok) return;
                 const result = await response.json();
                 const logs = result.data || result;
@@ -2448,7 +3081,7 @@
 
         window.triggerLogExportSimulation = async function() {
             try {
-                const response = await fetch('/api/v1/operations/audit');
+                const response = await apiFetch('/api/v1/operations/audit');
                 if (!response.ok) return;
                 const result = await response.json();
                 const logs = result.data || result;
@@ -2877,7 +3510,7 @@
                 }
 
                 // 2. Fetch Prompt Templates
-                const promptsRes = await fetch('/api/v1/prompts');
+                const promptsRes = await apiFetch('/api/v1/prompts');
                 if (promptsRes.ok) {
                     const promptsResult = await promptsRes.json();
                     const prompts = promptsResult.data || promptsResult;
@@ -2891,7 +3524,7 @@
                 }
 
                 // 3. Fetch Topics
-                const topicsRes = await fetch('/api/v1/topics');
+                const topicsRes = await apiFetch('/api/v1/topics');
                 if (topicsRes.ok) {
                     const topicsResult = await topicsRes.json();
                     const topics = topicsResult.data || topicsResult;
@@ -2920,7 +3553,7 @@
             if (!tbody) return;
 
             try {
-                const response = await fetch('/api/v1/articles');
+                const response = await apiFetch('/api/v1/articles');
                 if (!response.ok) return;
                 const result = await response.json();
                 const articles = result.data || result;
@@ -2991,7 +3624,7 @@
             if (output) output.innerHTML = '<div class="flex items-center gap-2"><span class="material-symbols-outlined text-warning animate-spin text-base">autorenew</span><span>Synthesizing article content via LLM driver...</span></div>';
 
             try {
-                const sitesRes = await fetch('/api/v1/sites');
+                const sitesRes = await apiFetch('/api/v1/sites');
                 if (!sitesRes.ok) throw new Error("Could not fetch sites");
                 const sites = await sitesRes.json();
                 const sitesList = sites.data || sites;
@@ -3040,7 +3673,7 @@
                     await fetchRecentRuns();
                     
                     try {
-                        const articlesRes = await fetch('/api/v1/articles');
+                        const articlesRes = await apiFetch('/api/v1/articles');
                         if (articlesRes.ok) {
                             const articles = await articlesRes.json();
                             const list = articles.data || articles;
@@ -3099,7 +3732,7 @@
 
         window.previewArticleText = async function(id) {
             try {
-                const response = await fetch(`/api/v1/articles/${id}`);
+                const response = await apiFetch(`/api/v1/articles/${id}`);
                 if (!response.ok) return;
                 const result = await response.json();
                 const article = result.data || result;
@@ -3123,7 +3756,7 @@
 
         window.publishArticle = async function(id, element) {
             try {
-                const articleRes = await fetch(`/api/v1/articles/${id}`);
+                const articleRes = await apiFetch(`/api/v1/articles/${id}`);
                 if (!articleRes.ok) throw new Error("Could not load article metadata.");
                 const article = await articleRes.json();
                 const data = article.data || article;
@@ -3239,7 +3872,7 @@
             if (!registryList) return;
 
             try {
-                const response = await fetch('/api/v1/pipelines');
+                const response = await apiFetch('/api/v1/pipelines');
                 if (!response.ok) return;
                 const result = await response.json();
                 const pipelines = result.data || result;
@@ -3286,7 +3919,7 @@
             
             try {
                 // 1. Sites
-                const sitesRes = await fetch('/api/v1/sites');
+                const sitesRes = await apiFetch('/api/v1/sites');
                 const sites = await sitesRes.json();
                 const sitesList = sites.data || sites;
                 const siteSelect = document.getElementById('workflow-site');
@@ -3296,7 +3929,7 @@
                 });
 
                 // 2. Topics
-                const topicsRes = await fetch('/api/v1/topics');
+                const topicsRes = await apiFetch('/api/v1/topics');
                 const topics = await topicsRes.json();
                 const topicsList = topics.data || topics;
                 const topicSelect = document.getElementById('workflow-topic');
@@ -3309,7 +3942,7 @@
                 });
 
                 // 3. Prompts
-                const promptsRes = await fetch('/api/v1/prompts');
+                const promptsRes = await apiFetch('/api/v1/prompts');
                 const prompts = await promptsRes.json();
                 const promptsList = prompts.data || prompts;
                 const promptSelect = document.getElementById('workflow-prompt');

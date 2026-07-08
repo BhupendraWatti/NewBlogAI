@@ -337,7 +337,7 @@ Source Text:
 
         async function fetchPrompts() {
             try {
-                const response = await fetch('/api/v1/prompts');
+                const response = await apiFetch('/api/v1/prompts');
                 loadedPrompts = await response.json();
                 renderPrompts(loadedPrompts);
             } catch (err) {
@@ -409,13 +409,13 @@ Source Text:
             try {
                 let response;
                 if (activePromptId) {
-                    response = await fetch(`/api/v1/prompts/${activePromptId}`, {
+                    response = await apiFetch(`/api/v1/prompts/${activePromptId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ name, promt })
                     });
                 } else {
-                    response = await fetch('/api/v1/prompts', {
+                    response = await apiFetch('/api/v1/prompts', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ name, promt })
@@ -442,7 +442,7 @@ Source Text:
                 "Are you sure you want to delete this prompt template?",
                 async () => {
                     try {
-                        const response = await fetch(`/api/v1/prompts/${id}`, { method: 'DELETE' });
+                        const response = await apiFetch(`/api/v1/prompts/${id}`, { method: 'DELETE' });
                         if (response.ok) {
                             if (activePromptId === id) activePromptId = null;
                             await fetchPrompts();

@@ -6,6 +6,8 @@ use App\Modules\ContentPipeline\Services\PipelineService;
 use App\Modules\ScheduleManager\Models\PublishingSchedule;
 use App\Modules\SiteManager\Models\Site;
 use App\Modules\SubscriptionManager\Services\EntitlementService;
+use App\Modules\TopicManager\Services\CoverageService;
+use App\Modules\Operations\Models\ScheduleLog;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -15,6 +17,7 @@ class ScheduleService
     public function __construct(
         protected EntitlementService $entitlements,
         protected PipelineService $pipelines,
+        protected CoverageService $coverageService,
     ) {}
 
     public function create(array $data): PublishingSchedule
@@ -61,13 +64,17 @@ class ScheduleService
 
         PublishingSchedule::query()
             ->where('is_active', true)
+            ->where(function ($query) {
+                $query->whereIn('schedule_mode', ['time_based', 'coverage_based'])
+                    ->orWhereNull('schedule_mode');
+            })
             ->whereNotNull('next_run_at')
             ->where('next_run_at', '<=', now())
             ->orderBy('id')
             ->each(function (PublishingSchedule $schedule) use (&$processed): void {
                 DB::transaction(function () use ($schedule, &$processed): void {
                     $locked = PublishingSchedule::query()
-                        ->with(['site', 'pipeline'])
+                        ->with(['site', 'pipeline.topic'])
                         ->lockForUpdate()
                         ->find($schedule->id);
 
@@ -79,18 +86,100 @@ class ScheduleService
                         throw new InvalidArgumentException('A schedule must reference a pipeline owned by the same website.');
                     }
 
-                    $this->entitlements->assertCanGenerate($locked->site);
-                    $this->pipelines->triggerRun($locked->pipeline);
-
-                    $locked->update([
-                        'last_run_at' => now(),
-                        'next_run_at' => $this->nextRunAt($locked->toArray(), now()),
+                    $log = ScheduleLog::create([
+                        'task_name' => "Publishing Schedule #{$locked->id} ({$locked->name})",
+                        'status' => 'running',
+                        'started_at' => now(),
                     ]);
-                    $processed++;
+
+                    try {
+                        $this->entitlements->assertCanGenerate($locked->site);
+
+                        $shouldTrigger = true;
+                        if ($locked->schedule_mode === 'coverage_based') {
+                            $category = $locked->pipeline->topic?->category;
+                            if ($category) {
+                                $status = $this->coverageService->getCategoryStatus($locked->site_id, $category);
+                                if ($status !== 'stale' && $status !== 'empty') {
+                                    $shouldTrigger = false;
+                                }
+                            }
+                        }
+
+                        if ($shouldTrigger) {
+                            $this->pipelines->triggerRun($locked->pipeline);
+                            $log->update([
+                                'status' => 'success',
+                                'completed_at' => now(),
+                                'output' => "Successfully triggered pipeline run for schedule #{$locked->id}.",
+                            ]);
+                            $processed++;
+                        } else {
+                            $log->update([
+                                'status' => 'success',
+                                'completed_at' => now(),
+                                'output' => "Skipped trigger: Category is not stale or empty.",
+                            ]);
+                        }
+
+                        $locked->update([
+                            'last_run_at' => $shouldTrigger ? now() : $locked->last_run_at,
+                            'next_run_at' => $this->nextRunAt($locked->toArray(), now()),
+                        ]);
+                    } catch (\Throwable $e) {
+                        $log->update([
+                            'status' => 'failed',
+                            'completed_at' => now(),
+                            'output' => $e->getMessage() . "\n" . $e->getTraceAsString(),
+                        ]);
+                        throw $e;
+                    }
                 });
             });
 
         return $processed;
+    }
+
+    public function triggerManualRun(PublishingSchedule $schedule): void
+    {
+        DB::transaction(function () use ($schedule) {
+            $locked = PublishingSchedule::with(['site', 'pipeline.topic'])->lockForUpdate()->find($schedule->id);
+            if (!$locked) {
+                return;
+            }
+
+            if (! $locked->pipeline || $locked->pipeline->site_id !== $locked->site_id) {
+                throw new InvalidArgumentException('A schedule must reference a pipeline owned by the same website.');
+            }
+
+            $this->entitlements->assertCanGenerate($locked->site);
+
+            $log = ScheduleLog::create([
+                'task_name' => "Manual Schedule Run #{$locked->id} ({$locked->name})",
+                'status' => 'running',
+                'started_at' => now(),
+            ]);
+
+            try {
+                $this->pipelines->triggerRun($locked->pipeline);
+                $log->update([
+                    'status' => 'success',
+                    'completed_at' => now(),
+                    'output' => "Successfully triggered pipeline run for schedule #{$locked->id}.",
+                ]);
+
+                $locked->update([
+                    'last_run_at' => now(),
+                ]);
+            } catch (\Throwable $e) {
+                $log->update([
+                    'status' => 'failed',
+                    'completed_at' => now(),
+                    'output' => $e->getMessage(),
+                ]);
+                throw $e;
+            }
+        });
     }
 
     public function nextRunAt(array $configuration, mixed $after = null): CarbonImmutable

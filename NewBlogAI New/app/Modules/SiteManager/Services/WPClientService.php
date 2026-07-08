@@ -2,7 +2,7 @@
 
 namespace App\Modules\SiteManager\Services;
 
-use App\Models\keys;
+use App\Models\Key;
 use App\Modules\SiteManager\Events\SiteSyncCompleted;
 use App\Modules\SiteManager\Events\SiteSyncFailed;
 use App\Modules\SiteManager\Models\Site;
@@ -174,6 +174,7 @@ class WPClientService
         array $tags = [],
         ?string $featuredImageUrl = null,
         array $meta = [],
+        ?string $slug = null,
     ): array {
         $domain = rtrim($site->domain_url, '/');
         $apiKey = $this->resolveApiKey($site);
@@ -193,6 +194,7 @@ class WPClientService
             'tags' => $tags,
             'featured_image_url' => $featuredImageUrl,
             'meta' => $meta,
+            'slug' => $slug,
         ];
 
         if ($status === 'future' && $scheduledAt) {
@@ -215,7 +217,7 @@ class WPClientService
             if ($pluginResponse->status() === 404) {
                 Log::info("Site {$site->id}: newsblogify/v1/publish not found, falling back to wp/v2/posts.");
 
-                return $this->publishViaWpRestApi($domain, $apiKey, $title, $content, $status, $scheduledAt, $wpPostId);
+                return $this->publishViaWpRestApi($domain, $apiKey, $title, $content, $status, $scheduledAt, $wpPostId, $slug);
             }
 
             throw new \RuntimeException("WordPress plugin publish error ({$pluginResponse->status()}): ".$pluginResponse->body());
@@ -236,6 +238,7 @@ class WPClientService
         string $status,
         ?string $scheduledAt = null,
         ?int $wpPostId = null,
+        ?string $slug = null,
     ): array {
         $endpoint = $wpPostId
             ? "{$domain}/wp-json/wp/v2/posts/{$wpPostId}"
@@ -244,6 +247,9 @@ class WPClientService
         $payload = ['title' => $title, 'content' => $content, 'status' => $status];
         if ($status === 'future' && $scheduledAt) {
             $payload['date'] = date('Y-m-d\TH:i:s', strtotime($scheduledAt));
+        }
+        if (! empty($slug)) {
+            $payload['slug'] = $slug;
         }
 
         $response = Http::timeout(20)
@@ -315,7 +321,7 @@ class WPClientService
         }
 
         if (! empty($site->key_id)) {
-            $keyRecord = keys::find($site->key_id);
+            $keyRecord = Key::find($site->key_id);
             if ($keyRecord) {
                 // The keys table `key` column is TEXT and stores encrypted ciphertext;
                 // decrypt it to get the original token.

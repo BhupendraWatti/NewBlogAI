@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
-use App\Models\keys;
+use App\Models\Key;
 use App\Models\User;
+use App\Modules\AIProviderManager\Models\AIProvider;
+use App\Modules\ContentPipeline\Models\ContentPipeline;
 use App\Modules\CustomerManager\Models\Customer;
+use App\Modules\PromptManager\Models\Prompt;
 use App\Modules\ScheduleManager\Services\ScheduleService;
 use App\Modules\SiteManager\Models\Site;
 use App\Modules\SiteManager\Services\PluginTokenService;
@@ -13,6 +16,7 @@ use App\Modules\SubscriptionManager\Exceptions\EntitlementDeniedException;
 use App\Modules\SubscriptionManager\Models\Plan;
 use App\Modules\SubscriptionManager\Models\Subscription;
 use App\Modules\SubscriptionManager\Services\EntitlementService;
+use App\Modules\TopicManager\Models\Topic;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -98,11 +102,40 @@ class BackendSourceOfTruthTest extends TestCase
             'domain_url' => 'https://acmeblog.com',
             'name' => 'Acme Blog',
             'api_key' => 'wp_app_password_value',
-            'slot' => 'daily',
-            'selected_topics' => ['Tech', 'Science'],
             'is_active' => true,
             'status' => 'connected',
             'timezone' => 'UTC',
+        ]);
+
+        $topic = Topic::create([
+            'name' => 'Tech',
+            'category' => 'Tech',
+            'status' => 'active',
+        ]);
+
+        $prompt = Prompt::create([
+            'name' => 'Standard Prompt',
+            'prompt' => 'Write content.',
+            'category' => 'Tech',
+            'status' => 'active',
+        ]);
+
+        $provider = AIProvider::create([
+            'provider_key' => 'openai',
+            'name' => 'OpenAI',
+            'api_key' => 'some-encrypted-key',
+            'default_model' => 'gpt-4o',
+            'is_enabled' => true,
+        ]);
+
+        ContentPipeline::create([
+            'site_id' => $this->site->id,
+            'topic_id' => $topic->id,
+            'prompt_id' => $prompt->id,
+            'ai_provider_id' => $provider->id,
+            'language' => 'en',
+            'generation_type' => 'article',
+            'is_active' => true,
         ]);
     }
 

@@ -34,6 +34,12 @@ class PipelineService
             $query->where('status', $filters['status']);
         }
 
+        if (! empty($filters['customer_id'])) {
+            $query->whereHas('site', function ($q) use ($filters) {
+                $q->where('customer_id', $filters['customer_id']);
+            });
+        }
+
         return $query->latest()->paginate($limit);
     }
 

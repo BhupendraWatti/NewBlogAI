@@ -28,6 +28,10 @@ class PipelineController extends Controller
         $filters = $request->only(['site_id', 'status']);
         $limit = $request->input('limit', 15);
 
+        if (\Illuminate\Support\Facades\Auth::user()->role !== 1) {
+            $filters['customer_id'] = \Illuminate\Support\Facades\Auth::user()->customer_id;
+        }
+
         $pipelines = $this->pipelineService->getPaginated($filters, $limit);
 
         return PipelineResource::collection($pipelines);
@@ -38,6 +42,13 @@ class PipelineController extends Controller
      */
     public function store(StorePipelineRequest $request): JsonResponse
     {
+        if (\Illuminate\Support\Facades\Auth::user()->role !== 1) {
+            $site = \App\Modules\SiteManager\Models\Site::findOrFail($request->input('site_id'));
+            if ($site->customer_id !== \Illuminate\Support\Facades\Auth::user()->customer_id) {
+                abort(403, 'Unauthorized site selection.');
+            }
+        }
+
         $pipeline = $this->pipelineService->createPipeline($request->validated());
 
         return (new PipelineResource($pipeline->load(['site', 'topic', 'prompt', 'provider'])))
@@ -50,7 +61,7 @@ class PipelineController extends Controller
      */
     public function show(string $id): PipelineResource
     {
-        $pipeline = ContentPipeline::with(['site', 'topic', 'prompt', 'provider', 'runs'])->findOrFail($id);
+        $pipeline = $this->findPipelineOrFail($id, ['site', 'topic', 'prompt', 'provider', 'runs']);
 
         return new PipelineResource($pipeline);
     }
@@ -60,8 +71,17 @@ class PipelineController extends Controller
      */
     public function update(UpdatePipelineRequest $request, string $id): PipelineResource
     {
-        $pipeline = ContentPipeline::findOrFail($id);
-        $updated = $this->pipelineService->updatePipeline($pipeline, $request->validated());
+        $pipeline = $this->findPipelineOrFail($id);
+        $validated = $request->validated();
+
+        if (isset($validated['site_id']) && \Illuminate\Support\Facades\Auth::user()->role !== 1) {
+            $site = \App\Modules\SiteManager\Models\Site::findOrFail($validated['site_id']);
+            if ($site->customer_id !== \Illuminate\Support\Facades\Auth::user()->customer_id) {
+                abort(403, 'Unauthorized site selection.');
+            }
+        }
+
+        $updated = $this->pipelineService->updatePipeline($pipeline, $validated);
 
         return new PipelineResource($updated->load(['site', 'topic', 'prompt', 'provider']));
     }
@@ -71,7 +91,7 @@ class PipelineController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
-        $pipeline = ContentPipeline::findOrFail($id);
+        $pipeline = $this->findPipelineOrFail($id);
         $pipeline->delete();
 
         return response()->json([
@@ -84,7 +104,7 @@ class PipelineController extends Controller
      */
     public function execute(string $id): JsonResponse
     {
-        $pipeline = ContentPipeline::findOrFail($id);
+        $pipeline = $this->findPipelineOrFail($id);
         $run = $this->pipelineService->triggerRun($pipeline);
 
         return response()->json([
@@ -98,7 +118,7 @@ class PipelineController extends Controller
      */
     public function retry(string $runId): JsonResponse
     {
-        $run = PipelineRun::with('pipeline')->findOrFail($runId);
+        $run = $this->findRunOrFail($runId, ['pipeline']);
         $newRun = $this->pipelineService->retryRun($run);
 
         return response()->json([
@@ -112,7 +132,7 @@ class PipelineController extends Controller
      */
     public function cancel(string $runId): JsonResponse
     {
-        $run = PipelineRun::with('pipeline')->findOrFail($runId);
+        $run = $this->findRunOrFail($runId, ['pipeline']);
         $this->pipelineService->cancelRun($run);
 
         return response()->json([
@@ -125,9 +145,47 @@ class PipelineController extends Controller
      */
     public function history(string $id): AnonymousResourceCollection
     {
-        $pipeline = ContentPipeline::findOrFail($id);
+        $pipeline = $this->findPipelineOrFail($id);
         $runs = PipelineRun::where('pipeline_id', $pipeline->id)->latest('id')->paginate(15);
 
         return PipelineRunResource::collection($runs);
+    }
+
+    /**
+     * Find a pipeline by ID while enforcing tenant isolation.
+     */
+    private function findPipelineOrFail(string $id, array $relations = []): ContentPipeline
+    {
+        $query = ContentPipeline::query();
+        if (! empty($relations)) {
+            $query->with($relations);
+        }
+
+        if (\Illuminate\Support\Facades\Auth::user()->role !== 1) {
+            $query->whereHas('site', function ($q) {
+                $q->where('customer_id', \Illuminate\Support\Facades\Auth::user()->customer_id);
+            });
+        }
+
+        return $query->findOrFail($id);
+    }
+
+    /**
+     * Find a run by ID while enforcing tenant isolation.
+     */
+    private function findRunOrFail(string $runId, array $relations = []): PipelineRun
+    {
+        $query = PipelineRun::query();
+        if (! empty($relations)) {
+            $query->with($relations);
+        }
+
+        if (\Illuminate\Support\Facades\Auth::user()->role !== 1) {
+            $query->whereHas('pipeline.site', function ($q) {
+                $q->where('customer_id', \Illuminate\Support\Facades\Auth::user()->customer_id);
+            });
+        }
+
+        return $query->findOrFail($runId);
     }
 }

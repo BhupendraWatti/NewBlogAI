@@ -72,6 +72,8 @@ class PublishPostJob implements ShouldQueue
 
                 // Re-queue with delay
                 $this->release($this->backoff);
+
+                return;
             } else {
                 $logRecord->update([
                     'status' => 'failed',
@@ -79,7 +81,9 @@ class PublishPostJob implements ShouldQueue
                     'error_message' => "All {$this->tries} attempts failed. Error: ".$e->getMessage(),
                 ]);
 
-                $logRecord->content->update(['status' => 'draft']); // fall back to draft
+                $workflowService = app(\App\Modules\ContentGeneration\Services\WorkflowService::class);
+                $workflowService->transitionTo($logRecord->content, 'failed', $logRecord->user_id);
+                $workflowService->transitionTo($logRecord->content, 'draft', $logRecord->user_id);
             }
 
             throw $e;

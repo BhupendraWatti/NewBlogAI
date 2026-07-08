@@ -72,6 +72,8 @@ class ProcessPipelineJob implements ShouldQueue
             ]);
 
             $pipeline->update(['status' => 'failed']);
+
+            throw $e;
         }
     }
 }

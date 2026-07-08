@@ -15,7 +15,7 @@ class UpdateStatusRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'status' => ['required', 'string', 'in:draft,pending_review,approved,rejected,published'],
+            'status' => ['required', 'string', 'in:generated,draft,pending_review,approved,scheduled,published,rejected,failed'],
         ];
     }
 }

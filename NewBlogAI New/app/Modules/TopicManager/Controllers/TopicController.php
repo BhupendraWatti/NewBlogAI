@@ -26,6 +26,10 @@ class TopicController extends Controller
         $filters = $request->only(['search', 'parent_id', 'status', 'language', 'sort_by', 'sort_order']);
         $limit = $request->input('limit', 15);
 
+        if (\Illuminate\Support\Facades\Auth::user()->role !== 1) {
+            $filters['customer_id'] = \Illuminate\Support\Facades\Auth::user()->customer_id;
+        }
+
         $topics = $this->topicService->getPaginated($filters, $limit);
 
         return TopicResource::collection($topics);
@@ -36,6 +40,15 @@ class TopicController extends Controller
      */
     public function store(StoreTopicRequest $request): JsonResponse
     {
+        if (\Illuminate\Support\Facades\Auth::user()->role !== 1) {
+            if ($request->filled('subscription_id')) {
+                $sub = \App\Modules\SubscriptionManager\Models\Subscription::findOrFail($request->input('subscription_id'));
+                if ($sub->customer_id !== \Illuminate\Support\Facades\Auth::user()->customer_id) {
+                    abort(403, 'Unauthorized subscription selection.');
+                }
+            }
+        }
+
         $topic = $this->topicService->createTopic($request->validated());
 
         return (new TopicResource($topic->load(['parent', 'prompt'])))
@@ -48,7 +61,7 @@ class TopicController extends Controller
      */
     public function show(string $id): TopicResource
     {
-        $topic = Topic::with(['parent', 'prompt'])->findOrFail($id);
+        $topic = $this->findTopicOrFail($id, ['parent', 'prompt']);
 
         return new TopicResource($topic);
     }
@@ -58,8 +71,19 @@ class TopicController extends Controller
      */
     public function update(UpdateTopicRequest $request, string $id): TopicResource
     {
-        $topic = Topic::findOrFail($id);
-        $updated = $this->topicService->updateTopic($topic, $request->validated());
+        $topic = $this->findTopicOrFail($id);
+        $validated = $request->validated();
+
+        if (\Illuminate\Support\Facades\Auth::user()->role !== 1) {
+            if (isset($validated['subscription_id'])) {
+                $sub = \App\Modules\SubscriptionManager\Models\Subscription::findOrFail($validated['subscription_id']);
+                if ($sub->customer_id !== \Illuminate\Support\Facades\Auth::user()->customer_id) {
+                    abort(403, 'Unauthorized subscription selection.');
+                }
+            }
+        }
+
+        $updated = $this->topicService->updateTopic($topic, $validated);
 
         return new TopicResource($updated->load(['parent', 'prompt']));
     }
@@ -69,7 +93,7 @@ class TopicController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
-        $topic = Topic::findOrFail($id);
+        $topic = $this->findTopicOrFail($id);
         $this->topicService->deleteTopic($topic);
 
         return response()->json([
@@ -82,11 +106,47 @@ class TopicController extends Controller
      */
     public function restore(string $id): JsonResponse
     {
-        $restored = $this->topicService->restoreTopic($id);
+        $topic = $this->findTrashedTopicOrFail($id);
+        $restored = $this->topicService->restoreTopic($topic->id);
 
         return response()->json([
             'message' => 'Topic restored successfully.',
             'data' => new TopicResource($restored->load(['parent', 'prompt'])),
         ]);
+    }
+
+    /**
+     * Find a topic by ID while enforcing tenant isolation.
+     */
+    private function findTopicOrFail(string $id, array $relations = []): Topic
+    {
+        $query = Topic::query();
+        if (! empty($relations)) {
+            $query->with($relations);
+        }
+
+        if (\Illuminate\Support\Facades\Auth::user()->role !== 1) {
+            $query->whereHas('subscription', function ($q) {
+                $q->where('customer_id', \Illuminate\Support\Facades\Auth::user()->customer_id);
+            });
+        }
+
+        return $query->findOrFail($id);
+    }
+
+    /**
+     * Find a trashed topic by ID while enforcing tenant isolation.
+     */
+    private function findTrashedTopicOrFail(string $id): Topic
+    {
+        $query = Topic::onlyTrashed();
+
+        if (\Illuminate\Support\Facades\Auth::user()->role !== 1) {
+            $query->whereHas('subscription', function ($q) {
+                $q->where('customer_id', \Illuminate\Support\Facades\Auth::user()->customer_id);
+            });
+        }
+
+        return $query->findOrFail($id);
     }
 }

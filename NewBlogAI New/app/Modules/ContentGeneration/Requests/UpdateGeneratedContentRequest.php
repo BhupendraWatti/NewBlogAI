@@ -17,7 +17,7 @@ class UpdateGeneratedContentRequest extends FormRequest
         return [
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'content' => ['sometimes', 'required', 'string'],
-            'status' => ['sometimes', 'required', 'string', 'in:draft,pending_review,approved,rejected,published'],
+            'status' => ['sometimes', 'required', 'string', 'in:generated,draft,pending_review,approved,scheduled,published,rejected,failed'],
         ];
     }
 }

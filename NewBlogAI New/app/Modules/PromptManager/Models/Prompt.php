@@ -8,14 +8,14 @@ use Illuminate\Database\Eloquent\Model;
 class Prompt extends Model
 {
     /**
-     * The table is named 'promts' for backward compatibility.
+     * The table associated with the model.
      */
-    protected $table = 'promts';
+    protected $table = 'prompts';
 
     protected $fillable = [
         'name',
         'topic_id',
-        'promt', // the raw prompt text
+        'prompt', // the raw prompt text
         'category',
         'variables', // json list of variables, e.g. ["topic", "keyword", "tone"]
         'version',

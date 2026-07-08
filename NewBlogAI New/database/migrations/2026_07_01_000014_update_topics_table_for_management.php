@@ -23,7 +23,7 @@ return new class extends Migration
             $table->softDeletes()->after('updated_at');
 
             $table->foreign('parent_id')->references('id')->on('topics')->onDelete('cascade');
-            $table->foreign('prompt_id')->references('id')->on('promts')->onDelete('set null');
+            $table->foreign('prompt_id')->references('id')->on('prompts')->onDelete('set null');
 
             $table->index('status');
             $table->index('category');

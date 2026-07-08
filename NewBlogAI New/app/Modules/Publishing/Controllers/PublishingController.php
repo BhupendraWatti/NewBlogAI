@@ -27,6 +27,10 @@ class PublishingController extends Controller
         $filters = $request->only(['status', 'site_id']);
         $limit = $request->input('limit', 15);
 
+        if (Auth::user()->role !== 1) {
+            $filters['customer_id'] = Auth::user()->customer_id;
+        }
+
         $logs = $this->publishingService->getPaginated($filters, $limit);
 
         return PublishingLogResource::collection($logs);
@@ -37,7 +41,7 @@ class PublishingController extends Controller
      */
     public function show(string $id): PublishingLogResource
     {
-        $log = PublishingLog::with(['content', 'site', 'author'])->findOrFail($id);
+        $log = $this->findLogOrFail($id, ['content', 'site', 'author']);
 
         return new PublishingLogResource($log);
     }
@@ -47,6 +51,20 @@ class PublishingController extends Controller
      */
     public function publish(PublishArticleRequest $request, string $articleId): JsonResponse
     {
+        if (Auth::user()->role !== 1) {
+            $content = \App\Modules\ContentGeneration\Models\GeneratedContent::findOrFail($articleId);
+            if ($content->site->customer_id !== Auth::user()->customer_id) {
+                abort(403, 'Unauthorized.');
+            }
+            $siteId = $request->input('site_id');
+            if (! empty($siteId)) {
+                $site = \App\Modules\SiteManager\Models\Site::findOrFail($siteId);
+                if ($site->customer_id !== Auth::user()->customer_id) {
+                    abort(403, 'Unauthorized site selection.');
+                }
+            }
+        }
+
         try {
             $log = $this->publishingService->queuePublish(
                 (int) $articleId,
@@ -70,6 +88,24 @@ class PublishingController extends Controller
      */
     public function bulkPublish(BulkPublishRequest $request): JsonResponse
     {
+        if (Auth::user()->role !== 1) {
+            $siteId = $request->input('site_id');
+            if (! empty($siteId)) {
+                $site = \App\Modules\SiteManager\Models\Site::findOrFail($siteId);
+                if ($site->customer_id !== Auth::user()->customer_id) {
+                    abort(403, 'Unauthorized site selection.');
+                }
+            }
+            $articlesCount = \App\Modules\ContentGeneration\Models\GeneratedContent::whereIn('id', $request->input('article_ids'))
+                ->whereHas('site', function ($q) {
+                    $q->where('customer_id', Auth::user()->customer_id);
+                })
+                ->count();
+            if ($articlesCount !== count($request->input('article_ids'))) {
+                abort(403, 'Unauthorized article selection.');
+            }
+        }
+
         try {
             $logs = $this->publishingService->bulkQueuePublish(
                 $request->input('article_ids'),
@@ -93,7 +129,7 @@ class PublishingController extends Controller
      */
     public function retry(string $id): JsonResponse
     {
-        $log = PublishingLog::findOrFail($id);
+        $log = $this->findLogOrFail($id);
         $this->publishingService->retryPublish($log);
 
         return response()->json([
@@ -106,7 +142,7 @@ class PublishingController extends Controller
      */
     public function cancel(string $id): JsonResponse
     {
-        $log = PublishingLog::findOrFail($id);
+        $log = $this->findLogOrFail($id);
         $this->publishingService->cancelPublish($log);
 
         return response()->json([
@@ -119,12 +155,31 @@ class PublishingController extends Controller
      */
     public function sync(string $id): JsonResponse
     {
-        $log = PublishingLog::with('site')->findOrFail($id);
+        $log = $this->findLogOrFail($id, ['site']);
         $this->publishingService->syncPostStatus($log);
 
         return response()->json([
             'message' => 'WordPress status synchronized successfully.',
             'log' => new PublishingLogResource($log->fresh(['content', 'site'])),
         ]);
+    }
+
+    /**
+     * Find a publishing log by ID while enforcing tenant isolation.
+     */
+    private function findLogOrFail(string $id, array $relations = []): PublishingLog
+    {
+        $query = PublishingLog::query();
+        if (! empty($relations)) {
+            $query->with($relations);
+        }
+
+        if (Auth::user()->role !== 1) {
+            $query->whereHas('site', function ($q) {
+                $q->where('customer_id', Auth::user()->customer_id);
+            });
+        }
+
+        return $query->findOrFail($id);
     }
 }

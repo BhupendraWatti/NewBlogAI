@@ -18,6 +18,7 @@ class PublishingService
     public function __construct(
         protected WPClientService $wpClient,
         protected EntitlementService $entitlements,
+        protected \App\Modules\ContentGeneration\Services\WorkflowService $workflowService,
     ) {}
 
     /**
@@ -33,6 +34,12 @@ class PublishingService
 
         if (! empty($filters['site_id'])) {
             $query->where('site_id', $filters['site_id']);
+        }
+
+        if (! empty($filters['customer_id'])) {
+            $query->whereHas('site', function ($q) use ($filters) {
+                $q->where('customer_id', $filters['customer_id']);
+            });
         }
 
         return $query->latest()->paginate($limit);
@@ -85,7 +92,7 @@ class PublishingService
                 ]);
 
                 // Transition article approval status
-                $article->update(['status' => 'pending_review']);
+                $this->workflowService->transitionTo($article, 'pending_review', $userId);
 
                 // Dispatch asynchronous publish job
                 PublishPostJob::dispatch($log->id);
@@ -137,6 +144,48 @@ class PublishingService
             $wpStatus = 'future';
         }
 
+        // Resolve categories
+        $categories = [];
+        if ($content->topic && ! empty($content->topic->category)) {
+            $categories[] = $content->topic->category;
+        }
+
+        // Resolve tags
+        $tagsRaw = $content->metadata['seo']['focus_keywords'] ?? [];
+        $tags = [];
+        if (is_array($tagsRaw)) {
+            $tags = $tagsRaw;
+        } elseif (is_string($tagsRaw)) {
+            $tags = array_filter(array_map('trim', explode(',', $tagsRaw)));
+        }
+
+        // Resolve featured image
+        $featuredImageUrl = $content->metadata['featured_image_url'] ?? null;
+
+        // Resolve SEO metadata for Yoast / RankMath
+        $seo = $content->metadata['seo'] ?? [];
+        $seoTitle = $seo['title'] ?? null;
+        $seoDesc = $seo['meta_description'] ?? null;
+        $seoKeywordsRaw = $seo['focus_keywords'] ?? [];
+        $seoKeywords = is_array($seoKeywordsRaw) ? implode(', ', $seoKeywordsRaw) : $seoKeywordsRaw;
+
+        $meta = [];
+        if (! empty($seoTitle)) {
+            $meta['_yoast_wpseo_title'] = $seoTitle;
+            $meta['rank_math_title'] = $seoTitle;
+        }
+        if (! empty($seoDesc)) {
+            $meta['_yoast_wpseo_metadesc'] = $seoDesc;
+            $meta['rank_math_description'] = $seoDesc;
+        }
+        if (! empty($seoKeywords)) {
+            $meta['_yoast_wpseo_focuskw'] = $seoKeywords;
+            $meta['rank_math_focus_keyword'] = $seoKeywords;
+        }
+
+        // Resolve slug
+        $slug = $seo['slug'] ?? null;
+
         // Perform the WordPress post publication/update
         $result = $this->wpClient->publishPost(
             $site,
@@ -144,7 +193,13 @@ class PublishingService
             $content->content,
             $wpStatus,
             $log->scheduled_at ? $log->scheduled_at->toDateTimeString() : null,
-            $log->wp_post_id
+            $log->wp_post_id,
+            $log->id,
+            $categories,
+            $tags,
+            $featuredImageUrl,
+            $meta,
+            $slug
         );
 
         // Update successful states inside transaction
@@ -157,8 +212,9 @@ class PublishingService
                 'error_message' => null,
             ]);
 
-            // Update content status to published
-            $content->update(['status' => 'published']);
+            // Update content status to scheduled or published
+            $targetStatus = ($log->scheduled_at && $log->scheduled_at->isFuture()) ? 'scheduled' : 'published';
+            $this->workflowService->transitionTo($content, $targetStatus, $log->user_id);
         });
     }
 
@@ -185,7 +241,7 @@ class PublishingService
                     'status' => 'failed',
                     'error_message' => 'Post was deleted or unpublished from WordPress.',
                 ]);
-                $log->content->update(['status' => 'draft']);
+                $this->workflowService->transitionTo($log->content, 'draft', $log->user_id);
             });
             Log::info("Synced Post ID {$log->wp_post_id}: Detected deleted on remote WP.");
         } else {
@@ -215,6 +271,9 @@ class PublishingService
                     'error_message' => null,
                 ]);
 
+                // Transition content status back to pending_review
+                $this->workflowService->transitionTo($log->content, 'pending_review', $log->user_id);
+
                 PublishPostJob::dispatch($log->id);
             });
         } catch (\Exception $e) {
@@ -235,7 +294,7 @@ class PublishingService
         try {
             DB::transaction(function () use ($log) {
                 $log->update(['status' => 'cancelled']);
-                $log->content->update(['status' => 'approved']); // reset to approved draft
+                $this->workflowService->transitionTo($log->content, 'approved', $log->user_id); // reset to approved draft
             });
         } catch (\Exception $e) {
             Log::error("Failed to cancel publishing run ID {$log->id}: ".$e->getMessage());

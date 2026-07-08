@@ -24,6 +24,57 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(PaymentGatewayInterface::class, PaymentGatewayStub::class);
+
+        // Content Pipeline Interface Bindings with Concrete Services
+        $this->app->bind(
+            \App\Modules\ContentPipeline\Contracts\TopicResolverInterface::class,
+            \App\Modules\TopicManager\Services\TopicResolverService::class
+        );
+
+        $this->app->bind(
+            \App\Modules\ContentPipeline\Contracts\ResearchServiceInterface::class,
+            \App\Modules\ContentPipeline\Services\ResearchService::class
+        );
+
+        $this->app->bind(
+            \App\Modules\ContentPipeline\Contracts\SourceCollectorInterface::class,
+            \App\Modules\ContentPipeline\Services\SourceCollectionService::class
+        );
+
+        $this->app->bind(
+            \App\Modules\ContentPipeline\Contracts\FactExtractorInterface::class,
+            \App\Modules\ContentPipeline\Services\FactExtractionService::class
+        );
+
+        $this->app->bind(
+            \App\Modules\ContentPipeline\Contracts\ContentGeneratorInterface::class,
+            \App\Modules\ContentPipeline\Services\ContentGeneratorService::class
+        );
+
+        $this->app->bind(
+            \App\Modules\ContentPipeline\Contracts\TranslationInterface::class,
+            \App\Modules\ContentPipeline\Services\TranslationService::class
+        );
+
+        $this->app->bind(
+            \App\Modules\ContentPipeline\Contracts\FactAuditorInterface::class,
+            \App\Modules\ContentPipeline\Services\FactAuditService::class
+        );
+
+        $this->app->bind(
+            \App\Modules\ContentPipeline\Contracts\SEOServiceInterface::class,
+            \App\Modules\ContentPipeline\Services\SEOService::class
+        );
+
+        $this->app->bind(
+            \App\Modules\ContentPipeline\Contracts\MediaPreparatorInterface::class,
+            \App\Modules\MediaManager\Services\MediaPreparationService::class
+        );
+
+        $this->app->bind(
+            \App\Modules\ContentPipeline\Contracts\PublishingQueueInterface::class,
+            \App\Modules\Publishing\Services\PublishingQueueService::class
+        );
     }
 
     /**
@@ -33,6 +84,9 @@ class AppServiceProvider extends ServiceProvider
     {
         Gate::policy(Customer::class, CustomerPolicy::class);
         Gate::policy(Subscription::class, SubscriptionPolicy::class);
+        Gate::policy(\App\Modules\CustomerManager\Models\Workspace::class, \App\Modules\CustomerManager\Policies\WorkspacePolicy::class);
+        Gate::policy(\App\Modules\ContentGeneration\Models\GeneratedContent::class, \App\Modules\CustomerManager\Policies\GeneratedContentPolicy::class);
+
 
         // Queue Event Listeners for Operational Monitoring
         Queue::before(function (JobProcessing $event) {

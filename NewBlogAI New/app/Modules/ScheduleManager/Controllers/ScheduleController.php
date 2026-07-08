@@ -17,7 +17,14 @@ class ScheduleController extends Controller
 
     public function index(Request $request): AnonymousResourceCollection
     {
-        $query = PublishingSchedule::query()->latest();
+        $user = \Illuminate\Support\Facades\Auth::user();
+        $query = PublishingSchedule::query()
+            ->when($user->role !== 1, function ($q) use ($user) {
+                $q->whereHas('site', function ($sq) use ($user) {
+                    $sq->where('customer_id', $user->customer_id);
+                });
+            })
+            ->latest();
 
         if ($request->filled('site_id')) {
             $query->where('site_id', $request->integer('site_id'));
@@ -28,6 +35,12 @@ class ScheduleController extends Controller
 
     public function store(StoreScheduleRequest $request): JsonResponse
     {
+        $site = Site::findOrFail($request->input('site_id'));
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if ($user->role !== 1 && $site->customer_id !== $user->customer_id) {
+            abort(403, 'Unauthorized.');
+        }
+
         return (new ScheduleResource($this->schedules->create($request->validated())))
             ->response()
             ->setStatusCode(201);
@@ -35,16 +48,34 @@ class ScheduleController extends Controller
 
     public function show(PublishingSchedule $schedule): ScheduleResource
     {
+        $site = Site::findOrFail($schedule->site_id);
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if ($user->role !== 1 && $site->customer_id !== $user->customer_id) {
+            abort(403, 'Unauthorized.');
+        }
+
         return new ScheduleResource($schedule);
     }
 
     public function update(StoreScheduleRequest $request, PublishingSchedule $schedule): ScheduleResource
     {
+        $site = Site::findOrFail($schedule->site_id);
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if ($user->role !== 1 && $site->customer_id !== $user->customer_id) {
+            abort(403, 'Unauthorized.');
+        }
+
         return new ScheduleResource($this->schedules->update($schedule, $request->validated()));
     }
 
     public function destroy(PublishingSchedule $schedule): JsonResponse
     {
+        $site = Site::findOrFail($schedule->site_id);
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if ($user->role !== 1 && $site->customer_id !== $user->customer_id) {
+            abort(403, 'Unauthorized.');
+        }
+
         $this->schedules->delete($schedule);
 
         return response()->json(['message' => 'Schedule deleted successfully.']);

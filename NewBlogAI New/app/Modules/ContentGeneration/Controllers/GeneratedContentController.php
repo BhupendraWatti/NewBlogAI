@@ -30,6 +30,10 @@ class GeneratedContentController extends Controller
         $filters = $request->only(['status', 'search']);
         $limit = $request->input('limit', 15);
 
+        if (Auth::user()->role !== 1) {
+            $filters['customer_id'] = Auth::user()->customer_id;
+        }
+
         $articles = $this->generationService->getPaginated($filters, $limit);
 
         return GeneratedContentResource::collection($articles);
@@ -40,7 +44,7 @@ class GeneratedContentController extends Controller
      */
     public function show(string $id): GeneratedContentResource
     {
-        $content = GeneratedContent::with(['site', 'topic', 'pipeline', 'revisions'])->findOrFail($id);
+        $content = $this->findContentOrFail($id, ['site', 'topic', 'pipeline', 'revisions']);
 
         return new GeneratedContentResource($content);
     }
@@ -50,7 +54,7 @@ class GeneratedContentController extends Controller
      */
     public function update(UpdateGeneratedContentRequest $request, string $id): GeneratedContentResource
     {
-        $content = GeneratedContent::findOrFail($id);
+        $content = $this->findContentOrFail($id);
         $updated = $this->generationService->updateContent(
             $content,
             $request->validated(),
@@ -65,7 +69,7 @@ class GeneratedContentController extends Controller
      */
     public function updateStatus(UpdateStatusRequest $request, string $id): GeneratedContentResource
     {
-        $content = GeneratedContent::findOrFail($id);
+        $content = $this->findContentOrFail($id);
         $updated = $this->generationService->updateStatus($content, $request->input('status'));
 
         return new GeneratedContentResource($updated->load(['site', 'topic']));
@@ -76,7 +80,7 @@ class GeneratedContentController extends Controller
      */
     public function revisions(string $id): AnonymousResourceCollection
     {
-        $content = GeneratedContent::findOrFail($id);
+        $content = $this->findContentOrFail($id);
         $revisions = ContentRevision::where('generated_content_id', $content->id)
             ->latest('id')
             ->paginate(15);
@@ -91,6 +95,10 @@ class GeneratedContentController extends Controller
     {
         $query = AIRequestLog::with(['prompt', 'topic'])->latest('id');
 
+        if (Auth::user()->role !== 1) {
+            $query->where('customer_id', Auth::user()->customer_id);
+        }
+
         if ($request->filled('provider')) {
             $query->where('provider', $request->input('provider'));
         }
@@ -102,5 +110,24 @@ class GeneratedContentController extends Controller
         $logs = $query->paginate($request->input('limit', 15));
 
         return AIRequestLogResource::collection($logs);
+    }
+
+    /**
+     * Find a generated content by ID while enforcing tenant isolation.
+     */
+    private function findContentOrFail(string $id, array $relations = []): GeneratedContent
+    {
+        $query = GeneratedContent::query();
+        if (! empty($relations)) {
+            $query->with($relations);
+        }
+
+        if (Auth::user()->role !== 1) {
+            $query->whereHas('site', function ($q) {
+                $q->where('customer_id', Auth::user()->customer_id);
+            });
+        }
+
+        return $query->findOrFail($id);
     }
 }

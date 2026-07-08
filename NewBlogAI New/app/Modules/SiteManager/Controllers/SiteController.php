@@ -30,7 +30,7 @@ class SiteController extends Controller
         $search = $request->get('search');
         $status = $request->get('status');
 
-        $query = Site::with('promt')->latest();
+        $query = Site::latest();
 
         // Tenant Isolation: Only allow SuperAdmin to view all websites
         if (Auth::user()->role !== 1) {
@@ -67,7 +67,7 @@ class SiteController extends Controller
 
         event(new SiteCreated($site));
 
-        return (new SiteResource($site->load('promt')))
+        return (new SiteResource($site))
             ->response()
             ->setStatusCode(201);
     }
@@ -77,7 +77,7 @@ class SiteController extends Controller
      */
     public function show(string $id): SiteResource
     {
-        $site = $this->findSiteOrFail($id, ['promt']);
+        $site = $this->findSiteOrFail($id);
 
         return new SiteResource($site);
     }
@@ -101,7 +101,7 @@ class SiteController extends Controller
 
         $updated = $this->siteService->updateSite($site, $validated);
 
-        return new SiteResource($updated->load('promt'));
+        return new SiteResource($updated);
     }
 
     /**

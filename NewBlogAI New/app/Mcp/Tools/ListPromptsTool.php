@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Models\Promt;
+use App\Modules\PromptManager\Models\Prompt;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -10,14 +10,14 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
 #[Description('Get list of all prompt templates available in the database.')]
-class ListPromtsTool extends Tool
+class ListPromptsTool extends Tool
 {
     /**
      * Handle the tool request.
      */
     public function handle(Request $request): Response
     {
-        $prompts = Promt::all();
+        $prompts = Prompt::all();
 
         if ($prompts->isEmpty()) {
             return Response::text('No prompt templates are currently configured.');
@@ -29,7 +29,7 @@ class ListPromtsTool extends Tool
                 "- ID: %d | Name: %s | Prompt: %s\n",
                 $prompt->id,
                 $prompt->name,
-                $prompt->promt
+                $prompt->prompt
             );
         }
 

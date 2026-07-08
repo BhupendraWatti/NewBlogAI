@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Models\Promt;
+use App\Modules\PromptManager\Models\Prompt;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -10,7 +10,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
 #[Description('Add a new prompt template or update an existing prompt template.')]
-class AddPromtTool extends Tool
+class AddPromptTool extends Tool
 {
     /**
      * Handle the tool request.
@@ -18,7 +18,7 @@ class AddPromtTool extends Tool
     public function handle(Request $request): Response
     {
         $name = $request->get('name');
-        $promptText = $request->get('promt');
+        $promptText = $request->get('prompt') ?? $request->get('promt');
 
         if (empty($name)) {
             return Response::error('Prompt template name is required.');
@@ -27,16 +27,16 @@ class AddPromtTool extends Tool
             return Response::error('Prompt text is required.');
         }
 
-        $promt = Promt::updateOrCreate(
+        $prompt = Prompt::updateOrCreate(
             ['name' => $name],
-            ['promt' => $promptText]
+            ['prompt' => $promptText]
         );
 
         return Response::text(sprintf(
             "Successfully saved prompt template!\nID: %d\nName: %s\nPrompt text: %s",
-            $promt->id,
-            $promt->name,
-            $promt->promt
+            $prompt->id,
+            $prompt->name,
+            $prompt->prompt
         ));
     }
 
@@ -51,7 +51,7 @@ class AddPromtTool extends Tool
             'name' => $schema->string()
                 ->description('The name of the prompt template, e.g. "Blog Post Generator"')
                 ->required(),
-            'promt' => $schema->string()
+            'prompt' => $schema->string()
                 ->description('The actual prompt template text')
                 ->required(),
         ];

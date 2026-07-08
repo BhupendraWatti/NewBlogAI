@@ -24,7 +24,7 @@ class StoreTopicRequest extends FormRequest
             'generation_frequency' => ['sometimes', 'string', 'max:255'],
             'tags' => ['nullable', 'array'],
             'tags.*' => ['string'],
-            'prompt_id' => ['nullable', 'integer', 'exists:promts,id'],
+            'prompt_id' => ['nullable', 'integer', 'exists:prompts,id'],
         ];
     }
 }

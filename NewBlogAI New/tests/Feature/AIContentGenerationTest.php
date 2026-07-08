@@ -61,7 +61,7 @@ class AIContentGenerationTest extends TestCase
 
         $this->prompt = Prompt::create([
             'name' => 'Finance Report Prompt',
-            'promt' => 'Write about {{topic}} for {{website}} in {{language}}.',
+            'prompt' => 'Write about {{topic}} for {{website}} in {{language}}.',
             'category' => 'Finance',
             'status' => 'active',
         ]);
@@ -92,7 +92,8 @@ class AIContentGenerationTest extends TestCase
 
     public function test_ai_generation_service_orchestrates_successful_generation(): void
     {
-        // Fake OpenAI completions API
+        // Fake OpenAI completions API & pollinations image generator
+        $dummyPng = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');
         Http::fake([
             'https://api.openai.com/v1/chat/completions' => Http::response([
                 'choices' => [
@@ -108,6 +109,10 @@ class AIContentGenerationTest extends TestCase
                     'total_tokens' => 270,
                 ],
             ], 200),
+            'https://image.pollinations.ai/*' => Http::response($dummyPng, 200, [
+                'Content-Type' => 'image/png',
+                'Content-Length' => (string) strlen($dummyPng),
+            ]),
         ]);
 
         $service = resolve(ContentGenerationService::class);
@@ -117,12 +122,13 @@ class AIContentGenerationTest extends TestCase
         $this->assertDatabaseHas('generated_contents', [
             'id' => $article->id,
             'pipeline_id' => $this->pipeline->id,
-            'title' => 'Article: Venture Capital in India - '.now()->format('Y-m-d'),
-            'status' => 'draft',
+            'title' => '[Translated to hi]: Article: Venture Capital in India - '.now()->format('Y-m-d'),
+            'status' => 'generated',
         ]);
 
         // Verify content compiles variables
-        $this->assertEquals('भारतीय उद्यम पूंजी बाजार में अभूतपूर्व वृद्धि देखी जा रही है।', $article->content);
+        $this->assertStringContainsString('भारतीय उद्यम पूंजी बाजार में अभूतपूर्व वृद्धि देखी जा रही है।', $article->content);
+        $this->assertStringStartsWith('<div class="post-featured-image"', $article->content);
 
         // Verify initial revision entry
         $this->assertDatabaseHas('content_revisions', [

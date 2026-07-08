@@ -18,6 +18,8 @@ class PublishingSchedule extends Model
         'time_of_day',
         'days_of_week',
         'is_active',
+        'schedule_mode',
+        'metadata',
         'next_run_at',
         'last_run_at',
     ];
@@ -27,6 +29,7 @@ class PublishingSchedule extends Model
         return [
             'days_of_week' => 'array',
             'is_active' => 'boolean',
+            'metadata' => 'array',
             'next_run_at' => 'datetime',
             'last_run_at' => 'datetime',
         ];

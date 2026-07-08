@@ -328,8 +328,8 @@
                         <input type="text" id="slot" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-2.5 text-on-surface focus:outline-none focus:border-primary" placeholder="12:00" required>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="promt_id">Prompt Template</label>
-                        <select id="promt_id" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-2.5 text-on-surface focus:outline-none focus:border-primary">
+                        <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="prompt_id">Prompt Template</label>
+                        <select id="prompt_id" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-2.5 text-on-surface focus:outline-none focus:border-primary">
                             <!-- Populated dynamically -->
                         </select>
                     </div>
@@ -360,7 +360,7 @@
                     { id: 2, name: 'Tech Blog Writer' }
                 ];
                 
-                const select = document.getElementById('promt_id');
+                const select = document.getElementById('prompt_id');
                 select.innerHTML = '<option value="">Select Prompt Template</option>';
                 prompts.forEach(p => {
                     select.innerHTML += `<option value="${p.id}">${p.name}</option>`;
@@ -372,7 +372,7 @@
 
         async function fetchSites() {
             try {
-                const response = await fetch('/api/v1/sites');
+                const response = await apiFetch('/api/v1/sites');
                 const result = await response.json();
                 allSites = result.data || result;
                 renderSites(allSites);
@@ -591,7 +591,7 @@
         async function triggerSync(id, element) {
             element.classList.add('animate-spin');
             try {
-                const response = await fetch(`/api/v1/sites/${id}/sync`, { method: 'POST' });
+                const response = await apiFetch(`/api/v1/sites/${id}/sync`, { method: 'POST' });
                 const result = await response.json();
                 if (response.ok) {
                     fetchSites();
@@ -618,7 +618,7 @@
             document.getElementById('domain_url').value = '';
             document.getElementById('api_key').value = '';
             document.getElementById('slot').value = '12:00';
-            document.getElementById('promt_id').value = '';
+            document.getElementById('prompt_id').value = '';
             document.getElementById('modal-title').innerText = 'Add WordPress Site';
             document.getElementById('site-modal').classList.add('active');
         }
@@ -629,7 +629,7 @@
 
         async function editSite(id) {
             try {
-                const response = await fetch(`/api/v1/sites/${id}`);
+                const response = await apiFetch(`/api/v1/sites/${id}`);
                 const result = await response.json();
                 const site = result.data;
 
@@ -637,7 +637,7 @@
                 document.getElementById('domain_url').value = site.domain_url;
                 document.getElementById('api_key').value = ''; 
                 document.getElementById('slot').value = site.slot || '12:00';
-                document.getElementById('promt_id').value = site.promt_id || '';
+                document.getElementById('prompt_id').value = site.prompt_id || '';
                 
                 document.getElementById('modal-title').innerText = 'Edit WordPress Site';
                 document.getElementById('site-modal').classList.add('active');
@@ -652,11 +652,11 @@
             const domain_url = document.getElementById('domain_url').value;
             const api_key = document.getElementById('api_key').value;
             const slot = document.getElementById('slot').value;
-            const promt_id = document.getElementById('promt_id').value;
+            const prompt_id = document.getElementById('prompt_id').value;
 
             const payload = { domain_url, slot };
             if (api_key) payload.api_key = api_key;
-            if (promt_id) payload.promt_id = parseInt(promt_id);
+            if (prompt_id) payload.prompt_id = parseInt(prompt_id);
 
             // Lock submission button
             const submitBtn = e.target.querySelector('button[type="submit"]');
@@ -687,13 +687,13 @@
             try {
                 let response;
                 if (id) {
-                    response = await fetch(`/api/v1/sites/${id}`, {
+                    response = await apiFetch(`/api/v1/sites/${id}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
                 } else {
-                    response = await fetch('/api/v1/sites', {
+                    response = await apiFetch('/api/v1/sites', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
@@ -740,7 +740,7 @@
                 "Are you sure you want to disconnect this WordPress site?",
                 async () => {
                     try {
-                        const response = await fetch(`/api/v1/sites/${id}`, { method: 'DELETE' });
+                        const response = await apiFetch(`/api/v1/sites/${id}`, { method: 'DELETE' });
                         if (response.ok) {
                             if (selectedSite && selectedSite.id === id) {
                                 selectedSite = null;

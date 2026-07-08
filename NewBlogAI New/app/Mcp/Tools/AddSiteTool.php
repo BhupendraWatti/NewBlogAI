@@ -19,35 +19,18 @@ class AddSiteTool extends Tool
     {
         $domainUrl = rtrim($request->get('domain_url'), '/');
         $apiKey = $request->get('api_key');
-        $slot = $request->get('slot', '12:00');
-        $promtId = $request->get('promt_id');
-        $topics = $request->get('topics', []);
-
-        $selectedTopics = [];
-        foreach ($topics as $topic) {
-            $selectedTopics[] = [
-                'topic' => $topic,
-                'promt_id' => $promtId,
-            ];
-        }
 
         $site = Site::updateOrCreate(
             ['domain_url' => $domainUrl],
             [
                 'api_key' => $apiKey,
-                'slot' => $slot,
-                'promt_id' => $promtId,
-                'selected_topics' => $selectedTopics,
             ]
         );
 
         return Response::text(sprintf(
-            "Successfully saved site!\nID: %d\nURL: %s\nSlot: %s\nPrompt ID: %s\nTopics Count: %d",
+            "Successfully saved site!\nID: %d\nURL: %s",
             $site->id,
-            $site->domain_url,
-            $site->slot,
-            $site->promt_id ?? 'None',
-            count($selectedTopics)
+            $site->domain_url
         ));
     }
 
@@ -65,13 +48,6 @@ class AddSiteTool extends Tool
             'api_key' => $schema->string()
                 ->description('API Key or Key ID to authorize sync requests')
                 ->required(),
-            'slot' => $schema->string()
-                ->description('The scheduled execution slot, e.g. "12:00"')
-                ->default('12:00'),
-            'promt_id' => $schema->integer()
-                ->description('Associated prompt configuration ID'),
-            'topics' => $schema->array()
-                ->description('List of topic names to assign to the site'),
         ];
     }
 }

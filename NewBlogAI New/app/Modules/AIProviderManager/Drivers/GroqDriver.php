@@ -43,7 +43,7 @@ class GroqDriver implements AIProviderClientInterface
 
         try {
             $response = Http::withToken($apiKey)
-                ->timeout($options['timeout'] ?? 30)
+                ->timeout($options['timeout'] ?? 90)
                 ->post('https://api.groq.com/openai/v1/chat/completions', [
                     'model' => $model,
                     'messages' => [

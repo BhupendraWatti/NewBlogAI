@@ -69,4 +69,14 @@ class SyncSiteDataJob implements ShouldQueue
             throw $e;
         }
     }
+
+    /**
+     * Handle a job failure.
+     */
+    public function failed(\Throwable $exception): void
+    {
+        $this->site->update([
+            'last_sync_status' => 'failed',
+        ]);
+    }
 }

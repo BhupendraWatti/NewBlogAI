@@ -46,6 +46,15 @@ class ImageGeneratorService
             $result = $driver->generate($prompt, $options);
             $remoteUrl = $result['url'];
             $metadata = $result['metadata'] ?? [];
+            if (isset($options['alt'])) {
+                $metadata['alt'] = $options['alt'];
+            }
+            if (isset($options['caption'])) {
+                $metadata['caption'] = $options['caption'];
+            }
+            if (!isset($metadata['prompt'])) {
+                $metadata['prompt'] = $prompt;
+            }
         } catch (\Exception $e) {
             Log::error("Image generation failed with driver '{$driverName}': ".$e->getMessage());
             throw new \RuntimeException('Image generation failed: '.$e->getMessage(), 0, $e);

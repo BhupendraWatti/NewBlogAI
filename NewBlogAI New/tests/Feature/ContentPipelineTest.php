@@ -54,7 +54,7 @@ class ContentPipelineTest extends TestCase
 
         $this->prompt = Prompt::create([
             'name' => 'Standard Prompt',
-            'promt' => 'Write content.',
+            'prompt' => 'Write content.',
             'category' => 'Tech',
             'status' => 'active',
         ]);

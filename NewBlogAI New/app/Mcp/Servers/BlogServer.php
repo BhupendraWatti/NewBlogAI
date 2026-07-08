@@ -3,11 +3,11 @@
 namespace App\Mcp\Servers;
 
 use App\Mcp\Tools\AddKeyTool;
-use App\Mcp\Tools\AddPromtTool;
+use App\Mcp\Tools\AddPromptTool;
 use App\Mcp\Tools\AddSiteTool;
 use App\Mcp\Tools\AddTopicTool;
 use App\Mcp\Tools\ListKeysTool;
-use App\Mcp\Tools\ListPromtsTool;
+use App\Mcp\Tools\ListPromptsTool;
 use App\Mcp\Tools\ListSitesTool;
 use App\Mcp\Tools\ListTopicsTool;
 use App\Mcp\Tools\SyncSiteTopicsTool;
@@ -27,8 +27,8 @@ class BlogServer extends Server
         SyncSiteTopicsTool::class,
         ListTopicsTool::class,
         AddTopicTool::class,
-        ListPromtsTool::class,
-        AddPromtTool::class,
+        ListPromptsTool::class,
+        AddPromptTool::class,
         ListKeysTool::class,
         AddKeyTool::class,
     ];

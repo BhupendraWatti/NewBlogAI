@@ -245,7 +245,7 @@
 
         async function fetchFleet() {
             try {
-                const response = await fetch('/api/v1/sites');
+                const response = await apiFetch('/api/v1/sites');
                 const result = await response.json();
                 fleetSites = result.data || result;
                 renderFleet(fleetSites);
@@ -418,7 +418,7 @@
         async function triggerSync(id, btn) {
             btn.classList.add('animate-spin');
             try {
-                await fetch(`/api/v1/sites/${id}/sync`, { method: 'POST' });
+                await apiFetch(`/api/v1/sites/${id}/sync`, { method: 'POST' });
                 fetchFleet();
             } catch (err) {
                 console.error("Sync failed:", err);

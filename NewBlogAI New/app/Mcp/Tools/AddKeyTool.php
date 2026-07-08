@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Models\keys;
+use App\Models\Key;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -27,7 +27,7 @@ class AddKeyTool extends Tool
             return Response::error('Key value is required.');
         }
 
-        $key = keys::updateOrCreate(
+        $key = Key::updateOrCreate(
             ['name' => $name],
             ['key' => $keyValue]
         );

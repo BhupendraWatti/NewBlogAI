@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Models\keys;
+use App\Models\Key;
 use App\Modules\SiteManager\Models\Site;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Facades\Http;
@@ -35,7 +35,7 @@ class SyncSiteTopicsTool extends Tool
         // Resolve API key
         $apiKey = $site->api_key;
         if (is_numeric($apiKey)) {
-            $keyRecord = keys::find((int) $apiKey);
+            $keyRecord = Key::find((int) $apiKey);
             if ($keyRecord) {
                 $apiKey = $keyRecord->key;
             }

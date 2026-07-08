@@ -43,7 +43,7 @@ class OllamaDriver implements AIProviderClientInterface
         $model = $model ?: 'llama3';
 
         try {
-            $response = Http::timeout($options['timeout'] ?? 60)->post("{$host}/api/generate", [
+            $response = Http::timeout($options['timeout'] ?? 90)->post("{$host}/api/generate", [
                 'model' => $model,
                 'prompt' => $prompt,
                 'stream' => false,

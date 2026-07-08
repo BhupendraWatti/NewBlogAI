@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Models\keys;
+use App\Models\Key;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -17,7 +17,7 @@ class ListKeysTool extends Tool
      */
     public function handle(Request $request): Response
     {
-        $keys = keys::all();
+        $keys = Key::all();
 
         if ($keys->isEmpty()) {
             return Response::text('No API keys are currently configured.');

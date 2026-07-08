@@ -18,6 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => RequireRole::class,
         ]);
+        $middleware->validateCsrfTokens(except: [
+            'api/v1/*',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (EntitlementDeniedException $exception, Request $request) {

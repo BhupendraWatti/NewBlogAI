@@ -51,7 +51,7 @@ class OpenRouterDriver implements AIProviderClientInterface
                     'HTTP-Referer' => config('app.url', 'http://localhost'),
                     'X-Title' => 'NewsBlogify AI OS',
                 ])
-                ->timeout($options['timeout'] ?? 30)
+                ->timeout($options['timeout'] ?? 90)
                 ->post('https://openrouter.ai/api/v1/chat/completions', [
                     'model' => $model,
                     'messages' => [

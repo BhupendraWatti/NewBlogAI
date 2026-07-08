@@ -100,6 +100,16 @@ Route::prefix('v1')->group(function () {
             Route::get('operations/jobs', [OperationsController::class, 'jobLogs']);
             Route::post('operations/jobs/{id}/retry', [OperationsController::class, 'retryJob']);
             Route::apiResource('users', UserController::class);
+
+            // Staging -> Production Site Analytics Routes
+            Route::get('sites/{siteId}/analytics/coverage', [\App\Modules\Analytics\Controllers\AnalyticsController::class, 'coverage']);
+            Route::get('sites/{siteId}/analytics/daily', [\App\Modules\Analytics\Controllers\AnalyticsController::class, 'daily']);
+            Route::get('sites/{siteId}/analytics/monthly', [\App\Modules\Analytics\Controllers\AnalyticsController::class, 'monthly']);
+            Route::get('sites/{siteId}/analytics/tokens', [\App\Modules\Analytics\Controllers\AnalyticsController::class, 'tokens']);
+            Route::get('sites/{siteId}/analytics/costs', [\App\Modules\Analytics\Controllers\AnalyticsController::class, 'costs']);
+            Route::get('sites/{siteId}/analytics/success-rate', [\App\Modules\Analytics\Controllers\AnalyticsController::class, 'successRate']);
+            Route::get('sites/{siteId}/analytics/failures', [\App\Modules\Analytics\Controllers\AnalyticsController::class, 'failures']);
+            Route::get('sites/{siteId}/analytics/providers', [\App\Modules\Analytics\Controllers\AnalyticsController::class, 'providers']);
         });
 
         // WordPress Plugin Licensing REST API (Rate-limited)

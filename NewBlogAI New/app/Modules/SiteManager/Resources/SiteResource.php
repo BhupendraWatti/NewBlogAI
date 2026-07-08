@@ -2,7 +2,6 @@
 
 namespace App\Modules\SiteManager\Resources;
 
-use App\Modules\PromptManager\Resources\PromptResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -17,9 +16,6 @@ class SiteResource extends JsonResource
             'domain_url' => $this->domain_url,
             'has_api_key' => ! empty($this->api_key),
             'key_id' => $this->key_id,
-            'selected_topics' => $this->selected_topics ?? [],
-            'promt_id' => $this->promt_id,
-            'slot' => $this->slot,
             'is_active' => (bool) $this->is_active,
             'is_default' => (bool) $this->is_default,
             'status' => $this->status,
@@ -32,7 +28,6 @@ class SiteResource extends JsonResource
             'sync_settings' => $this->sync_settings ?? [],
             'timezone' => $this->timezone,
             'configuration_version' => $this->configuration_version,
-            'promt' => new PromptResource($this->whenLoaded('promt')),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

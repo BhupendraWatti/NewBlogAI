@@ -16,7 +16,7 @@ class StorePromptRequest extends FormRequest
         return [
             'topic_id' => ['nullable', 'integer', 'exists:topics,id'],
             'name' => ['required', 'string', 'max:255'],
-            'promt' => ['required', 'string'],
+            'prompt' => ['required', 'string'],
             'category' => ['required', 'string', 'max:255'],
             'variables' => ['nullable', 'array'],
             'variables.*' => ['string'],

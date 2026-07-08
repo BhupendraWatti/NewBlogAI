@@ -56,22 +56,7 @@ class SiteConfigurationService
             ->all();
 
         if ($topics === []) {
-            $topics = collect($site->selected_topics ?? [])
-                ->map(function (mixed $topic): array {
-                    if (is_array($topic)) {
-                        return [
-                            'id' => $topic['id'] ?? null,
-                            'name' => $topic['name'] ?? $topic['topic'] ?? '',
-                            'category' => $topic['category'] ?? null,
-                            'prompt_id' => $topic['prompt_id'] ?? $topic['promt_id'] ?? null,
-                        ];
-                    }
-
-                    return ['id' => null, 'name' => (string) $topic, 'category' => null, 'prompt_id' => null];
-                })
-                ->filter(fn (array $topic) => $topic['name'] !== '')
-                ->values()
-                ->all();
+            $topics = [];
         }
 
         $schedules = $site->schedules

@@ -75,11 +75,14 @@ return new class extends Migration
             ]);
         });
 
-        Schema::table('promts', function (Blueprint $table) {
-            $table->dropForeign(['topic_id']);
-            $table->dropIndex(['topic_id']);
-            $table->dropColumn('topic_id');
-        });
+        $promtTable = Schema::hasTable('prompts') ? 'prompts' : (Schema::hasTable('promts') ? 'promts' : null);
+        if ($promtTable) {
+            Schema::table($promtTable, function (Blueprint $table) {
+                $table->dropForeign(['topic_id']);
+                $table->dropIndex(['topic_id']);
+                $table->dropColumn('topic_id');
+            });
+        }
 
         Schema::table('topics', function (Blueprint $table) {
             $table->dropForeign(['subscription_id']);
