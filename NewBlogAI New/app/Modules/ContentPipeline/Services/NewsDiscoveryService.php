@@ -74,9 +74,9 @@ class NewsDiscoveryService
             );
 
             $site->loadMissing('customer');
-            $country = $site->customer?->country ?? null;
+            $country = $pipeline->target_country ?: ($site->customer?->country ?? null);
 
-            $category = strtolower($pipeline->news_category ?? 'global');
+            $category = $pipeline->news_category ?? 'global';
             $language = $pipeline->language ?: 'en';
 
             $excludedTitles = [];

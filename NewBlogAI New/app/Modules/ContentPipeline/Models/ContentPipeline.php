@@ -16,6 +16,7 @@ class ContentPipeline extends Model
     protected $fillable = [
         'site_id',
         'news_category',
+        'target_country',
         'prompt_id',
         'ai_provider_id',
         'language',
