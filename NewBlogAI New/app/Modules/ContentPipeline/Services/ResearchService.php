@@ -25,7 +25,18 @@ class ResearchService implements ResearchServiceInterface
             }
 
             $category = $context->metadata['news_category'] ?? 'global';
-            $queries  = $this->generateNewsQueriesForCategory($categorySubject, $category);
+
+            // Newsroom workflow: when an employee-selected candidate anchors
+            // this run, research the exact event instead of generic category
+            // headlines, and snapshot the candidate into the research data so
+            // downstream stages audit against the authoritative event.
+            $selectedNews = $context->metadata['selected_news'] ?? null;
+            if (is_array($selectedNews) && ! empty($selectedNews['title'])) {
+                $queries = $this->generateQueriesForSelectedNews($selectedNews, $category);
+                $context->addResearchData('selected_news', $selectedNews);
+            } else {
+                $queries = $this->generateNewsQueriesForCategory($categorySubject, $category);
+            }
 
             $context->addResearchData('queries', $queries);
             $context->addResearchData('researched_at', now()->toIso8601String());
@@ -43,6 +54,29 @@ class ResearchService implements ResearchServiceInterface
         }
 
         return $context;
+    }
+
+    /**
+     * Generate research queries anchored to an employee-selected news
+     * candidate (exact event verification instead of generic headlines).
+     */
+    protected function generateQueriesForSelectedNews(array $selectedNews, string $category): array
+    {
+        $headline = trim((string) $selectedNews['title']);
+        $keywords = array_filter(array_map('strval', (array) ($selectedNews['keywords'] ?? [])));
+        $today = now()->format('Y-m-d');
+
+        $queries = [
+            '"'.$headline.'"',
+            $headline.' latest updates '.$today,
+            $headline.' official statement source verification',
+        ];
+
+        if (! empty($keywords)) {
+            $queries[] = implode(' ', array_slice($keywords, 0, 4)).' '.$category.' news';
+        }
+
+        return $queries;
     }
 
     /**

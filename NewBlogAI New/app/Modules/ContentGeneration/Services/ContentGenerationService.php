@@ -105,6 +105,27 @@ class ContentGenerationService
             $selectedCandidate = $run->properties['selected_candidate'] ?? null;
             if (is_array($selectedCandidate) && ! empty($selectedCandidate['title'])) {
                 $context->metadata['selected_news'] = $selectedCandidate;
+
+                // Seed the candidate's trusted source references as authoritative
+                // sources: SourceCollectionService merges and ranks them, and
+                // FactAuditService then verifies claims against the exact
+                // references discovered for this event (Research → Candidate →
+                // Fact Audit chain).
+                foreach ((array) ($selectedCandidate['source_references'] ?? []) as $reference) {
+                    if (empty($reference['url'])) {
+                        continue;
+                    }
+
+                    $context->addSource([
+                        'url' => (string) $reference['url'],
+                        'title' => (string) ($reference['name'] ?? $selectedCandidate['title']),
+                        'snippet' => (string) ($selectedCandidate['summary'] ?? ''),
+                        'publisher' => $reference['name'] ?? null,
+                        'relevance_score' => 0.9,
+                        'keywords' => array_values(array_filter(array_map('strval', (array) ($selectedCandidate['keywords'] ?? [])))),
+                        'metadata' => ['origin' => 'news_candidate'],
+                    ]);
+                }
             }
 
             // Run Laravel pipeline sequentially through the 7 stages

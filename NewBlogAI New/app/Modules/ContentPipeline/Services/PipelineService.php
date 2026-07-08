@@ -6,6 +6,7 @@ use App\Modules\AIProviderManager\Models\AIProvider;
 use App\Modules\ContentPipeline\Jobs\GenerateNewsCandidatesJob;
 use App\Modules\ContentPipeline\Jobs\ProcessPipelineJob;
 use App\Modules\ContentPipeline\Models\ContentPipeline;
+use App\Modules\ContentPipeline\Models\NewsCandidate;
 use App\Modules\ContentPipeline\Models\PipelineRun;
 use App\Modules\PromptManager\Models\Prompt;
 use App\Modules\SiteManager\Models\Site;
@@ -181,6 +182,15 @@ class PipelineService
                 if ($newRun->isDiscovery()) {
                     GenerateNewsCandidatesJob::dispatch($newRun->id);
                 } else {
+                    // Preserve coverage lineage: the selected candidate must
+                    // always point at the latest full generation run so that
+                    // analytics, usage tracking, audit logs and debugging
+                    // reflect the final authoritative PipelineRun.
+                    $candidateId = $newRun->properties['selected_candidate']['news_candidate_id'] ?? null;
+                    if ($candidateId) {
+                        NewsCandidate::whereKey($candidateId)->update(['full_run_id' => $newRun->id]);
+                    }
+
                     $pipeline->update(['status' => 'queued']);
                     ProcessPipelineJob::dispatch($newRun->id);
                 }
