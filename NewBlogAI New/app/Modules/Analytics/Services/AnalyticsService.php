@@ -222,17 +222,15 @@ class AnalyticsService
     public function getCategoryCoverageStats(int $siteId): array
     {
         $pipelineCategories = ContentPipeline::where('site_id', $siteId)
-            ->with('topic')
-            ->get()
-            ->pluck('topic.category')
+            ->pluck('news_category')
             ->filter()
             ->unique()
             ->values()
             ->toArray();
 
-        $generatedCategories = GeneratedContent::where('site_id', $siteId)
-            ->join('topics', 'generated_contents.topic_id', '=', 'topics.id')
-            ->pluck('topics.category')
+        $generatedCategories = GeneratedContent::where('generated_contents.site_id', $siteId)
+            ->join('content_pipelines', 'generated_contents.pipeline_id', '=', 'content_pipelines.id')
+            ->pluck('content_pipelines.news_category')
             ->filter()
             ->unique()
             ->values()

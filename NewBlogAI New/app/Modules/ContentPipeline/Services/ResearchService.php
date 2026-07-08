@@ -11,33 +11,33 @@ use Illuminate\Support\Facades\Log;
 class ResearchService implements ResearchServiceInterface
 {
     /**
-     * Process the current stage of the content pipeline.
-     * Prepares search-oriented queries based on the topic.
+     * Process the research stage of the news content pipeline.
+     * Prepares search-oriented news queries based on the resolved category subject.
      */
     public function handle(PipelineContext $context): PipelineContext
     {
         try {
-            Log::info('ResearchService: Preparing research queries.');
+            Log::info('ResearchService: Preparing news research queries.');
 
-            $topicName = $context->resolvedTopic;
-            if (empty($topicName)) {
-                throw new \RuntimeException('Topic name has not been resolved yet.');
+            $categorySubject = $context->resolvedTopic;
+            if (empty($categorySubject)) {
+                throw new \RuntimeException('Category subject has not been resolved yet (resolvedTopic is empty).');
             }
 
-            $category = $context->metadata['resolved_topic_category'] ?? 'General';
-            $queries = $this->generateQueriesForTopic($topicName, $category);
+            $category = $context->metadata['news_category'] ?? 'global';
+            $queries  = $this->generateNewsQueriesForCategory($categorySubject, $category);
 
             $context->addResearchData('queries', $queries);
             $context->addResearchData('researched_at', now()->toIso8601String());
 
-            Log::info('ResearchService: Prepared queries successfully.', [
-                'topic' => $topicName,
-                'category' => $category,
-                'queries' => $queries
+            Log::info('ResearchService: News research queries prepared successfully.', [
+                'category'        => $category,
+                'category_subject' => $categorySubject,
+                'queries'         => $queries,
             ]);
         } catch (\Exception $e) {
-            Log::error('ResearchService failed: ' . $e->getMessage(), [
-                'exception' => $e
+            Log::error('ResearchService failed: '.$e->getMessage(), [
+                'exception' => $e,
             ]);
             $context->addError('research_service', $e->getMessage());
         }
@@ -46,45 +46,77 @@ class ResearchService implements ResearchServiceInterface
     }
 
     /**
-     * Generate structured queries based on topic and category.
+     * Generate structured news search queries based on category and subject.
      */
-    protected function generateQueriesForTopic(string $topicName, string $category): array
+    protected function generateNewsQueriesForCategory(string $subject, string $category): array
     {
-        $categoryLower = strtolower($category);
+        $today = now()->format('Y-m-d');
 
-        // Define search-oriented templates based on category
-        $templates = match ($categoryLower) {
-            'tech', 'technology', 'software' => [
-                '"{topic}" latest updates and features',
-                '"{topic}" tutorial and best practices',
-                '"{topic}" architecture and design patterns',
-                'future of "{topic}" and industry trends',
+        // Base news query templates applicable to all categories
+        $baseTemplates = [
+            '"' . $subject . '" breaking news ' . $today,
+            '"' . $subject . '" latest updates today',
+            'top ' . $subject . ' headlines',
+        ];
+
+        // Category-specific news query extensions
+        $categoryTemplates = match (strtolower($category)) {
+            'global'        => [
+                'world news highlights today',
+                'international breaking stories today',
+                'global events ' . date('Y'),
             ],
-            'finance', 'business', 'economy' => [
-                '"{topic}" market trends and statistics',
-                'how to invest in "{topic}"',
-                '"{topic}" analysis and reports 2026',
-                'impact of "{topic}" on global business',
+            'trending'      => [
+                'most shared trending news today',
+                'viral news stories right now',
+                'top trending stories ' . $today,
             ],
-            'health', 'medical', 'wellness' => [
-                '"{topic}" benefits and side effects',
-                'latest research on "{topic}"',
-                'how to improve "{topic}"',
-                '"{topic}" guide for beginners',
+            'local'         => [
+                'local community news today',
+                'regional news updates ' . $today,
+                'city council local events today',
+            ],
+            'technology'    => [
+                'tech industry news and product launches today',
+                'AI and software developments ' . date('Y'),
+                'cybersecurity alerts and digital news today',
+            ],
+            'business'      => [
+                'stock market and finance news today',
+                'corporate earnings and economic data ' . $today,
+                'startup and investment news today',
+            ],
+            'politics'      => [
+                'government policy and political news today',
+                'election and legislative updates ' . $today,
+                'geopolitical developments and diplomacy news',
+            ],
+            'sports'        => [
+                'sports scores and match results today',
+                'athlete and team news ' . $today,
+                'sports transfers and breaking sports news',
+            ],
+            'health'        => [
+                'health and medical research news today',
+                'public health alerts and wellness updates ' . $today,
+                'new medical treatments and drug approvals today',
+            ],
+            'science'       => [
+                'scientific research discoveries today',
+                'space exploration and environment news ' . $today,
+                'peer-reviewed study findings in the news',
+            ],
+            'entertainment' => [
+                'celebrity and entertainment industry news today',
+                'film, music, and TV releases ' . $today,
+                'arts and culture events today',
             ],
             default => [
-                '"{topic}" overview and definitions',
-                'latest news about "{topic}"',
-                '"{topic}" guide and tutorial',
-                'key challenges and opportunities in "{topic}"',
+                'latest news headlines today',
+                'top stories breaking news ' . $today,
             ],
         };
 
-        $queries = [];
-        foreach ($templates as $template) {
-            $queries[] = str_replace('{topic}', $topicName, $template);
-        }
-
-        return $queries;
+        return array_merge($baseTemplates, $categoryTemplates);
     }
 }

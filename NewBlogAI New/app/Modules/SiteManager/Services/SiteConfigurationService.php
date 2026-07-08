@@ -15,7 +15,6 @@ class SiteConfigurationService
     {
         $site->loadMissing([
             'customer.subscription.plan',
-            'pipelines.topic',
             'pipelines.prompt',
             'pipelines.provider',
             'schedules',
@@ -38,25 +37,22 @@ class SiteConfigurationService
             }
         }
 
-        $topics = $site->pipelines
-            ->filter(fn ($pipeline) => $pipeline->topic)
+        $pipelines = $site->pipelines
+            ->filter(fn ($pipeline) => $pipeline->is_active)
             ->map(fn ($pipeline): array => [
-                'id' => $pipeline->topic->id,
-                'name' => $pipeline->topic->name,
-                'category' => $pipeline->topic->category,
-                'language' => $pipeline->language ?: $pipeline->topic->language,
-                'generation_frequency' => $pipeline->topic->generation_frequency,
-                'prompt_id' => $pipeline->prompt_id,
-                'pipeline_id' => $pipeline->id,
-                'provider' => $pipeline->provider?->provider_key,
-                'model' => $pipeline->provider?->default_model,
+                'id'           => $pipeline->id,
+                'news_category' => $pipeline->news_category ?? 'global',
+                'language'     => $pipeline->language ?: 'en',
+                'prompt_id'    => $pipeline->prompt_id,
+                'pipeline_id'  => $pipeline->id,
+                'provider'     => $pipeline->provider?->provider_key,
+                'model'        => $pipeline->provider?->default_model,
             ])
-            ->unique('id')
             ->values()
             ->all();
 
-        if ($topics === []) {
-            $topics = [];
+        if ($pipelines === []) {
+            $pipelines = [];
         }
 
         $schedules = $site->schedules
@@ -108,7 +104,7 @@ class SiteConfigurationService
                 'feature_flags' => Arr::get($limits, 'feature_flags', []),
             ],
             'content' => [
-                'topics' => $topics,
+                'pipelines'       => $pipelines,
                 'category_mapping' => $site->category_mapping ?? [],
             ],
             'scheduling' => [
@@ -135,10 +131,12 @@ class SiteConfigurationService
         // Compatibility keys consumed by existing plugin versions.
         $configuration['site_id'] = $site->id;
         $configuration['slot'] = $site->slot ?? ($schedules[0]['frequency'] ?? 'daily');
-        $configuration['selected_topics'] = array_values(array_map(
-            fn (array $topic): string => $topic['name'],
-            $topics,
+        $configuration['selected_categories'] = array_values(array_map(
+            fn (array $p): string => $p['news_category'],
+            $pipelines,
         ));
+        // Backward-compat: keep selected_topics as an alias
+        $configuration['selected_topics'] = $configuration['selected_categories'];
         $configuration['is_active'] = (bool) $site->is_active;
 
         return $configuration;

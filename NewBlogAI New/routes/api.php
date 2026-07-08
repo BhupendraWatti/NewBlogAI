@@ -69,6 +69,7 @@ Route::prefix('v1')->group(function () {
             Route::post('pipelines/runs/{run}/cancel', [PipelineController::class, 'cancel']);
             Route::get('pipelines/{id}/history', [PipelineController::class, 'history']);
             Route::apiResource('pipelines', PipelineController::class);
+            Route::post('schedules/run', [ScheduleController::class, 'runDue']);
             Route::apiResource('schedules', ScheduleController::class);
         });
 

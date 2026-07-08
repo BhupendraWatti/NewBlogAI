@@ -51,7 +51,7 @@ class PipelineController extends Controller
 
         $pipeline = $this->pipelineService->createPipeline($request->validated());
 
-        return (new PipelineResource($pipeline->load(['site', 'topic', 'prompt', 'provider'])))
+        return (new PipelineResource($pipeline->load(['site', 'prompt', 'provider'])))
             ->response()
             ->setStatusCode(201);
     }
@@ -61,7 +61,7 @@ class PipelineController extends Controller
      */
     public function show(string $id): PipelineResource
     {
-        $pipeline = $this->findPipelineOrFail($id, ['site', 'topic', 'prompt', 'provider', 'runs']);
+        $pipeline = $this->findPipelineOrFail($id, ['site', 'prompt', 'provider', 'runs']);
 
         return new PipelineResource($pipeline);
     }
@@ -83,7 +83,7 @@ class PipelineController extends Controller
 
         $updated = $this->pipelineService->updatePipeline($pipeline, $validated);
 
-        return new PipelineResource($updated->load(['site', 'topic', 'prompt', 'provider']));
+        return new PipelineResource($updated->load(['site', 'prompt', 'provider']));
     }
 
     /**

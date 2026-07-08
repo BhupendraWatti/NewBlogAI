@@ -4,7 +4,6 @@ namespace App\Modules\ContentGeneration\Resources;
 
 use App\Modules\ContentPipeline\Resources\PipelineResource;
 use App\Modules\SiteManager\Resources\SiteResource;
-use App\Modules\TopicManager\Resources\TopicResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -21,8 +20,8 @@ class GeneratedContentResource extends JsonResource
             'content' => $this->content,
             'status' => $this->status,
             'metadata' => $this->metadata ?? [],
+            'news_category' => $this->pipeline?->news_category ?? 'global',
             'site' => new SiteResource($this->whenLoaded('site')),
-            'topic' => new TopicResource($this->whenLoaded('topic')),
             'pipeline' => new PipelineResource($this->whenLoaded('pipeline')),
             'revisions' => ContentRevisionResource::collection($this->whenLoaded('revisions')),
             'created_at' => $this->created_at,

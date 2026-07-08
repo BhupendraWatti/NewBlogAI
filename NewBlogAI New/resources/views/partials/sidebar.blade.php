@@ -31,10 +31,6 @@
                         <span class="material-symbols-outlined text-xs transition-transform duration-200 group-open/menu:rotate-180 text-muted/60">expand_more</span>
                     </summary>
                     <div class="space-y-1 mt-2 pl-1">
-                        <button onclick="switchWorkspace('topics')" data-node="topics" class="w-full flex items-center gap-3 text-left px-3 py-2 rounded-xl font-medium text-sm transition-all duration-200 text-muted hover:text-text hover:bg-white/5">
-                            <span class="material-symbols-outlined text-lg">topic</span>
-                            Topics
-                        </button>
                         <button onclick="switchWorkspace('pipeline')" data-node="pipeline" class="w-full flex items-center gap-3 text-left px-3 py-2 rounded-xl font-medium text-sm transition-all duration-200 text-muted hover:text-text hover:bg-white/5">
                             <span class="material-symbols-outlined text-lg">route</span>
                             Content Pipeline
@@ -151,14 +147,40 @@
         </div>
 
         <!-- Sidebar Footer - always pinned at bottom, never scrolls away -->
+        @php
+            $auth_user = auth()->user();
+            $displayName = $auth_user ? $auth_user->name : 'Super Admin';
+            $displayRole = 'Super Admin';
+            if ($auth_user) {
+                $roleNames = [
+                    1 => 'Super Admin',
+                    2 => 'Admin',
+                    3 => 'Editor',
+                    4 => 'SEO Specialist',
+                    5 => 'Support'
+                ];
+                $displayRole = $roleNames[$auth_user->role] ?? 'Operator';
+            }
+            $initials = '';
+            foreach (explode(' ', $displayName) as $part) {
+                $initials .= !empty($part) ? $part[0] : '';
+            }
+            $initials = strtoupper(substr($initials, 0, 2));
+            if (empty($initials)) {
+                $initials = 'SA';
+            }
+        @endphp
         <div class="pt-4 mt-2 border-t border-border space-y-3 shrink-0">
             <div class="flex items-center gap-3 px-2">
                 <div class="w-8 h-8 rounded-full bg-surface border border-border flex items-center justify-center text-accent text-xs font-semibold">
-                    SA
+                    {{ $initials }}
                 </div>
                 <div>
-                    <p class="text-xs font-medium">Super Admin</p>
-                    <p class="text-[10px] text-muted">Active Node</p>
+                    <p class="text-xs font-medium text-text">{{ $displayName }}</p>
+                    <p class="text-[10px] text-muted">{{ $displayRole }}</p>
+                    <button onclick="triggerLogout()" class="text-[10px] text-rose-500 hover:text-rose-400 hover:underline flex items-center gap-1 mt-1 font-mono transition">
+                        <span class="material-symbols-outlined text-[12px] font-bold">logout</span> Sign Out
+                    </button>
                 </div>
             </div>
             <p class="text-[10px] text-muted px-2 font-mono">v2.4.1-stable</p>

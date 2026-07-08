@@ -25,7 +25,7 @@ class ContentGenerationService
      */
     public function getPaginated(array $filters, int $limit = 15): LengthAwarePaginator
     {
-        $query = GeneratedContent::query()->with(['site', 'topic', 'pipeline']);
+        $query = GeneratedContent::query()->with(['site', 'pipeline']);
 
         if (! empty($filters['status'])) {
             $query->where('status', $filters['status']);
@@ -71,12 +71,11 @@ class ContentGenerationService
         }
 
         // 1. Gather all variables
-        $site = $pipeline->site;
-        $topic = $pipeline->topic;
+        $site           = $pipeline->site;
         $promptTemplate = $pipeline->prompt;
-        $provider = $pipeline->provider;
+        $provider       = $pipeline->provider;
 
-        if (! $site || ! $topic || ! $promptTemplate || ! $provider) {
+        if (! $site || ! $promptTemplate || ! $provider) {
             throw new InvalidArgumentException('Pipeline configuration dependencies are incomplete.');
         }
 
@@ -93,7 +92,7 @@ class ContentGenerationService
                 $provider->provider_key,
                 $provider->default_model ?? 'unknown',
                 $promptTemplate->id,
-                $topic->id,
+                null,   // topic_id no longer required — pipeline is category-driven
             );
 
             // 2. Create a PipelineContext using the PipelineRun
@@ -200,8 +199,8 @@ class ContentGenerationService
                 'site_id' => $site->id,
                 'provider' => $provider->provider_key,
                 'model' => $provider->default_model ?? 'unknown',
-                'prompt_id' => $promptTemplate->id,
-                'topic_id' => $topic->id,
+                'prompt_id'      => $promptTemplate->id,
+                'topic_id'       => null,   // category-driven — no topic FK
                 'execution_time_ms' => $executionTimeMs,
                 'status' => 'failed',
                 'error_log' => $e->getMessage(),

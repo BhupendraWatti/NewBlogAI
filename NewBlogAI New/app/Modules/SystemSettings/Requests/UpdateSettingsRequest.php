@@ -21,6 +21,8 @@ class UpdateSettingsRequest extends FormRequest
             'language' => ['sometimes', 'required', 'string', 'in:en,es,fr,de,hi'],
             'ai_default_provider' => ['sometimes', 'required', 'string', 'in:gemini,openai,claude,groq,openrouter,ollama'],
             'ai_default_model' => ['sometimes', 'required', 'string', 'max:255'],
+            'image_generator_driver' => ['sometimes', 'required', 'string', 'in:pollinations,unsplash,dalle,dall-e'],
+            'unsplash_access_key' => ['sometimes', 'nullable', 'string'],
         ];
     }
 }

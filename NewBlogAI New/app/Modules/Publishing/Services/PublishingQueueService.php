@@ -26,18 +26,18 @@ class PublishingQueueService implements PublishingQueueInterface
         try {
             Log::info('PublishingQueueService: Saving generated content and resolving reservation.');
 
-            $run = $context->run;
-            $pipeline = $context->pipeline;
-            $site = $pipeline->site;
-            $topic = $pipeline->topic;
+            $run            = $context->run;
+            $pipeline       = $context->pipeline;
+            $site           = $pipeline->site;
             $promptTemplate = $pipeline->prompt;
-            $provider = $pipeline->provider;
+            $provider       = $pipeline->provider;
 
-            if (!$site || !$topic || !$promptTemplate || !$provider) {
+            if (!$site || !$promptTemplate || !$provider) {
                 throw new \RuntimeException('Incomplete pipeline dependencies in context.');
             }
 
-            $title = $context->title ?? ("Article: {$topic->name} - " . now()->format('Y-m-d'));
+            $category = $context->metadata['news_category'] ?? strtolower($pipeline->news_category ?? 'global');
+            $title    = $context->title ?? (ucfirst($category).' News: '.now()->format('F j, Y'));
             $content = $context->generatedContent;
             $promptTokens = $context->metadata['prompt_tokens'] ?? 0;
             $completionTokens = $context->metadata['completion_tokens'] ?? 0;
@@ -64,11 +64,22 @@ class PublishingQueueService implements PublishingQueueInterface
             if (isset($context->metadata['processed_at'])) {
                 $metadataField['processed_at'] = $context->metadata['processed_at'];
             }
+            if (isset($context->metadata['seo_audit'])) {
+                $metadataField['seo_audit'] = $context->metadata['seo_audit'];
+            }
+            if (isset($context->metadata['seo'])) {
+                $metadataField['seo'] = $context->metadata['seo'];
+            }
+            if (isset($context->metadata['fact_audit'])) {
+                $metadataField['fact_audit'] = $context->metadata['fact_audit'];
+            }
+            if (isset($context->metadata['extracted_facts'])) {
+                $metadataField['extracted_facts'] = $context->metadata['extracted_facts'];
+            }
 
             $generatedContent = DB::transaction(function () use (
                 $pipeline,
                 $site,
-                $topic,
                 $title,
                 $content,
                 $metadataField,
@@ -87,12 +98,12 @@ class PublishingQueueService implements PublishingQueueInterface
                 // 1. Create Generated Content record with status = 'draft' (enforced)
                 $generatedContent = GeneratedContent::create([
                     'pipeline_id' => $pipeline->id,
-                    'site_id' => $site->id,
-                    'topic_id' => $topic->id,
-                    'title' => $title,
-                    'content' => $content,
-                    'status' => 'generated', // Enforced generated status
-                    'metadata' => $metadataField,
+                    'site_id'     => $site->id,
+                    'topic_id'    => null,   // category-driven — no topic FK
+                    'title'       => $title,
+                    'content'     => $content,
+                    'status'      => 'generated',
+                    'metadata'    => $metadataField,
                 ]);
 
                 // 2. Create the initial ContentRevision record
@@ -110,8 +121,8 @@ class PublishingQueueService implements PublishingQueueInterface
                     'site_id' => $site->id,
                     'provider' => $provider->provider_key,
                     'model' => $provider->default_model ?? 'unknown',
-                    'prompt_id' => $promptTemplate->id,
-                    'topic_id' => $topic->id,
+                    'prompt_id'       => $promptTemplate->id,
+                    'topic_id'        => null,   // category-driven — no topic FK
                     'execution_time_ms' => $executionTimeMs,
                     'prompt_tokens' => $promptTokens,
                     'completion_tokens' => $completionTokens,

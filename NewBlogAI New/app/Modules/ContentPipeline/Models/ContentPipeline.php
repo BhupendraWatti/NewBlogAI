@@ -5,7 +5,6 @@ namespace App\Modules\ContentPipeline\Models;
 use App\Modules\AIProviderManager\Models\AIProvider;
 use App\Modules\PromptManager\Models\Prompt;
 use App\Modules\SiteManager\Models\Site;
-use App\Modules\TopicManager\Models\Topic;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -16,7 +15,7 @@ class ContentPipeline extends Model
 
     protected $fillable = [
         'site_id',
-        'topic_id',
+        'news_category',
         'prompt_id',
         'ai_provider_id',
         'language',
@@ -32,11 +31,6 @@ class ContentPipeline extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class, 'site_id');
-    }
-
-    public function topic(): BelongsTo
-    {
-        return $this->belongsTo(Topic::class, 'topic_id');
     }
 
     public function prompt(): BelongsTo

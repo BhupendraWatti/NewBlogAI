@@ -7,6 +7,7 @@ use App\Modules\ScheduleManager\Models\PublishingSchedule;
 use App\Modules\ScheduleManager\Requests\StoreScheduleRequest;
 use App\Modules\ScheduleManager\Resources\ScheduleResource;
 use App\Modules\ScheduleManager\Services\ScheduleService;
+use App\Modules\WebsiteManager\Models\Site;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -79,5 +80,15 @@ class ScheduleController extends Controller
         $this->schedules->delete($schedule);
 
         return response()->json(['message' => 'Schedule deleted successfully.']);
+    }
+
+    public function runDue(): JsonResponse
+    {
+        $processed = $this->schedules->runDue();
+
+        return response()->json([
+            'message' => 'Scheduler sync release triggered successfully.',
+            'processed' => $processed,
+        ]);
     }
 }

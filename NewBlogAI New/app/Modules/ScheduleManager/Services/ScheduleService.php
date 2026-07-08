@@ -74,7 +74,7 @@ class ScheduleService
             ->each(function (PublishingSchedule $schedule) use (&$processed): void {
                 DB::transaction(function () use ($schedule, &$processed): void {
                     $locked = PublishingSchedule::query()
-                        ->with(['site', 'pipeline.topic'])
+                        ->with(['site', 'pipeline'])
                         ->lockForUpdate()
                         ->find($schedule->id);
 
@@ -97,7 +97,7 @@ class ScheduleService
 
                         $shouldTrigger = true;
                         if ($locked->schedule_mode === 'coverage_based') {
-                            $category = $locked->pipeline->topic?->category;
+                            $category = $locked->pipeline->news_category ?? null;
                             if ($category) {
                                 $status = $this->coverageService->getCategoryStatus($locked->site_id, $category);
                                 if ($status !== 'stale' && $status !== 'empty') {
@@ -143,7 +143,7 @@ class ScheduleService
     public function triggerManualRun(PublishingSchedule $schedule): void
     {
         DB::transaction(function () use ($schedule) {
-            $locked = PublishingSchedule::with(['site', 'pipeline.topic'])->lockForUpdate()->find($schedule->id);
+            $locked = PublishingSchedule::with(['site', 'pipeline'])->lockForUpdate()->find($schedule->id);
             if (!$locked) {
                 return;
             }

@@ -109,17 +109,19 @@
                                     <div class="space-y-1.5">
                                         <span class="text-[9px] font-mono text-muted uppercase">Placeholder Variables (Click to copy)</span>
                                         <div class="flex flex-wrap gap-1" id="prompt-variables-container">
-                                            <span data-var="topic" class="prompt-var-chip px-2 py-0.5 rounded bg-white/5 border border-border text-[9px] font-mono text-muted cursor-pointer hover:border-accent hover:text-text transition">&#123;&#123;topic&#125;&#125;</span>
-                                            <span data-var="keyword" class="prompt-var-chip px-2 py-0.5 rounded bg-white/5 border border-border text-[9px] font-mono text-muted cursor-pointer hover:border-accent hover:text-text transition">&#123;&#123;keyword&#125;&#125;</span>
+                                            <span data-var="category" class="prompt-var-chip px-2 py-0.5 rounded bg-white/5 border border-border text-[9px] font-mono text-muted cursor-pointer hover:border-accent hover:text-text transition">&#123;&#123;category&#125;&#125;</span>
+                                            <span data-var="keywords" class="prompt-var-chip px-2 py-0.5 rounded bg-white/5 border border-border text-[9px] font-mono text-muted cursor-pointer hover:border-accent hover:text-text transition">&#123;&#123;keywords&#125;&#125;</span>
                                             <span data-var="tone" class="prompt-var-chip px-2 py-0.5 rounded bg-white/5 border border-border text-[9px] font-mono text-muted cursor-pointer hover:border-accent hover:text-text transition">&#123;&#123;tone&#125;&#125;</span>
                                             <span data-var="language" class="prompt-var-chip px-2 py-0.5 rounded bg-white/5 border border-border text-[9px] font-mono text-muted cursor-pointer hover:border-accent hover:text-text transition">&#123;&#123;language&#125;&#125;</span>
+                                            <span data-var="website" class="prompt-var-chip px-2 py-0.5 rounded bg-white/5 border border-border text-[9px] font-mono text-muted cursor-pointer hover:border-accent hover:text-text transition">&#123;&#123;website&#125;&#125;</span>
+                                            <span data-var="date" class="prompt-var-chip px-2 py-0.5 rounded bg-white/5 border border-border text-[9px] font-mono text-muted cursor-pointer hover:border-accent hover:text-text transition">&#123;&#123;date&#125;&#125;</span>
                                         </div>
                                     </div>
 
                                     <!-- Code Editor Input Box -->
                                     <div class="space-y-1.5 flex-1 flex flex-col">
                                         <label class="block text-[9px] font-mono text-muted uppercase">Prompt Template Instructions</label>
-                                        <textarea id="prompt-editor-textarea" class="w-full h-56 bg-background border border-border rounded-xl p-4 font-mono text-xs text-text focus:outline-none focus:border-accent focus:ring-0 leading-relaxed" placeholder="System instructions prompt..." oninput="updatePromptField('prompt')">You are a senior tech reporter. Summarize the following news details regarding @{{topic}} in a professional, engaging format with key bullet points. Target keyword: @{{keyword}}.</textarea>
+                                        <textarea id="prompt-editor-textarea" class="w-full h-56 bg-background border border-border rounded-xl p-4 font-mono text-xs text-text focus:outline-none focus:border-accent focus:ring-0 leading-relaxed" placeholder="News article prompt instructions..." oninput="updatePromptField('prompt')">You are a professional news journalist. Write a comprehensive, factual, and engaging @{{category}} news article based on the latest headlines and research provided. Tone: @{{tone}}. Language: @{{language}}. Focus keywords: @{{keywords}}. Include source attribution where applicable. Date: @{{date}}.</textarea>
                                     </div>
 
                                     <!-- Footer Actions -->
@@ -141,12 +143,12 @@
                                             <h4 class="text-xs font-mono uppercase tracking-widest text-muted">Variable Mock Inputs</h4>
                                             <div class="space-y-3">
                                                 <div>
-                                                    <label class="block text-[10px] font-mono text-muted mb-1">&#123;&#123;topic&#125;&#125;</label>
-                                                    <input class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent" type="text" value="Quantum Computing Breakthrough"/>
+                                                    <label class="block text-[10px] font-mono text-muted mb-1">&#123;&#123;category&#125;&#125;</label>
+                                                    <input class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent" type="text" value="Technology"/>
                                                 </div>
                                                 <div>
-                                                    <label class="block text-[10px] font-mono text-muted mb-1">&#123;&#123;keyword&#125;&#125;</label>
-                                                    <input class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent" type="text" value="Quantum Processor IBM"/>
+                                                    <label class="block text-[10px] font-mono text-muted mb-1">&#123;&#123;keywords&#125;&#125;</label>
+                                                    <input class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent" type="text" value="AI, machine learning, OpenAI"/>
                                                 </div>
                                                 <button onclick="runPromptTestSimulation()" class="w-full bg-secondary hover:bg-secondary/80 text-background font-medium text-xs py-2 rounded-xl transition">Execute Prompt Dry-Run</button>
                                             </div>

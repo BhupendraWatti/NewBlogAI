@@ -19,7 +19,7 @@
                             <button onclick="openScheduleAddModal()" class="bg-accent hover:bg-accent/80 text-background font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 cyber-glow-emerald">
                                 <span class="material-symbols-outlined text-sm font-bold">add</span> Create Schedule
                             </button>
-                            <button onclick="triggerManualSchedulerRelease()" class="bg-surface hover:bg-white/5 border border-border text-text font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5">
+                            <button onclick="triggerManualSchedulerRelease(this)" class="bg-surface hover:bg-white/5 border border-border text-text font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5">
                                 <span class="material-symbols-outlined text-sm">send</span> Force Sync Release
                             </button>
                         </div>

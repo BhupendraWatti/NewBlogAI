@@ -30,7 +30,7 @@ class ContentCalendarService
 
         // 1. Fetch all GeneratedContent for this site
         $contents = GeneratedContent::where('site_id', $siteId)
-            ->with(['topic', 'pipeline'])
+            ->with(['pipeline'])
             ->get();
 
         // Fetch publishing logs for this site
@@ -55,8 +55,8 @@ class ContentCalendarService
                     'date' => $scheduledLog->scheduled_at->toDateTimeString(),
                     'details' => [
                         'content_id' => $content->id,
-                        'topic' => $content->topic?->name,
-                        'category' => $content->topic?->category,
+                        'topic' => ucfirst($content->pipeline?->news_category ?? 'general'),
+                        'category' => ucfirst($content->pipeline?->news_category ?? 'general'),
                         'pipeline_id' => $content->pipeline_id,
                         'log_id' => $scheduledLog->id,
                     ],
@@ -79,8 +79,8 @@ class ContentCalendarService
                         'date' => $pubDate->toDateTimeString(),
                         'details' => [
                             'content_id' => $content->id,
-                            'topic' => $content->topic?->name,
-                            'category' => $content->topic?->category,
+                            'topic' => ucfirst($content->pipeline?->news_category ?? 'general'),
+                            'category' => ucfirst($content->pipeline?->news_category ?? 'general'),
                             'pipeline_id' => $content->pipeline_id,
                             'published_url' => $completedLog?->published_url,
                         ],
@@ -100,8 +100,8 @@ class ContentCalendarService
                         'date' => $content->created_at->toDateTimeString(),
                         'details' => [
                             'content_id' => $content->id,
-                            'topic' => $content->topic?->name,
-                            'category' => $content->topic?->category,
+                            'topic' => ucfirst($content->pipeline?->news_category ?? 'general'),
+                            'category' => ucfirst($content->pipeline?->news_category ?? 'general'),
                             'pipeline_id' => $content->pipeline_id,
                         ],
                     ];

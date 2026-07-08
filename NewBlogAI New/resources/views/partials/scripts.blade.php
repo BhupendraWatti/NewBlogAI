@@ -148,6 +148,16 @@
             return null;
         };
 
+        window.openModal = function(id) {
+            const modal = document.getElementById(id);
+            if (modal) modal.classList.add('active');
+        };
+
+        window.closeModal = function(id) {
+            const modal = document.getElementById(id);
+            if (modal) modal.classList.remove('active');
+        };
+
         window.getResponseErrorMessage = function(response, result, defaultMessage = "Could not complete request.") {
             if (!response) return defaultMessage;
             if (result && result.message) return result.message;
@@ -593,6 +603,9 @@
             }
             if (node === 'prompts' && window.fetchPromptTemplates) {
                 window.fetchPromptTemplates();
+            }
+            if (node === 'settings' && window.fetchSystemSettings) {
+                window.fetchSystemSettings();
             }
 
             // Highlight Active Sidebar Menu Option
@@ -1482,18 +1495,18 @@
             });
         };
 
-        window.triggerManualSchedulerRelease = async function() {
-            showLoading("Triggering manual scheduler release sync...");
-            try {
-                setTimeout(() => {
-                    showSuccess("Scheduler Sync Triggered", "Laravel schedule:run check executed successfully.");
+        window.triggerManualSchedulerRelease = async function(btn) {
+            await apiRequest('/api/v1/schedules/run', { method: 'POST' }, {
+                submitBtn: btn,
+                successTitle: "Scheduler Sync Triggered",
+                successMessage: "Laravel schedule:run check executed successfully.",
+                defaultErrorMessage: "Could not run scheduler command.",
+                onSuccess: async () => {
                     if (window.fetchScheduledJobs) {
-                        window.fetchScheduledJobs();
+                        await window.fetchScheduledJobs();
                     }
-                }, 1000);
-            } catch (err) {
-                showError("Error", "Could not run scheduler command.");
-            }
+                }
+            });
         };
 
         // Tab Switcher inside Node Workspace
@@ -2051,7 +2064,7 @@
                 category: document.getElementById('prompt-edit-category')?.value || '',
                 version: document.getElementById('prompt-edit-version')?.value || '',
                 status: document.getElementById('prompt-edit-status')?.value || 'active',
-                promt: document.getElementById('prompt-editor-textarea')?.value || ''
+                prompt: document.getElementById('prompt-editor-textarea')?.value || ''
             };
 
             const isNew = activePromptId === 'new' || isNaN(activePromptId);
@@ -2065,7 +2078,14 @@
             }, {
                 successTitle: "Prompt Saved",
                 successMessage: "Prompt template saved successfully in the Library!",
-                defaultErrorMessage: "Could not save prompt template."
+                defaultErrorMessage: "Could not save prompt template.",
+                onSuccess: (result) => {
+                    if (result && result.data && result.data.id) {
+                        activePromptId = result.data.id;
+                    } else if (result && result.id) {
+                        activePromptId = result.id;
+                    }
+                }
             });
 
             if (window.fetchPromptTemplates) {
@@ -2981,10 +3001,65 @@
             }
         }
 
-        // Simulate settings save
-        function triggerSystemSaveSimulation() {
-            showSuccess("Settings Saved", "Global system configurations saved successfully! Environment variables sync dispatched to runtime container fleet.");
-        }
+        // Settings CRUD & Key Management
+        window.triggerSystemSaveSimulation = async function(btn) {
+            const driver = document.getElementById('setting-img-driver')?.value;
+            const key = document.getElementById('setting-img-key')?.value;
+
+            const payload = {
+                image_generator_driver: driver,
+                unsplash_access_key: key
+            };
+
+            await apiRequest('/api/v1/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }, {
+                submitBtn: btn,
+                successTitle: "Settings Saved",
+                successMessage: "Global system configurations saved successfully!",
+                defaultErrorMessage: "Failed to save system settings."
+            });
+        };
+
+        window.fetchSystemSettings = async function() {
+            try {
+                const res = await apiFetch('/api/v1/settings');
+                if (res.ok) {
+                    const result = await res.json();
+                    const settings = result.settings || {};
+
+                    const imgDriver = document.getElementById('setting-img-driver');
+                    const imgKey = document.getElementById('setting-img-key');
+                    if (imgDriver) imgDriver.value = settings.image_generator_driver || 'pollinations';
+                    if (imgKey) imgKey.value = settings.unsplash_access_key || '';
+
+                    window.toggleImageDriverKeyField();
+                }
+            } catch (err) {
+                console.error("Error loading system settings:", err);
+            }
+        };
+
+        window.toggleImageDriverKeyField = function() {
+            const driver = document.getElementById('setting-img-driver')?.value;
+            const keyContainer = document.getElementById('img-driver-key-container');
+            const keyLabel = document.getElementById('img-driver-key-label');
+            const keyInput = document.getElementById('setting-img-key');
+
+            if (driver === 'unsplash') {
+                if (keyContainer) keyContainer.classList.remove('hidden');
+                if (keyLabel) keyLabel.innerText = "Unsplash Access Key";
+                if (keyInput) keyInput.placeholder = "Paste Unsplash Access Key...";
+            } else if (driver === 'dalle') {
+                if (keyContainer) keyContainer.classList.remove('hidden');
+                if (keyLabel) keyLabel.innerText = "OpenAI DALL-E Key (optional)";
+                if (keyInput) keyInput.placeholder = "Uses OpenAI provider key if left blank...";
+            } else {
+                if (keyContainer) keyContainer.classList.add('hidden');
+            }
+        };
 
         // Simulate settings health verification test
         function triggerSystemHealthTestSimulation() {
@@ -3495,6 +3570,21 @@
         // ─── Content Generation form validation ─────────────────────────────
         window.populatePipelineSelections = async function() {
             try {
+                // 0. Fetch Connected Websites
+                const sitesRes = await apiFetch('/api/v1/sites');
+                if (sitesRes.ok) {
+                    const sitesResult = await sitesRes.json();
+                    const sites = sitesResult.data || sitesResult;
+                    const select = document.getElementById('gen-site');
+                    if (select) {
+                        select.innerHTML = '<option value="">— Select Target Site —</option>';
+                        sites.forEach(s => {
+                            const cleanUrl = s.domain_url.replace(/https?:\/\//, '');
+                            select.innerHTML += `<option value="${s.id}">${cleanUrl}</option>`;
+                        });
+                    }
+                }
+
                 // 1. Fetch AI Providers
                 const providersRes = await apiFetch('/api/v1/providers');
                 if (providersRes.ok) {
@@ -3517,28 +3607,23 @@
                     const select = document.getElementById('gen-prompt');
                     if (select) {
                         select.innerHTML = '<option value="">— Select Template —</option>';
+                        let defaultId = "";
                         prompts.forEach(p => {
                             select.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+                            if (p.name === 'Standard News') {
+                                defaultId = p.id;
+                            }
                         });
+                        if (defaultId) {
+                            select.value = defaultId;
+                        } else if (prompts.length > 0) {
+                            select.value = prompts[0].id;
+                        }
                     }
                 }
 
-                // 3. Fetch Topics
-                const topicsRes = await apiFetch('/api/v1/topics');
-                if (topicsRes.ok) {
-                    const topicsResult = await topicsRes.json();
-                    const topics = topicsResult.data || topicsResult;
-                    const select = document.getElementById('gen-topic');
-                    if (select) {
-                        select.innerHTML = '<option value="">— Select Topic —</option>';
-                        topics.forEach(t => {
-                            const isActive = t.status === 'active';
-                            const disabledAttr = isActive ? '' : 'disabled';
-                            const suffix = isActive ? '' : ` (${t.status})`;
-                            select.innerHTML += `<option value="${t.id}" ${disabledAttr}>${t.name}${suffix}</option>`;
-                        });
-                    }
-                }
+                // Initial validation check
+                validatePipelineForm();
 
                 // 4. Fetch Recent Generation Runs
                 await fetchRecentRuns();
@@ -3576,14 +3661,14 @@
                             statusClass = "bg-danger/20 text-danger border-danger/30";
                         }
 
-                        const topicName = article.topic ? (article.topic.name || 'General') : 'General';
+                        const categoryLabel = article.news_category ? article.news_category.charAt(0).toUpperCase() + article.news_category.slice(1) : (article.topic ? (article.topic.name || 'General') : 'General');
                         const siteUrl = article.site ? article.site.domain_url.replace(/https?:\/\//, '') : '—';
                         const titleText = article.title || 'Untitled Article';
 
                         tr.innerHTML = `
                             <td class="p-3 pl-5 text-text font-medium truncate max-w-[200px]" title="${titleText}">${titleText}</td>
                             <td class="p-3 text-muted">${siteUrl}</td>
-                            <td class="p-3 text-muted">${topicName}</td>
+                            <td class="p-3 text-muted">${categoryLabel}</td>
                             <td class="p-3"><span class="px-2 py-0.5 rounded border text-[9px] ${statusClass}">${article.status}</span></td>
                             <td class="p-3 text-right pr-5">
                                 <button onclick="previewArticleText(${article.id})" class="text-secondary hover:underline mr-3">Preview</button>
@@ -3601,19 +3686,21 @@
         let lastGeneratedText = '';
         let lastGeneratedTitle = '';
 
-        window.triggerContentGeneration = async function() {
-            const provider = document.getElementById('gen-provider')?.value;
-            const prompt_id = document.getElementById('gen-prompt')?.value;
-            const topic_id = document.getElementById('gen-topic')?.value;
-            const lang = document.getElementById('gen-language')?.value;
-            const output = document.getElementById('gen-output');
-            const badge = document.getElementById('gen-status-badge');
-            const container = document.getElementById('gen-preview-container');
-            const generateBtn = document.getElementById('generate-btn');
-            const copyBtn = document.getElementById('btn-copy-gen');
-            const queueBtn = document.getElementById('btn-queue-gen');
 
-            if (!provider || !prompt_id || !topic_id) return;
+        window.triggerContentGeneration = async function() {
+            const siteId   = document.getElementById('gen-site')?.value;
+            const provider = document.getElementById('gen-provider')?.value;
+            const category = document.getElementById('gen-category')?.value;
+            const promptId = document.getElementById('gen-prompt')?.value;
+            const lang     = document.getElementById('gen-language')?.value;
+            const output   = document.getElementById('gen-output');
+            const badge    = document.getElementById('gen-status-badge');
+            const container   = document.getElementById('gen-preview-container');
+            const generateBtn = document.getElementById('generate-btn');
+            const copyBtn     = document.getElementById('btn-copy-gen');
+            const queueBtn    = document.getElementById('btn-queue-gen');
+
+            if (!siteId || !provider || !category || !promptId) return;
 
             if (container) container.classList.remove('hidden');
             if (badge) badge.classList.remove('hidden');
@@ -3621,32 +3708,17 @@
             if (copyBtn) copyBtn.disabled = true;
             if (queueBtn) queueBtn.disabled = true;
 
-            if (output) output.innerHTML = '<div class="flex items-center gap-2"><span class="material-symbols-outlined text-warning animate-spin text-base">autorenew</span><span>Synthesizing article content via LLM driver...</span></div>';
+            if (output) output.innerHTML = '<div class="flex items-center gap-2"><span class="material-symbols-outlined text-warning animate-spin text-base">autorenew</span><span>Synthesizing news content via AI pipeline...</span></div>';
 
             try {
-                const sitesRes = await apiFetch('/api/v1/sites');
-                if (!sitesRes.ok) throw new Error("Could not fetch sites");
-                const sites = await sitesRes.json();
-                const sitesList = sites.data || sites;
-                
-                if (sitesList.length === 0) {
-                    showError("No WordPress Sites Connected", "Please register and configure at least one WordPress website under the Sites panel first.");
-                    if (badge) badge.classList.add('hidden');
-                    if (generateBtn) generateBtn.disabled = false;
-                    if (copyBtn) copyBtn.disabled = false;
-                    if (queueBtn) queueBtn.disabled = false;
-                    return;
-                }
-                
-                const siteId = sitesList[0].id; // Use first connected site
-
-                // Create a pipeline on the fly
+                // Create pipeline directly with news_category — no topic needed
                 const pipelinePayload = {
-                    site_id: siteId,
-                    topic_id: parseInt(topic_id),
-                    prompt_id: parseInt(prompt_id),
+                    site_id:        parseInt(siteId),
+                    news_category:  category,
+                    prompt_id:      parseInt(promptId),
                     ai_provider_id: parseInt(provider),
-                    is_active: true
+                    language:       lang || 'en',
+                    is_active:      true
                 };
 
                 const createPipeRes = await apiFetch('/api/v1/pipelines', {
@@ -3738,12 +3810,95 @@
                 const article = result.data || result;
 
                 const safeTitle = (article.title || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                const safeContent = (article.content || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const safeContent = article.content || '';
+
+                let meta = {};
+                if (article.metadata) {
+                    try {
+                        meta = typeof article.metadata === 'string' ? JSON.parse(article.metadata) : article.metadata;
+                    } catch (e) {
+                        meta = {};
+                    }
+                }
+
+                const isDark = document.documentElement.classList.contains('dark');
+                const contentBg = isDark ? 'bg-[#071018] text-[#F8FAFC]' : 'bg-slate-100 text-slate-800';
+                const cardBg = isDark ? 'bg-[#071018]/50' : 'bg-slate-100/50';
+                const textMuted = isDark ? 'text-muted' : 'text-slate-500';
+                const textPrimary = isDark ? 'text-text' : 'text-slate-800';
+                const borderClass = isDark ? 'border-border' : 'border-slate-200';
 
                 Swal.fire({
                     title: safeTitle,
-                    html: `<div class="text-left text-xs font-mono max-h-[300px] overflow-y-auto custom-scrollbar p-3 bg-[#071018] text-[#F8FAFC] border border-border rounded-xl">${safeContent}</div>`,
-                    width: '600px',
+                    html: `
+                        <style>
+                            .rendered-content-preview img {
+                                max-width: 100%;
+                                height: auto;
+                                border-radius: 8px;
+                                margin: 8px 0;
+                            }
+                            .rendered-content-preview p {
+                                margin-bottom: 8px;
+                                line-height: 1.5;
+                            }
+                        </style>
+                        <div class="space-y-4 text-left text-xs font-mono">
+                            <div class="glass-surface border ${borderClass} p-3 rounded-xl ${contentBg}">
+                                <h5 class="text-[10px] text-accent uppercase tracking-wider mb-2 font-bold">Article Content</h5>
+                                <div class="max-h-[220px] overflow-y-auto custom-scrollbar pr-1 rendered-content-preview">${safeContent}</div>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-3">
+                                <!-- Fact Audit & SEO -->
+                                <div class="glass-surface border ${borderClass} p-3 rounded-xl ${cardBg}">
+                                    <h5 class="text-[10px] text-secondary uppercase tracking-wider mb-2 font-bold">AI Auditing &amp; SEO</h5>
+                                    <div class="space-y-1.5 text-[11px]">
+                                        <div class="flex justify-between">
+                                            <span class="${textMuted}">Fact Audit Score:</span>
+                                            <span class="text-success font-bold">${meta.fact_audit?.fact_score ?? 100}%</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="${textMuted}">Claims Verified:</span>
+                                            <span class="${textPrimary}">${(meta.fact_audit?.supported_claims || []).length} / ${((meta.fact_audit?.supported_claims || []).length + (meta.fact_audit?.unsupported_claims || []).length) || 0}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="${textMuted}">References Cited:</span>
+                                            <span class="${textPrimary}">${(meta.fact_audit?.references || []).length}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="${textMuted}">SEO Slug:</span>
+                                            <span class="${textPrimary} truncate max-w-[120px]">${meta.seo?.slug || 'N/A'}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="${textMuted}">Focus Keywords:</span>
+                                            <span class="${textPrimary} truncate max-w-[120px]">${(meta.seo?.focus_keywords || []).slice(0, 2).join(', ') || 'N/A'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Extracted Entities -->
+                                <div class="glass-surface border ${borderClass} p-3 rounded-xl ${cardBg}">
+                                    <h5 class="text-[10px] text-warning uppercase tracking-wider mb-2 font-bold">Source Intelligence</h5>
+                                    <div class="space-y-1.5 text-[10px]">
+                                        <div>
+                                            <span class="${textMuted}">People:</span>
+                                            <span class="${textPrimary} block truncate">${(meta.extracted_facts?.people || []).slice(0, 3).join(', ') || 'None'}</span>
+                                        </div>
+                                        <div>
+                                            <span class="${textMuted}">Orgs:</span>
+                                            <span class="${textPrimary} block truncate">${(meta.extracted_facts?.organizations || []).slice(0, 3).join(', ') || 'None'}</span>
+                                        </div>
+                                        <div>
+                                            <span class="${textMuted}">Locs:</span>
+                                            <span class="${textPrimary} block truncate">${(meta.extracted_facts?.locations || []).slice(0, 3).join(', ') || 'None'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `,
+                    width: '650px',
                     confirmButtonText: 'Close',
                     confirmButtonColor: '#059669',
                     background: document.documentElement.classList.contains('dark') ? '#0f172a' : '#ffffff',
@@ -3790,13 +3945,25 @@
         };
 
         // Enable generate button only when all required fields are set
-        document.addEventListener('change', function(e) {
-            if (!e.target.matches('#node-pipeline select')) return;
+        function validatePipelineForm() {
+            const site     = document.getElementById('gen-site')?.value;
             const provider = document.getElementById('gen-provider')?.value;
+            const category = document.getElementById('gen-category')?.value;
             const prompt   = document.getElementById('gen-prompt')?.value;
-            const topic    = document.getElementById('gen-topic')?.value;
             const btn      = document.getElementById('generate-btn');
-            if (btn) btn.disabled = !(provider && prompt && topic);
+            if (btn) btn.disabled = !(site && provider && category && prompt);
+        }
+
+        document.addEventListener('change', function(e) {
+            if (e.target.matches('#node-pipeline select, #node-pipeline input')) {
+                validatePipelineForm();
+            }
+        });
+
+        document.addEventListener('input', function(e) {
+            if (e.target.matches('#node-pipeline input')) {
+                validatePipelineForm();
+            }
         });
 
         // Insert prompt placeholder variable chip into textarea at current cursor position
@@ -4131,6 +4298,46 @@
                 }
             );
         };
+
+        // Sign Out Logic
+        window.triggerLogout = async function() {
+            showConfirmation(
+                "Sign Out",
+                "Are you sure you want to log out of the platform?",
+                async () => {
+                    try {
+                        const res = await apiFetch('/api/v1/auth/logout', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                        if (res.ok) {
+                            showSuccess("Signed Out", "You have been successfully logged out.");
+                            setTimeout(() => {
+                                window.location.href = '/login';
+                            }, 1000);
+                        } else {
+                            window.location.href = '/login';
+                        }
+                    } catch (err) {
+                        console.error("Logout error:", err);
+                        window.location.href = '/login';
+                    }
+                }
+            );
+        };
+
+        // Client-side protections to prevent casual inspection and layout modifications
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'F12') {
+                e.preventDefault();
+            }
+            if (e.ctrlKey && (e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j') || e.key === 'U' || e.key === 'u')) {
+                e.preventDefault();
+            }
+        });
 
     </script>
 

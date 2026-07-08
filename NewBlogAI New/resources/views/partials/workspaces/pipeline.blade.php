@@ -1,9 +1,9 @@
-                <!-- CONTENT GENERATION PIPELINE WORKSPACE -->
+                <!-- NEWS GENERATION PIPELINE WORKSPACE -->
                 <div id="node-pipeline" class="workspace-pane space-y-6 hidden">
                     <div class="flex justify-between items-center">
                         <div>
-                            <h2 class="font-display font-bold text-2xl">Content Generation Pipeline</h2>
-                            <p class="text-xs text-muted">Generate AI articles by selecting a provider, prompt template, and topic. Manage providers and prompts in their respective modules.</p>
+                            <h2 class="font-display font-bold text-2xl">News Generation Pipeline</h2>
+                            <p class="text-xs text-muted">Generate authentic, verified news articles by selecting a provider, category, and news subject.</p>
                         </div>
                     </div>
 
@@ -12,6 +12,15 @@
                         <div class="col-span-5 space-y-4">
                             <div class="glass-surface rounded-2xl p-5 space-y-4">
                                 <h4 class="text-xs font-mono uppercase tracking-widest text-muted">Generation Settings</h4>
+
+                                 <!-- Target Website -->
+                                <div class="space-y-1">
+                                    <label class="block text-[10px] font-mono text-muted uppercase tracking-widest" for="gen-site">Target Website</label>
+                                    <select id="gen-site" class="w-full bg-background border border-border text-text text-xs rounded-xl py-2 px-3 focus:outline-none focus:border-accent">
+                                        <option value="">— Select Target Site —</option>
+                                    </select>
+                                    <p class="text-[10px] text-muted">Configure websites in <button onclick="switchWorkspace('sites')" class="text-accent underline">Websites</button>.</p>
+                                </div>
 
                                 <!-- Provider -->
                                 <div class="space-y-1">
@@ -28,30 +37,31 @@
                                     <p class="text-[10px] text-muted">Configure providers in <button onclick="switchWorkspace('providers')" class="text-accent underline">AI Providers</button>.</p>
                                 </div>
 
+                                <!-- News Category -->
+                                <div class="space-y-1">
+                                    <label class="block text-[10px] font-mono text-muted uppercase tracking-widest" for="gen-category">News Category</label>
+                                    <select id="gen-category" class="w-full bg-background border border-border text-text text-xs rounded-xl py-2 px-3 focus:outline-none focus:border-accent">
+                                        <option value="global">Global</option>
+                                        <option value="trending">Trending</option>
+                                        <option value="local">Local</option>
+                                        <option value="technology">Technology</option>
+                                        <option value="business">Business</option>
+                                        <option value="politics">Politics</option>
+                                        <option value="sports">Sports</option>
+                                        <option value="health">Health</option>
+                                    </select>
+                                    <p class="text-[10px] text-muted">Select the news classification and tone.</p>
+                                </div>
+
                                 <!-- Prompt Template -->
                                 <div class="space-y-1">
                                     <label class="block text-[10px] font-mono text-muted uppercase tracking-widest">Prompt Template</label>
                                     <select id="gen-prompt" class="w-full bg-background border border-border text-text text-xs rounded-xl py-2 px-3 focus:outline-none focus:border-accent">
                                         <option value="">— Select Template —</option>
-                                        <option value="tech_summarizer">Standard Tech Summarizer</option>
-                                        <option value="bullet_writer">News Bullet-point Writer</option>
-                                        <option value="trend_analyst">Financial Trends Analyst</option>
                                     </select>
                                     <p class="text-[10px] text-muted">Create templates in <button onclick="switchWorkspace('prompts')" class="text-accent underline">Prompt Library</button>.</p>
                                 </div>
 
-                                <!-- Topic -->
-                                <div class="space-y-1">
-                                    <label class="block text-[10px] font-mono text-muted uppercase tracking-widest">Topic</label>
-                                    <select id="gen-topic" class="w-full bg-background border border-border text-text text-xs rounded-xl py-2 px-3 focus:outline-none focus:border-accent">
-                                        <option value="">— Select Topic —</option>
-                                        <option value="ai">Artificial Intelligence</option>
-                                        <option value="saas">SaaS Automations</option>
-                                        <option value="crypto">Cryptocurrency Markets</option>
-                                        <option value="tech_trends">Tech Trends</option>
-                                    </select>
-                                    <p class="text-[10px] text-muted">Manage topics in <button onclick="switchWorkspace('topics')" class="text-accent underline">Topic Management</button>.</p>
-                                </div>
 
                                 <!-- Language -->
                                 <div class="space-y-1">
@@ -70,9 +80,9 @@
                                 <!-- Generate Button -->
                                 <button id="generate-btn" onclick="triggerContentGeneration()" class="w-full bg-accent hover:bg-accent/80 text-background font-medium text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-2 cyber-glow-emerald mt-2" disabled>
                                     <span class="material-symbols-outlined text-sm">auto_awesome</span>
-                                    Generate Article
+                                    Generate News
                                 </button>
-                                <p class="text-[10px] text-muted text-center">Select provider, template, and topic to enable generation.</p>
+                                <p class="text-[10px] text-muted text-center">Select site, provider, category, and template to enable generation.</p>
                             </div>
                         </div>
 
@@ -104,7 +114,7 @@
                                 <table class="w-full text-left border-collapse">
                                     <thead>
                                         <tr class="bg-surface/50 border-b border-border text-muted font-mono text-[10px] uppercase">
-                                            <th class="p-3 pl-5">Topic</th>
+                                            <th class="p-3 pl-5">Category</th>
                                             <th class="p-3">Provider</th>
                                             <th class="p-3">Template</th>
                                             <th class="p-3">Status</th>

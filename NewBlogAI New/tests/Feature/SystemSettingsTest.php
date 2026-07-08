@@ -59,16 +59,25 @@ class SystemSettingsTest extends TestCase
                 'language' => 'hi',
                 'ai_default_provider' => 'gemini',
                 'ai_default_model' => 'gemini-2.0-flash',
+                'image_generator_driver' => 'unsplash',
+                'unsplash_access_key' => 'my-unsplash-key',
             ]);
 
         $response->assertStatus(200)
             ->assertJsonPath('settings.currency', 'INR')
             ->assertJsonPath('settings.timezone', 'Asia/Kolkata')
-            ->assertJsonPath('settings.language', 'hi');
+            ->assertJsonPath('settings.language', 'hi')
+            ->assertJsonPath('settings.image_generator_driver', 'unsplash')
+            ->assertJsonPath('settings.unsplash_access_key', 'my-unsplash-key');
 
         $this->assertDatabaseHas('settings', [
             'key' => 'currency',
             'value' => json_encode('INR'),
+        ]);
+
+        $this->assertDatabaseHas('settings', [
+            'key' => 'image_generator_driver',
+            'value' => json_encode('unsplash'),
         ]);
     }
 

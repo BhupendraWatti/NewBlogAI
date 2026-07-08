@@ -13,7 +13,7 @@ class PromptEngine
      */
     public function compileSystemPrompt(array $options = []): string
     {
-        return $options['persona'] ?? 'You are a professional, expert copywriter and assistant. Your role is to write high-quality, engaging, and SEO-optimized content based on the provided research context, user prompt, and instructions.';
+        return $options['persona'] ?? 'You are a professional news journalist and editor. Your role is to write accurate, well-researched, and engaging news articles based on the provided research context and editorial guidelines. Always report facts objectively, attribute claims to sources, and write in a clear journalistic style appropriate for a global online news publication.';
     }
 
     /**
@@ -108,16 +108,16 @@ class PromptEngine
     {
         $instructions = [];
 
-        // Language translations guidelines
+        // Language guidelines
         $language = $context->metadata['language'] ?? $context->pipeline->language ?? null;
         if ($language) {
-            $instructions[] = "Language: The content must be written in language code '{$language}'.";
+            $instructions[] = "Language: The news article must be written in language code '{$language}'.";
         }
 
-        // Locale target
-        $locale = $context->metadata['locale'] ?? $context->metadata['target_locale'] ?? null;
-        if ($locale) {
-            $instructions[] = "Locale: Target audience locale is '{$locale}'. Adhere to regional spelling conventions, terminology, and formatting style.";
+        // Category context
+        $category = $context->metadata['news_category'] ?? $context->pipeline->news_category ?? null;
+        if ($category) {
+            $instructions[] = "News Category: This is a '{$category}' category news article. Adopt the appropriate tone and framing for this category.";
         }
 
         // Style guides
@@ -150,10 +150,10 @@ class PromptEngine
      */
     public function compileOutputInstructions(array $options = []): string
     {
-        $instructions = $options['instructions'] ?? "Format the article using clean, readable Markdown. Use appropriate headings (e.g. H2, H3) to structure the content. Do not output HTML tags, and do not wrap the content in standard markdown code blocks (e.g. ```markdown ... ```). The output should be the raw markdown content of the article itself.";
+        $instructions = $options['instructions'] ?? "Format the news article using clean, readable Markdown. Structure with a compelling headline (# H1), a concise lead paragraph answering Who/What/When/Where/Why, followed by supporting sections (## H2 subheadings). Use short paragraphs (2-3 sentences). Include a 'Key Takeaways' bullet list at the end. Do not output HTML tags. Do not wrap in markdown code blocks. Output only the raw Markdown content of the news article.";
         
         if (isset($options['additional_output_instructions'])) {
-            $instructions .= " " . $options['additional_output_instructions'];
+            $instructions .= ' '.$options['additional_output_instructions'];
         }
 
         return $instructions;

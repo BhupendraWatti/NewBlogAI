@@ -9,7 +9,6 @@ use App\Modules\ContentPipeline\Models\PipelineRun;
 use App\Modules\PromptManager\Models\Prompt;
 use App\Modules\SiteManager\Models\Site;
 use App\Modules\SubscriptionManager\Services\EntitlementService;
-use App\Modules\TopicManager\Models\Topic;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -17,6 +16,13 @@ use InvalidArgumentException;
 
 class PipelineService
 {
+    /** Allowed news categories for pipeline generation. */
+    public const VALID_CATEGORIES = [
+        'global', 'trending', 'local', 'technology',
+        'business', 'politics', 'sports', 'health',
+        'science', 'entertainment',
+    ];
+
     public function __construct(protected EntitlementService $entitlements) {}
 
     /**
@@ -24,7 +30,7 @@ class PipelineService
      */
     public function getPaginated(array $filters, int $limit = 15): LengthAwarePaginator
     {
-        $query = ContentPipeline::query()->with(['site', 'topic', 'prompt', 'provider']);
+        $query = ContentPipeline::query()->with(['site', 'prompt', 'provider']);
 
         if (! empty($filters['site_id'])) {
             $query->where('site_id', $filters['site_id']);
@@ -97,7 +103,7 @@ class PipelineService
                 // Create execution history entry
                 $run = PipelineRun::create([
                     'pipeline_id' => $pipeline->id,
-                    'status' => 'queued',
+                    'status'      => 'queued',
                 ]);
 
                 // Update pipeline status
@@ -129,7 +135,7 @@ class PipelineService
             return DB::transaction(function () use ($pipeline, $run) {
                 $newRun = PipelineRun::create([
                     'pipeline_id' => $pipeline->id,
-                    'status' => 'queued',
+                    'status'      => 'queued',
                     'retry_count' => $run->retry_count + 1,
                 ]);
 
@@ -167,6 +173,7 @@ class PipelineService
 
     /**
      * Validate active dependencies in the database.
+     * Topic is no longer required — pipelines are driven by news_category.
      */
     protected function validateDependencies(array $data): void
     {
@@ -179,13 +186,10 @@ class PipelineService
             throw new InvalidArgumentException('Referenced Website is inactive/disabled.');
         }
 
-        // 2. Validate active topic
-        $topic = Topic::find($data['topic_id']);
-        if (! $topic) {
-            throw new InvalidArgumentException('Referenced Topic does not exist.');
-        }
-        if ($topic->status !== 'active') {
-            throw new InvalidArgumentException("Referenced Topic is not active (currently in '{$topic->status}' status).");
+        // 2. Validate news_category value
+        $category = strtolower(trim($data['news_category'] ?? ''));
+        if (empty($category) || ! in_array($category, self::VALID_CATEGORIES, true)) {
+            throw new InvalidArgumentException('Invalid or missing news category. Allowed: '.implode(', ', self::VALID_CATEGORIES).'.');
         }
 
         // 3. Validate prompt template
@@ -210,14 +214,5 @@ class PipelineService
         }
 
         $this->entitlements->assertProviderAvailable($site, $provider->provider_key);
-
-        $subscription = $this->entitlements->subscriptionForSite($site);
-        if ($subscription && $topic->subscription_id && $topic->subscription_id !== $subscription->id) {
-            throw new InvalidArgumentException('The selected topic is not owned by the website subscription.');
-        }
-
-        if ($prompt->topic_id && $prompt->topic_id !== $topic->id) {
-            throw new InvalidArgumentException('The selected prompt does not belong to the selected topic.');
-        }
     }
 }

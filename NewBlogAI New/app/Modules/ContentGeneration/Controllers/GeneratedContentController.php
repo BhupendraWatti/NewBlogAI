@@ -44,7 +44,7 @@ class GeneratedContentController extends Controller
      */
     public function show(string $id): GeneratedContentResource
     {
-        $content = $this->findContentOrFail($id, ['site', 'topic', 'pipeline', 'revisions']);
+        $content = $this->findContentOrFail($id, ['site', 'pipeline', 'revisions']);
 
         return new GeneratedContentResource($content);
     }
@@ -61,7 +61,7 @@ class GeneratedContentController extends Controller
             Auth::id()
         );
 
-        return new GeneratedContentResource($updated->load(['site', 'topic', 'revisions']));
+        return new GeneratedContentResource($updated->load(['site', 'revisions']));
     }
 
     /**
@@ -72,7 +72,7 @@ class GeneratedContentController extends Controller
         $content = $this->findContentOrFail($id);
         $updated = $this->generationService->updateStatus($content, $request->input('status'));
 
-        return new GeneratedContentResource($updated->load(['site', 'topic']));
+        return new GeneratedContentResource($updated->load(['site']));
     }
 
     /**

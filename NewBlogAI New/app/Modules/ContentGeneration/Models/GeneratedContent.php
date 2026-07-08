@@ -4,7 +4,6 @@ namespace App\Modules\ContentGeneration\Models;
 
 use App\Modules\ContentPipeline\Models\ContentPipeline;
 use App\Modules\SiteManager\Models\Site;
-use App\Modules\TopicManager\Models\Topic;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -38,10 +37,6 @@ class GeneratedContent extends Model
         return $this->belongsTo(Site::class, 'site_id');
     }
 
-    public function topic(): BelongsTo
-    {
-        return $this->belongsTo(Topic::class, 'topic_id');
-    }
 
     public function revisions(): HasMany
     {

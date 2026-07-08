@@ -1,4 +1,4 @@
-﻿                <!-- 18. SYSTEM SETTINGS WORKSPACE -->
+                <!-- 18. SYSTEM SETTINGS WORKSPACE -->
                 <div id="node-settings" class="workspace-pane space-y-6 hidden">
                     <div class="flex justify-between items-center">
                         <div>
@@ -9,7 +9,7 @@
                             <button onclick="triggerSystemHealthTestSimulation()" class="bg-surface hover:bg-surface/80 border border-border text-text font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5">
                                 <span class="material-symbols-outlined text-sm">health_and_safety</span> Run Health Test
                             </button>
-                            <button onclick="triggerSystemSaveSimulation()" class="bg-accent hover:bg-accent/80 text-background font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 cyber-glow-emerald">
+                            <button onclick="triggerSystemSaveSimulation(this)" class="bg-accent hover:bg-accent/80 text-background font-medium text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 cyber-glow-emerald">
                                 <span class="material-symbols-outlined text-sm font-bold">save</span> Save System Config
                             </button>
                         </div>
@@ -62,6 +62,26 @@
                                     <div class="space-y-1">
                                         <label class="text-[10px] text-muted uppercase">Maximum token threshold</label>
                                         <input class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent" type="number" value="4096"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="glass-surface rounded-2xl p-5 space-y-4 max-w-2xl bg-surface/30">
+                            <h3 class="text-xs font-mono uppercase tracking-widest text-accent">Image Generator Settings</h3>
+                            <div class="space-y-3 font-mono text-xs">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="space-y-1">
+                                        <label class="text-[10px] text-muted uppercase">Image Generator Driver</label>
+                                        <select id="setting-img-driver" onchange="toggleImageDriverKeyField()" class="w-full bg-[#071018] border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent">
+                                            <option value="pollinations">Pollinations (Free / No Key)</option>
+                                            <option value="unsplash">Unsplash API</option>
+                                            <option value="dalle">OpenAI DALL-E</option>
+                                        </select>
+                                    </div>
+                                    <div class="space-y-1" id="img-driver-key-container">
+                                        <label class="text-[10px] text-muted uppercase" id="img-driver-key-label">API Key / Access Key</label>
+                                        <input id="setting-img-key" class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent" type="password" placeholder="Key value..."/>
                                     </div>
                                 </div>
                             </div>
