@@ -3,6 +3,7 @@
 namespace App\Modules\ContentPipeline\Services;
 
 use App\Modules\AIProviderManager\Models\AIProvider;
+use App\Modules\ContentPipeline\Jobs\GenerateNewsCandidatesJob;
 use App\Modules\ContentPipeline\Jobs\ProcessPipelineJob;
 use App\Modules\ContentPipeline\Models\ContentPipeline;
 use App\Modules\ContentPipeline\Models\PipelineRun;
@@ -121,7 +122,42 @@ class PipelineService
     }
 
     /**
-     * Retry a failed pipeline run.
+     * Trigger a Coverage discovery run for a pipeline.
+     *
+     * Produces exactly 9 unique news candidates and stops at status 'ready'
+     * pending employee selection. Never generates full articles.
+     */
+    public function triggerDiscovery(ContentPipeline $pipeline): PipelineRun
+    {
+        if (! $pipeline->is_active) {
+            throw new InvalidArgumentException('Cannot run coverage discovery on an inactive content pipeline.');
+        }
+
+        $pipeline->loadMissing(['site', 'provider']);
+        $this->entitlements->assertCanGenerate($pipeline->site);
+        $this->entitlements->assertProviderAvailable($pipeline->site, $pipeline->provider->provider_key);
+
+        try {
+            return DB::transaction(function () use ($pipeline) {
+                $run = PipelineRun::create([
+                    'pipeline_id' => $pipeline->id,
+                    'status'      => 'queued',
+                    'run_type'    => PipelineRun::TYPE_DISCOVERY,
+                ]);
+
+                GenerateNewsCandidatesJob::dispatch($run->id);
+
+                return $run;
+            });
+        } catch (\Exception $e) {
+            Log::error('Failed to trigger coverage discovery run: '.$e->getMessage());
+            throw new \RuntimeException('Failed to queue coverage discovery run.', 0, $e);
+        }
+    }
+
+    /**
+     * Retry a failed pipeline run. Dispatches by run_type so both full
+     * generation and coverage discovery runs recover through the same API.
      */
     public function retryRun(PipelineRun $run): PipelineRun
     {
@@ -136,12 +172,17 @@ class PipelineService
                 $newRun = PipelineRun::create([
                     'pipeline_id' => $pipeline->id,
                     'status'      => 'queued',
+                    'run_type'    => $run->run_type ?? PipelineRun::TYPE_FULL,
                     'retry_count' => $run->retry_count + 1,
+                    'properties'  => $run->properties,
                 ]);
 
-                $pipeline->update(['status' => 'queued']);
-
-                ProcessPipelineJob::dispatch($newRun->id);
+                if ($newRun->isDiscovery()) {
+                    GenerateNewsCandidatesJob::dispatch($newRun->id);
+                } else {
+                    $pipeline->update(['status' => 'queued']);
+                    ProcessPipelineJob::dispatch($newRun->id);
+                }
 
                 return $newRun;
             });
