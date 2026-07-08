@@ -37,6 +37,11 @@ class GeneratedContent extends Model
         return $this->belongsTo(Site::class, 'site_id');
     }
 
+    public function topic(): BelongsTo
+    {
+        return $this->belongsTo(\App\Modules\TopicManager\Models\Topic::class, 'topic_id');
+    }
+
 
     public function revisions(): HasMany
     {

@@ -1,5 +1,17 @@
 # Changelog AI
 
+## [2026-07-09]
+### Added
+- **Phase 5: Enterprise Workspace & Team API (Increment 1)**
+  - Implemented HTTP layer for Workspace & Team management: added `StoreWorkspaceRequest`, `UpdateWorkspaceRequest`, `StoreEmployeeRequest`, `UpdateEmployeeRequest`, `WorkspaceResource`, `EmployeeResource`, and `WorkspaceController` with tenant isolation.
+  - Added new feature test suite `WorkspaceApiTest` verifying tenant isolation, Owner auto-assignment on workspace creation, user customer limits validation, and last-Owner deletion protection.
+  - Registered all 8 workspace and team routes in `routes/api.php` under auth middleware group.
+
+### Fixed
+- **Workspace Model**: Removed nonexistent phantom column `site_id` from `$fillable` array in `Workspace` model to prevent SQL unknown column mass assignment errors.
+- **GeneratedContent model**: Added the missing `topic()` belongsTo relationship method, fixing category resolution failure in `WordPressPublishingEnhancementTest`.
+- **Pipeline and Prompt Engine tests**: Refactored `PipelineServicesImplementationTest` and `PromptEngineImprovementTest` to use the updated newsroom category-based prompt schema rather than legacy copywriter/topic defaults, restoring 100% test suite compatibility.
+
 ## [2026-07-08]
 ### Added
 - **Phase 5: Newsroom Coverage Workflow (Coverage → 9 Candidates → Select One → Full Generation)**

@@ -55,3 +55,7 @@ Current features and code structure are working. Do not modify or refactor exist
 Rule 13
 
 Analytics dashboards and per-site analytics endpoints require plan-level analytics entitlement access (`analytics_access`), except for SuperAdmin/Support roles.
+
+Rule 14
+
+Workspace and employee team structures are isolated by Tenant (Customer). Adding team members requires workspace update authority and the user must belong to the same customer unless the acting user is a SuperAdmin/Admin. The last Owner of a workspace cannot be removed.

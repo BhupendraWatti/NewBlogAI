@@ -13,7 +13,6 @@ class Workspace extends Model
 
     protected $fillable = [
         'name',
-        'site_id',
         'customer_id',
     ];
 

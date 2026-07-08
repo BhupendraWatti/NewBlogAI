@@ -68,6 +68,7 @@ class PipelineServicesImplementationTest extends TestCase
             'prompt_id' => $this->prompt->id,
             'ai_provider_id' => $this->provider->id,
             'language' => 'en',
+            'news_category' => 'technology',
             'generation_type' => 'article',
             'is_active' => true,
         ]);
@@ -78,9 +79,6 @@ class PipelineServicesImplementationTest extends TestCase
         ]);
     }
 
-    /**
-     * Test the TopicResolverService resolves the expected topic, locale, and region info.
-     */
     public function test_topic_resolver_service(): void
     {
         $resolver = app(TopicResolverInterface::class);
@@ -89,8 +87,8 @@ class PipelineServicesImplementationTest extends TestCase
         $context = $resolver->handle($context);
 
         $this->assertFalse($context->hasErrors());
-        $this->assertEquals('Laravel 12 Features', $context->resolvedTopic);
-        $this->assertEquals('Tech', $context->metadata['resolved_topic_category']);
+        $this->assertEquals('latest technology news today', $context->resolvedTopic);
+        $this->assertEquals('Technology', $context->metadata['resolved_topic_category']);
         $this->assertEquals('en', $context->metadata['language']);
         $this->assertEquals('en-US', $context->metadata['locale']);
         $this->assertEquals('US', $context->metadata['region']);
@@ -110,7 +108,7 @@ class PipelineServicesImplementationTest extends TestCase
 
         $this->assertFalse($context->hasErrors());
         $this->assertNotEmpty($context->researchData['queries']);
-        $this->assertStringContainsString('Laravel 12 Features', $context->researchData['queries'][0]);
+        $this->assertStringContainsString('latest technology news today', $context->researchData['queries'][0]);
         $this->assertNotNull($context->researchData['researched_at']);
     }
 
@@ -175,8 +173,8 @@ class PipelineServicesImplementationTest extends TestCase
         $this->assertIsArray($facts['events']);
         $this->assertIsArray($facts['keywords']);
 
-        // Since it is 'Laravel 12 Features', let's check standard output contains some keywords
-        $this->assertContains('Laravel', $facts['keywords']);
+        // Since it is 'latest technology news today', let's check standard output contains some keywords
+        $this->assertContains('technology', $facts['keywords']);
     }
 
     /**

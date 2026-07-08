@@ -83,7 +83,7 @@ class PromptEngineImprovementTest extends TestCase
     {
         // Default system prompt
         $default = $this->promptEngine->compileSystemPrompt();
-        $this->assertStringContainsString('You are a professional, expert copywriter', $default);
+        $this->assertStringContainsString('You are a professional news journalist and editor', $default);
 
         // Custom system prompt override
         $custom = $this->promptEngine->compileSystemPrompt(['persona' => 'You are a minimalist tech writer.']);
@@ -166,15 +166,13 @@ class PromptEngineImprovementTest extends TestCase
     {
         $context = new PipelineContext($this->run, $this->pipeline);
         $context->metadata['language'] = 'fr';
-        $context->metadata['locale'] = 'fr-FR';
         $context->metadata['style_guide'] = 'Write in short paragraphs.';
         $context->metadata['tone'] = 'professional and technical';
         $context->metadata['dynamic_instructions'] = 'Add code examples where possible.';
 
         $compiled = $this->promptEngine->compileDynamicInstructions($context);
 
-        $this->assertStringContainsString("Language: The content must be written in language code 'fr'.", $compiled);
-        $this->assertStringContainsString("Locale: Target audience locale is 'fr-FR'.", $compiled);
+        $this->assertStringContainsString("Language: The news article must be written in language code 'fr'.", $compiled);
         $this->assertStringContainsString('Style Guide: Write in short paragraphs.', $compiled);
         $this->assertStringContainsString('Tone: Write with a professional and technical tone.', $compiled);
         $this->assertStringContainsString('Additional Guidelines: Add code examples where possible.', $compiled);
@@ -183,7 +181,7 @@ class PromptEngineImprovementTest extends TestCase
     public function test_compile_output_instructions_formats_markdown_instructions(): void
     {
         $default = $this->promptEngine->compileOutputInstructions();
-        $this->assertStringContainsString('Format the article using clean, readable Markdown.', $default);
+        $this->assertStringContainsString('Format the news article using clean, readable Markdown.', $default);
 
         $custom = $this->promptEngine->compileOutputInstructions([
             'additional_output_instructions' => 'Include a brief conclusion.'

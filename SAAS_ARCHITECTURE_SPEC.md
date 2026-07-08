@@ -301,6 +301,138 @@ erDiagram
 
 ---
 
+### C. Workspace & Employee Endpoints (Enterprise API)
+
+#### **1. List Workspaces**
+* **Method & Path**: `GET /api/v1/workspaces`
+* **Headers**: `Authorization: Bearer <access_token>`
+* **Parameters**: `customer_id` (optional, SuperAdmin only), `limit` (optional, default 15)
+* **Response (200 OK)**:
+  ```json
+  {
+    "data": [
+      {
+        "id": 1,
+        "name": "Production Workspace",
+        "customer_id": "uuid-string-here",
+        "sites": [],
+        "employees": [],
+        "created_at": "2026-07-09T03:00:00.000000Z",
+        "updated_at": "2026-07-09T03:00:00.000000Z"
+      }
+    ],
+    "links": {},
+    "meta": {}
+  }
+  ```
+
+#### **2. Create Workspace**
+* **Method & Path**: `POST /api/v1/workspaces`
+* **Headers**: `Authorization: Bearer <access_token>`
+* **Request Schema**:
+  ```json
+  {
+    "name": "New Team Workspace",
+    "customer_id": "uuid-string-here"
+  }
+  ```
+* **Response (201 Created)**:
+  ```json
+  {
+    "data": {
+      "id": 2,
+      "name": "New Team Workspace",
+      "customer_id": "uuid-string-here",
+      "sites": [],
+      "employees": [
+        {
+          "id": 5,
+          "workspace_id": 2,
+          "user_id": 12,
+          "role": "Owner"
+        }
+      ]
+    }
+  }
+  ```
+
+#### **3. List Workspace Employees**
+* **Method & Path**: `GET /api/v1/workspaces/{id}/employees`
+* **Headers**: `Authorization: Bearer <access_token>`
+* **Response (200 OK)**:
+  ```json
+  {
+    "data": [
+      {
+        "id": 5,
+        "workspace_id": 2,
+        "user_id": 12,
+        "role": "Owner",
+        "user": {
+          "id": 12,
+          "name": "Jane Doe",
+          "email": "jane@company.com"
+        }
+      }
+    ]
+  }
+  ```
+
+#### **4. Add Workspace Employee**
+* **Method & Path**: `POST /api/v1/workspaces/{id}/employees`
+* **Headers**: `Authorization: Bearer <access_token>`
+* **Request Schema**:
+  ```json
+  {
+    "user_id": 15,
+    "role": "Editor"
+  }
+  ```
+* **Response (201 Created)**:
+  ```json
+  {
+    "data": {
+      "id": 6,
+      "workspace_id": 2,
+      "user_id": 15,
+      "role": "Editor"
+    }
+  }
+  ```
+
+#### **5. Update Employee Role**
+* **Method & Path**: `PUT /api/v1/workspaces/{id}/employees/{employeeId}`
+* **Headers**: `Authorization: Bearer <access_token>`
+* **Request Schema**:
+  ```json
+  {
+    "role": "Admin"
+  }
+  ```
+* **Response (200 OK)**:
+  ```json
+  {
+    "data": {
+      "id": 6,
+      "workspace_id": 2,
+      "user_id": 15,
+      "role": "Admin"
+    }
+  }
+  ```
+
+#### **6. Remove Employee**
+* **Method & Path**: `DELETE /api/v1/workspaces/{id}/employees/{employeeId}`
+* **Headers**: `Authorization: Bearer <access_token>`
+* **Response (200 OK)**:
+  ```json
+  {
+    "message": "Employee removed from workspace."
+  }
+  ```
+
+---
+
 ## 6. Queue & Job Lifecycle Diagram
 
 The queue structure handles heavy processing tasks (AI completions, HTTP publication) outside of the HTTP request lifecycle.

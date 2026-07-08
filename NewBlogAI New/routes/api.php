@@ -7,6 +7,7 @@ use App\Modules\ContentGeneration\Controllers\GeneratedContentController;
 use App\Modules\ContentPipeline\Controllers\CoverageController;
 use App\Modules\ContentPipeline\Controllers\PipelineController;
 use App\Modules\CustomerManager\Controllers\CustomerController;
+use App\Modules\CustomerManager\Controllers\WorkspaceController;
 use App\Modules\Licensing\Controllers\LicenseController;
 use App\Modules\Operations\Controllers\OperationsController;
 use App\Modules\PromptManager\Controllers\PromptController;
@@ -61,6 +62,15 @@ Route::prefix('v1')->group(function () {
         Route::middleware('auth')->group(function () {
             Route::post('topics/{id}/restore', [TopicController::class, 'restore']);
             Route::apiResource('topics', TopicController::class);
+        });
+
+        // Workspace & Team Management (Enterprise)
+        Route::middleware('auth')->group(function () {
+            Route::get('workspaces/{id}/employees', [WorkspaceController::class, 'employees']);
+            Route::post('workspaces/{id}/employees', [WorkspaceController::class, 'addEmployee']);
+            Route::put('workspaces/{id}/employees/{employeeId}', [WorkspaceController::class, 'updateEmployee']);
+            Route::delete('workspaces/{id}/employees/{employeeId}', [WorkspaceController::class, 'removeEmployee']);
+            Route::apiResource('workspaces', WorkspaceController::class);
         });
 
         // Content Pipeline Routes

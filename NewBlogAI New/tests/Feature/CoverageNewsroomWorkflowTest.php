@@ -97,6 +97,7 @@ class CoverageNewsroomWorkflowTest extends TestCase
                 'model' => 'gpt-4o',
                 'site_id' => $this->site->id,
                 'status' => 'reserved',
+                'execution_time_ms' => 0,
             ]);
         });
         $this->app->instance(EntitlementService::class, $entitlements);
