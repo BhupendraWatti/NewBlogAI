@@ -4,18 +4,27 @@ namespace App\Modules\Analytics\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Analytics\Services\AnalyticsService;
+use App\Modules\CustomerManager\Models\Customer;
 use App\Modules\SiteManager\Models\Site;
+use App\Modules\SubscriptionManager\Exceptions\EntitlementDeniedException;
+use App\Modules\SubscriptionManager\Services\EntitlementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 
 class AnalyticsController extends Controller
 {
     public function __construct(
-        protected AnalyticsService $analyticsService
+        protected AnalyticsService $analyticsService,
+        protected EntitlementService $entitlements,
     ) {}
 
     /**
      * Helper to assert that user has access to the specified site's analytics.
+     *
+     * Enforces two layers, mirroring OperationsController:
+     * 1. Tenant isolation (non-superadmins may only access their own sites).
+     * 2. Billing entitlement (plan must include analytics_access).
+     *    SuperAdmins (role 1) bypass the entitlement gate.
      */
     protected function assertSiteAccess(int $siteId): void
     {
@@ -25,6 +34,18 @@ class AnalyticsController extends Controller
         // Standard tenant isolation check
         if ($user->role !== 1 && $site->customer_id !== $user->customer_id) {
             abort(403, 'Unauthorized access to site analytics.');
+        }
+
+        // Billing enforcement: analytics is a plan entitlement.
+        if ($user->role !== 1 && $site->customer_id) {
+            try {
+                $this->entitlements->assertFeatureEnabled(
+                    Customer::findOrFail($site->customer_id),
+                    'analytics',
+                );
+            } catch (EntitlementDeniedException $e) {
+                abort(403, $e->getMessage());
+            }
         }
     }
 

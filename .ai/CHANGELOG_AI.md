@@ -22,6 +22,8 @@
   - Aligned `PromptEngine` system instructions to news reporting and journalism styles, configuring raw markdown formatting defaults.
 
 ### Fixed
+- **Analytics billing entitlement**: Enforced paid plan entitlement access check (`analytics_access`) across all 8 per-site analytics endpoints in `AnalyticsController`. Standardized 403 response for non-entitled customers (SuperAdmin/Support role bypass remains).
+- **Optimized SQL aggregation in Analytics**: Replaced in-memory data filtering with SQL aggregates for success rate calculations (`getSuccessRateStats`) and publish failure aggregations (`getPublishFailures`) in `AnalyticsService`, avoiding database hydration memory leaks at scale.
 - **Research → Candidate → Fact Audit chain**: the selected `NewsCandidate` is now the authoritative input for full generation — its `source_references` are seeded as ranked context sources (verified by `FactAuditService`), and `ResearchService` anchors queries on the selected headline with a candidate snapshot in `researchData`. Legacy runs unchanged.
 - **Coverage retry lineage**: `PipelineService::retryRun()` re-points `news_candidates.full_run_id` at the new run so analytics, usage tracking and audit logs always reflect the final authoritative `PipelineRun`.
 - **Coverage endpoint authorization**: discovery, candidate listing and selection now enforce tenant ownership (platform roles 1/3 bypass; customer staff via `users.customer_id`; employees via workspace membership). Previously any authenticated user could operate on any pipeline.

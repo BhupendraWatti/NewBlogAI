@@ -51,3 +51,7 @@ Original database test data must be preserved. Do not clear database tables or r
 Rule 12
 
 Current features and code structure are working. Do not modify or refactor existing functional code unless implementing new specifications or fixing bugs.
+
+Rule 13
+
+Analytics dashboards and per-site analytics endpoints require plan-level analytics entitlement access (`analytics_access`), except for SuperAdmin/Support roles.

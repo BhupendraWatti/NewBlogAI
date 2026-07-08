@@ -144,21 +144,35 @@ class AnalyticsService
     /**
      * Computes success vs failure rates of pipeline runs and publishing attempts.
      *
+     * Uses SQL aggregation instead of hydrating rows to keep memory flat
+     * regardless of table size.
+     *
      * @param int $siteId
      * @return array
      */
     public function getSuccessRateStats(int $siteId): array
     {
-        $pipelineRuns = PipelineRun::whereHas('pipeline', function ($query) use ($siteId) {
-            $query->where('site_id', $siteId);
-        })->get();
+        $pipelineCounts = PipelineRun::query()
+            ->join('content_pipelines', 'pipeline_runs.pipeline_id', '=', 'content_pipelines.id')
+            ->where('content_pipelines.site_id', $siteId)
+            ->selectRaw(
+                "SUM(CASE WHEN pipeline_runs.status = 'completed' THEN 1 ELSE 0 END) as success_count, " .
+                "SUM(CASE WHEN pipeline_runs.status = 'failed' THEN 1 ELSE 0 END) as failed_count"
+            )
+            ->first();
 
-        $pipelineSuccess = $pipelineRuns->where('status', 'completed')->count();
-        $pipelineFailed = $pipelineRuns->where('status', 'failed')->count();
+        $publishingCounts = PublishingLog::query()
+            ->where('site_id', $siteId)
+            ->selectRaw(
+                "SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as success_count, " .
+                "SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_count"
+            )
+            ->first();
 
-        $publishingLogs = PublishingLog::where('site_id', $siteId)->get();
-        $publishingSuccess = $publishingLogs->where('status', 'completed')->count();
-        $publishingFailed = $publishingLogs->where('status', 'failed')->count();
+        $pipelineSuccess = (int) ($pipelineCounts->success_count ?? 0);
+        $pipelineFailed = (int) ($pipelineCounts->failed_count ?? 0);
+        $publishingSuccess = (int) ($publishingCounts->success_count ?? 0);
+        $publishingFailed = (int) ($publishingCounts->failed_count ?? 0);
 
         return [
             'success' => $pipelineSuccess + $publishingSuccess,
@@ -177,36 +191,46 @@ class AnalyticsService
     /**
      * Aggregates common error messages and count of failures from publishing_logs and pipeline_runs.
      *
+     * Grouping and counting are performed in SQL; only the (small) distinct
+     * error-message result set is merged in PHP.
+     *
      * @param int $siteId
      * @return array
      */
     public function getPublishFailures(int $siteId): array
     {
-        $pipelineFailures = PipelineRun::whereHas('pipeline', function ($query) use ($siteId) {
-            $query->where('site_id', $siteId);
-        })
-        ->where('status', 'failed')
-        ->whereNotNull('error_message')
-        ->where('error_message', '<>', '')
-        ->pluck('error_message')
-        ->toArray();
+        $pipelineFailures = PipelineRun::query()
+            ->join('content_pipelines', 'pipeline_runs.pipeline_id', '=', 'content_pipelines.id')
+            ->where('content_pipelines.site_id', $siteId)
+            ->where('pipeline_runs.status', 'failed')
+            ->whereNotNull('pipeline_runs.error_message')
+            ->where('pipeline_runs.error_message', '<>', '')
+            ->groupBy('pipeline_runs.error_message')
+            ->selectRaw('pipeline_runs.error_message as error_message, COUNT(*) as failure_count')
+            ->pluck('failure_count', 'error_message')
+            ->toArray();
 
-        $publishingFailures = PublishingLog::where('site_id', $siteId)
+        $publishingFailures = PublishingLog::query()
+            ->where('site_id', $siteId)
             ->where('status', 'failed')
             ->whereNotNull('error_message')
             ->where('error_message', '<>', '')
-            ->pluck('error_message')
+            ->groupBy('error_message')
+            ->selectRaw('error_message, COUNT(*) as failure_count')
+            ->pluck('failure_count', 'error_message')
             ->toArray();
 
-        $allFailures = array_merge($pipelineFailures, $publishingFailures);
-        $counts = array_count_values($allFailures);
+        $counts = $pipelineFailures;
+        foreach ($publishingFailures as $message => $count) {
+            $counts[$message] = ($counts[$message] ?? 0) + (int) $count;
+        }
         arsort($counts);
 
         $result = [];
         foreach ($counts as $msg => $count) {
             $result[] = [
                 'error' => $msg,
-                'count' => $count,
+                'count' => (int) $count,
             ];
         }
 

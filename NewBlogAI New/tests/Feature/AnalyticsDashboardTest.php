@@ -55,6 +55,7 @@ class AnalyticsDashboardTest extends TestCase
             'ai_providers_available' => ['openai', 'gemini'],
             'api_keys_allowed' => 10,
             'storage_limit' => 50000,
+            'analytics_access' => true,
             'status' => 'active',
         ]);
 
@@ -485,87 +486,62 @@ class AnalyticsDashboardTest extends TestCase
     public function test_category_coverage_stats(): void
     {
         // 1. CategoryEmpty
-        $topicEmpty = Topic::create([
-            'name' => 'Topic Empty',
-            'category' => 'CategoryEmpty',
-            'status' => 'active',
-        ]);
-        ContentPipeline::create([
+        $pipelineEmpty = ContentPipeline::create([
             'site_id' => $this->site1->id,
-            'topic_id' => $topicEmpty->id,
+            'news_category' => 'CategoryEmpty',
             'prompt_id' => Prompt::create(['name' => 'P1', 'prompt' => 'Text', 'category' => 'CategoryEmpty'])->id,
             'ai_provider_id' => $this->provider->id,
         ]);
 
         // 2. CategoryFresh
-        $topicFresh = Topic::create([
-            'name' => 'Topic Fresh',
-            'category' => 'CategoryFresh',
-            'status' => 'active',
-        ]);
-        ContentPipeline::create([
+        $pipelineFresh = ContentPipeline::create([
             'site_id' => $this->site1->id,
-            'topic_id' => $topicFresh->id,
+            'news_category' => 'CategoryFresh',
             'prompt_id' => Prompt::create(['name' => 'P2', 'prompt' => 'Text', 'category' => 'CategoryFresh'])->id,
             'ai_provider_id' => $this->provider->id,
         ]);
         GeneratedContent::create([
             'site_id' => $this->site1->id,
-            'topic_id' => $topicFresh->id,
+            'pipeline_id' => $pipelineFresh->id,
             'title' => 'Fresh Article',
             'content' => 'Content',
         ]);
 
         // 3. CategoryTrending (3 articles today)
-        $topicTrending = Topic::create([
-            'name' => 'Topic Trending',
-            'category' => 'CategoryTrending',
-            'status' => 'active',
-        ]);
-        ContentPipeline::create([
+        $pipelineTrending = ContentPipeline::create([
             'site_id' => $this->site1->id,
-            'topic_id' => $topicTrending->id,
+            'news_category' => 'CategoryTrending',
             'prompt_id' => Prompt::create(['name' => 'P3', 'prompt' => 'Text', 'category' => 'CategoryTrending'])->id,
             'ai_provider_id' => $this->provider->id,
         ]);
         for ($i = 0; $i < 3; $i++) {
             GeneratedContent::create([
                 'site_id' => $this->site1->id,
-                'topic_id' => $topicTrending->id,
+                'pipeline_id' => $pipelineTrending->id,
                 'title' => "Trending Article {$i}",
                 'content' => 'Content',
             ]);
         }
 
         // 4. CategoryStale (1 article 10 days ago)
-        $topicStale = Topic::create([
-            'name' => 'Topic Stale',
-            'category' => 'CategoryStale',
-            'status' => 'active',
-        ]);
-        ContentPipeline::create([
+        $pipelineStale = ContentPipeline::create([
             'site_id' => $this->site1->id,
-            'topic_id' => $topicStale->id,
+            'news_category' => 'CategoryStale',
             'prompt_id' => Prompt::create(['name' => 'P4', 'prompt' => 'Text', 'category' => 'CategoryStale'])->id,
             'ai_provider_id' => $this->provider->id,
         ]);
         $cStale = GeneratedContent::create([
             'site_id' => $this->site1->id,
-            'topic_id' => $topicStale->id,
+            'pipeline_id' => $pipelineStale->id,
             'title' => 'Stale Article',
             'content' => 'Content',
         ]);
         GeneratedContent::where('id', $cStale->id)->update(['created_at' => Carbon::now()->subDays(10)]);
 
         // Site 2 category (should be isolated)
-        $topicSite2 = Topic::create([
-            'name' => 'Topic Site 2',
-            'category' => 'CategorySite2Only',
-            'status' => 'active',
-        ]);
         ContentPipeline::create([
             'site_id' => $this->site2->id,
-            'topic_id' => $topicSite2->id,
+            'news_category' => 'CategorySite2Only',
             'prompt_id' => Prompt::create(['name' => 'P5', 'prompt' => 'Text', 'category' => 'CategorySite2Only'])->id,
             'ai_provider_id' => $this->provider->id,
         ]);
@@ -729,6 +705,78 @@ class AnalyticsDashboardTest extends TestCase
             $this->actingAs($superAdmin)
                 ->getJson($url)
                 ->assertStatus(200);
+        }
+    }
+
+    public function test_analytics_access_entitlement_blocked(): void
+    {
+        // 1. Create a customer without analytics_access
+        $noAccessCustomer = Customer::create([
+            'company_name' => 'No Analytics Corp',
+            'owner_name' => 'Bob Smith',
+            'email' => 'bob@test.com',
+            'status' => 'active',
+        ]);
+
+        $noAccessPlan = Plan::create([
+            'name' => 'Basic Plan',
+            'monthly_price' => 19.00,
+            'yearly_price' => 190.00,
+            'max_wordpress_sites' => 2,
+            'max_topics' => 10,
+            'publishing_schedule_limit' => 5,
+            'max_articles_per_day' => 5,
+            'monthly_generation_limit' => 100,
+            'prompt_templates_allowed' => 10,
+            'ai_providers_available' => ['openai'],
+            'api_keys_allowed' => 2,
+            'storage_limit' => 5000,
+            'analytics_access' => false,
+            'status' => 'active',
+        ]);
+
+        Subscription::create([
+            'customer_id' => $noAccessCustomer->id,
+            'plan_id' => $noAccessPlan->id,
+            'status' => 'active',
+            'billing_period' => 'monthly',
+            'starts_at' => now()->subDays(10),
+            'ends_at' => now()->addDays(30),
+            'limits' => $noAccessPlan->toArray(),
+        ]);
+
+        $user = \App\Models\User::create([
+            'name' => 'Bob User',
+            'email' => 'bob_user@test.com',
+            'password' => bcrypt('password'),
+            'role' => 2, // Client role
+            'customer_id' => $noAccessCustomer->id,
+        ]);
+
+        $site = Site::create([
+            'customer_id' => $noAccessCustomer->id,
+            'domain_url' => 'https://bobsite.com',
+            'api_key' => 'tokenbob',
+            'is_active' => true,
+        ]);
+
+        $endpoints = [
+            'coverage',
+            'daily',
+            'monthly',
+            'tokens',
+            'costs',
+            'success-rate',
+            'failures',
+            'providers'
+        ];
+
+        foreach ($endpoints as $endpoint) {
+            $url = "/api/v1/sites/{$site->id}/analytics/{$endpoint}";
+
+            $this->actingAs($user)
+                ->getJson($url)
+                ->assertStatus(403);
         }
     }
 }
