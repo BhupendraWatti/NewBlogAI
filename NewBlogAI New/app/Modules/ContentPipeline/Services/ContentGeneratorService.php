@@ -77,6 +77,24 @@ class ContentGeneratorService implements ContentGeneratorInterface
                 'date'     => now()->format('F j, Y'),
             ];
 
+            // Newsroom workflow: anchor generation to the employee-selected
+            // news candidate when present. Adds headline/summary/sources
+            // variables for prompt templates; legacy runs are unaffected.
+            $selectedNews = $context->metadata['selected_news'] ?? null;
+            if (is_array($selectedNews) && ! empty($selectedNews['title'])) {
+                $variables['headline'] = $selectedNews['title'];
+                $variables['summary']  = (string) ($selectedNews['summary'] ?? '');
+                $variables['sources']  = implode(', ', array_filter(
+                    array_column((array) ($selectedNews['source_references'] ?? []), 'url')
+                ));
+
+                $candidateKeywords = array_filter(array_map('strval', (array) ($selectedNews['keywords'] ?? [])));
+                if (! empty($candidateKeywords)) {
+                    $variables['keywords'] = implode(', ', array_slice($candidateKeywords, 0, 5));
+                    $variables['Keywords'] = $variables['keywords'];
+                }
+            }
+
             // 2. Modular prompt compilation
             $compiledPrompt = $this->promptEngine->buildFullPrompt(
                 $context,

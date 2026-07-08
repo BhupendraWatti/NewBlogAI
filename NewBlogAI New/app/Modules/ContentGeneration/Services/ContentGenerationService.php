@@ -99,6 +99,14 @@ class ContentGenerationService
             $context = new \App\Modules\ContentPipeline\DTOs\PipelineContext($run, $pipeline);
             $context->metadata['reservation'] = $reservation;
 
+            // Newsroom workflow: when this run was triggered by an employee
+            // selecting a coverage candidate, propagate the selected event so
+            // generation is anchored to it. Absent for legacy runs (BC-safe).
+            $selectedCandidate = $run->properties['selected_candidate'] ?? null;
+            if (is_array($selectedCandidate) && ! empty($selectedCandidate['title'])) {
+                $context->metadata['selected_news'] = $selectedCandidate;
+            }
+
             // Run Laravel pipeline sequentially through the 7 stages
             $context = \Illuminate\Support\Facades\Pipeline::send($context)
                 ->through([

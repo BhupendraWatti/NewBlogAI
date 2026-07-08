@@ -89,7 +89,7 @@ class PipelineService
     /**
      * Trigger execution run for a pipeline.
      */
-    public function triggerRun(ContentPipeline $pipeline): PipelineRun
+    public function triggerRun(ContentPipeline $pipeline, array $properties = []): PipelineRun
     {
         if (! $pipeline->is_active) {
             throw new InvalidArgumentException('Cannot execute an inactive content pipeline.');
@@ -100,11 +100,12 @@ class PipelineService
         $this->entitlements->assertProviderAvailable($pipeline->site, $pipeline->provider->provider_key);
 
         try {
-            return DB::transaction(function () use ($pipeline) {
+            return DB::transaction(function () use ($pipeline, $properties) {
                 // Create execution history entry
                 $run = PipelineRun::create([
                     'pipeline_id' => $pipeline->id,
                     'status'      => 'queued',
+                    'properties'  => $properties ?: null,
                 ]);
 
                 // Update pipeline status
