@@ -1,3 +1,22 @@
+# Sprint Progress: Phase 5: Newsroom Coverage Workflow (Coverage → 9 Candidates → Select One → Full Generation)
+
+## Current Sprint Objectives (Phase 5)
+- [x] **Task 0: Repository verification audit** (Verified Phases 1–4 against code. Confirmed missing: 9-candidate generation, employee selection gate, headline/body duplicate detection. Confirmed broken: `CoverageService::getCategoryStatus()` topic relation crash. Confirmed duplicates/dead code: identical `newsblogify-client/` + `wordpress-plugin/` dirs, 3 zip artifacts, `list_users.php`, `state_task.md` — cleanup deferred to a dedicated commit after Coverage is stable).
+- [x] **Task 1: Fix CoverageService freshness bug** (Rewrote `getCategoryStatus()` to join `content_pipelines.news_category`; rewrote `CoverageFreshnessTest` to category-driven model).
+- [x] **Task 2: Coverage newsroom architecture** (Added `run_type` to `pipeline_runs` (`full`|`discovery`), new `news_candidates` table, `NewsDiscoveryService` (exactly 9 unique candidates, overgenerate-12 + one retry, explicit shortfall failure), `DuplicateDetectionService`, `GenerateNewsCandidatesJob`, `CoverageController` + routes. Discovery run stops at status `ready`).
+- [x] **Task 3: Pipeline integration** (`CandidateSelectionService` guards selection, re-checks duplicates, marks discovery run completed, and triggers a standard full run via `PipelineService::triggerRun()` with `properties.selected_candidate`; `ContentGenerationService`/`ContentGeneratorService` expose `selected_news` context and `{{headline}}`/`{{summary}}`/`{{sources}}` prompt variables; retry endpoint dispatches by `run_type`).
+- [x] **Task 4: Analytics & usage tracking integration** (Discovery reserved via `EntitlementService::reserveGeneration`, tokens/cost aggregated across attempts into `ai_request_logs` with `run_type: discovery` response metadata; existing site analytics endpoints measure coverage without changes).
+- [x] **Task 5: Tests** (`CoverageNewsroomWorkflowTest`: queue dispatch, exactly-9 persistence with duplicate filtering, shortfall failure recovery, selection → full run integration, one-selection-per-run guard, selection-time duplicate rejection, similarity heuristics. AI provider and entitlement boundaries mocked; run full suite locally to verify — not executed in this environment).
+
+## Risks
+- Similarity thresholds in `DuplicateDetectionService` are heuristic (headline + keyword overlap); embeddings-based detection is a follow-up.
+- Prompt templates should adopt `{{headline}}`/`{{summary}}` variables to fully anchor generation to the selected candidate.
+
+## Dependencies
+- `pipeline_runs.properties` JSON column (exists), `EntitlementService` quotas, `AIProviderService` drivers, `WorkflowService` approval queue (all verified working).
+
+---
+
 # Sprint Progress: Phase 4: Category-Driven News Generation
 
 ## Current Sprint Objectives (Phase 4)

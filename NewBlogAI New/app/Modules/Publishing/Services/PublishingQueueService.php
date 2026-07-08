@@ -76,6 +76,16 @@ class PublishingQueueService implements PublishingQueueInterface
             if (isset($context->metadata['extracted_facts'])) {
                 $metadataField['extracted_facts'] = $context->metadata['extracted_facts'];
             }
+            // Newsroom workflow traceability: persist the employee-selected
+            // coverage candidate and originating run so candidate → article
+            // lineage survives generation (audit history, analytics,
+            // duplicate-prevention corpus). Absent for legacy runs.
+            if (isset($context->metadata['selected_news'])) {
+                $metadataField['selected_news'] = $context->metadata['selected_news'];
+            }
+            if ($run) {
+                $metadataField['pipeline_run_id'] = $run->id;
+            }
 
             $generatedContent = DB::transaction(function () use (
                 $pipeline,

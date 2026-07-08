@@ -2,50 +2,45 @@
 
 namespace App\Modules\TopicManager\Services;
 
-use App\Modules\TopicManager\Models\Topic;
 use App\Modules\ContentGeneration\Models\GeneratedContent;
 use App\Modules\ContentPipeline\Models\ContentPipeline;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 
 class CoverageService
 {
     /**
-     * Get the freshness status of a category for a specific site.
+     * Get the freshness status of a news category for a specific site.
+     *
+     * Category-driven (ADR-003): content is matched through its pipeline's
+     * news_category. The legacy topic relation no longer exists on
+     * GeneratedContent and must not be queried.
      *
      * @param int $siteId
      * @param string $category
-     * @return string
+     * @return string one of: empty|trending|fresh|stale
      */
     public function getCategoryStatus(int $siteId, string $category): string
     {
-        // 1. Check for empty
-        $contentsCount = GeneratedContent::where('site_id', $siteId)
-            ->whereHas('topic', function ($query) use ($category) {
-                $query->where('category', $category);
-            })
-            ->count();
+        $category = strtolower(trim($category));
 
-        if ($contentsCount === 0) {
+        // 1. Check for empty
+        if (! $this->categoryContentQuery($siteId, $category)->exists()) {
             return 'empty';
         }
 
         // 2. Check for trending
-        // trending: has high volume of recent generation (e.g., 3+ articles in the last 2 days) or marked as trending in metadata.
-        $recentCount = GeneratedContent::where('site_id', $siteId)
-            ->whereHas('topic', function ($query) use ($category) {
-                $query->where('category', $category);
-            })
-            ->where('created_at', '>=', Carbon::now()->subDays(2))
+        // trending: has high volume of recent generation (3+ articles in the
+        // last 2 days) or marked as trending in metadata.
+        $recentCount = $this->categoryContentQuery($siteId, $category)
+            ->where('generated_contents.created_at', '>=', Carbon::now()->subDays(2))
             ->count();
 
-        $hasTrendingMetadata = GeneratedContent::where('site_id', $siteId)
-            ->whereHas('topic', function ($query) use ($category) {
-                $query->where('category', $category);
-            })
+        $hasTrendingMetadata = $this->categoryContentQuery($siteId, $category)
             ->where(function ($q) {
-                $q->whereJsonContains('metadata->trending', true)
-                  ->orWhere('metadata->trending', 'true')
-                  ->orWhere('metadata->trending', 1);
+                $q->whereJsonContains('generated_contents.metadata->trending', true)
+                    ->orWhere('generated_contents.metadata->trending', 'true')
+                    ->orWhere('generated_contents.metadata->trending', 1);
             })
             ->exists();
 
@@ -55,11 +50,8 @@ class CoverageService
 
         // 3. Check for fresh
         // fresh: has generated content in the category within the last 7 days.
-        $hasRecentContent = GeneratedContent::where('site_id', $siteId)
-            ->whereHas('topic', function ($query) use ($category) {
-                $query->where('category', $category);
-            })
-            ->where('created_at', '>=', Carbon::now()->subDays(7))
+        $hasRecentContent = $this->categoryContentQuery($siteId, $category)
+            ->where('generated_contents.created_at', '>=', Carbon::now()->subDays(7))
             ->exists();
 
         if ($hasRecentContent) {
@@ -115,5 +107,16 @@ class CoverageService
         }
 
         return array_merge($emptyRecommendations, $staleRecommendations);
+    }
+
+    /**
+     * Base query for a site's generated content in a given news category.
+     */
+    protected function categoryContentQuery(int $siteId, string $category): Builder
+    {
+        return GeneratedContent::query()
+            ->join('content_pipelines', 'generated_contents.pipeline_id', '=', 'content_pipelines.id')
+            ->where('generated_contents.site_id', $siteId)
+            ->whereRaw('LOWER(content_pipelines.news_category) = ?', [$category]);
     }
 }

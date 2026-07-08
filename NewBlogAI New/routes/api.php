@@ -4,6 +4,7 @@ use App\Modules\AIProviderManager\Controllers\AIProviderController;
 use App\Modules\AuthManager\Controllers\AuthController;
 use App\Modules\AuthManager\Controllers\UserController;
 use App\Modules\ContentGeneration\Controllers\GeneratedContentController;
+use App\Modules\ContentPipeline\Controllers\CoverageController;
 use App\Modules\ContentPipeline\Controllers\PipelineController;
 use App\Modules\CustomerManager\Controllers\CustomerController;
 use App\Modules\Licensing\Controllers\LicenseController;
@@ -65,6 +66,11 @@ Route::prefix('v1')->group(function () {
         // Content Pipeline Routes
         Route::middleware('auth')->group(function () {
             Route::post('pipelines/{id}/execute', [PipelineController::class, 'execute']);
+
+            // Newsroom Coverage (Coverage → 9 candidates → employee selects one)
+            Route::post('pipelines/{id}/discover', [CoverageController::class, 'discover']);
+            Route::get('pipelines/runs/{run}/candidates', [CoverageController::class, 'candidates']);
+            Route::post('coverage/candidates/{id}/select', [CoverageController::class, 'select']);
             Route::post('pipelines/runs/{run}/retry', [PipelineController::class, 'retry']);
             Route::post('pipelines/runs/{run}/cancel', [PipelineController::class, 'cancel']);
             Route::get('pipelines/{id}/history', [PipelineController::class, 'history']);
