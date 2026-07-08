@@ -2,6 +2,7 @@
 
 namespace App\Modules\Publishing\Jobs;
 
+use App\Modules\Operations\Notifications\PublishingFailedNotification;
 use App\Modules\Publishing\Models\PublishingLog;
 use App\Modules\Publishing\Services\PublishingService;
 use Illuminate\Bus\Queueable;
@@ -10,6 +11,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 
 class PublishPostJob implements ShouldQueue
 {
@@ -84,6 +86,21 @@ class PublishPostJob implements ShouldQueue
                 $workflowService = app(\App\Modules\ContentGeneration\Services\WorkflowService::class);
                 $workflowService->transitionTo($logRecord->content, 'failed', $logRecord->user_id);
                 $workflowService->transitionTo($logRecord->content, 'draft', $logRecord->user_id);
+
+                // Notify admins of the customer that owns this site.
+                try {
+                    $site = $logRecord->site;
+                    if ($site && $site->customer_id) {
+                        $adminUsers = \App\Models\User::where('customer_id', $site->customer_id)
+                            ->whereIn('role', [1, 2])
+                            ->get();
+                        if ($adminUsers->isNotEmpty()) {
+                            Notification::send($adminUsers, new PublishingFailedNotification($logRecord));
+                        }
+                    }
+                } catch (\Throwable $notifyEx) {
+                    Log::warning('PublishPostJob: Could not dispatch PublishingFailedNotification — '.$notifyEx->getMessage());
+                }
             }
 
             throw $e;

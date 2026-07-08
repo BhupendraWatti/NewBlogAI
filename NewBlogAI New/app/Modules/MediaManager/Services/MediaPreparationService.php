@@ -8,13 +8,15 @@ use App\Modules\ContentPipeline\Contracts\MediaPreparatorInterface;
 use App\Modules\ContentPipeline\DTOs\PipelineContext;
 use App\Modules\MediaManager\Services\ImageGeneratorService;
 use App\Modules\MediaManager\Services\ContentPostProcessor;
+use App\Modules\SubscriptionManager\Services\EntitlementService;
 use Illuminate\Support\Facades\Log;
 
 class MediaPreparationService implements MediaPreparatorInterface
 {
     public function __construct(
         protected ImageGeneratorService $imageGeneratorService,
-        protected ContentPostProcessor $contentPostProcessor
+        protected ContentPostProcessor $contentPostProcessor,
+        protected EntitlementService $entitlementService
     ) {}
 
     /**
@@ -28,6 +30,12 @@ class MediaPreparationService implements MediaPreparatorInterface
 
         try {
             Log::info('MediaPreparationService: Starting media preparation.');
+
+            // 0. Enforce storage quota before generating any images.
+            $site = $context->pipeline?->site;
+            if ($site) {
+                $this->entitlementService->assertStorageWithinLimit($site);
+            }
 
             $markdown = $context->generatedContent;
             if (empty($markdown)) {
@@ -106,8 +114,9 @@ class MediaPreparationService implements MediaPreparatorInterface
             try {
                 Log::info("Generating featured image with prompt: '{$imagePrompt}'");
                 $options = [
-                    'alt' => $title,
+                    'alt'     => $title,
                     'caption' => $topicName,
+                    'site_id' => $site?->id,
                 ];
                 $mediaItem = $this->imageGeneratorService->generateAndStore($imagePrompt, $options, null);
 
@@ -145,8 +154,9 @@ class MediaPreparationService implements MediaPreparatorInterface
                 try {
                     Log::info("Generating inline image for prompt: '{$spec['prompt']}'");
                     $options = [
-                        'alt' => $spec['alt'],
+                        'alt'     => $spec['alt'],
                         'caption' => $spec['caption'],
+                        'site_id' => $site?->id,
                     ];
                     $mediaItem = $this->imageGeneratorService->generateAndStore($spec['prompt'], $options, null);
 

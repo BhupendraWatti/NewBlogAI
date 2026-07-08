@@ -7,10 +7,12 @@ use App\Modules\ContentGeneration\Models\AIRequestLog;
 use App\Modules\ContentGeneration\Models\ContentRevision;
 use App\Modules\ContentGeneration\Models\GeneratedContent;
 use App\Modules\ContentPipeline\Models\PipelineRun;
+use App\Modules\Operations\Notifications\AIGenerationFailedNotification;
 use App\Modules\SubscriptionManager\Services\EntitlementService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use InvalidArgumentException;
 
 class ContentGenerationService
@@ -247,6 +249,20 @@ class ContentGenerationService
                 'completed_at' => now(),
             ]);
             $pipeline->update(['status' => 'failed']);
+
+            // Notify site admins that AI generation failed.
+            try {
+                if ($site->customer_id) {
+                    $adminUsers = \App\Models\User::where('customer_id', $site->customer_id)
+                        ->whereIn('role', [1, 2])
+                        ->get();
+                    if ($adminUsers->isNotEmpty()) {
+                        Notification::send($adminUsers, new AIGenerationFailedNotification($run));
+                    }
+                }
+            } catch (\Throwable $notifyEx) {
+                Log::warning('ContentGenerationService: Could not dispatch AIGenerationFailedNotification — '.$notifyEx->getMessage());
+            }
 
             throw $e;
         }

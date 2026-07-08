@@ -21,8 +21,8 @@ class AnalyticsService
 
         $aggregates = (clone $baseQuery)->selectRaw('
             COUNT(id) as total_requests,
-            SUM(CASE WHEN status = "success" THEN 1 ELSE 0 END) as successful_requests,
-            SUM(CASE WHEN status = "failed" THEN 1 ELSE 0 END) as failed_requests,
+            SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as successful_requests,
+            SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_requests,
             SUM(prompt_tokens) as total_prompt_tokens,
             SUM(completion_tokens) as total_completion_tokens,
             SUM(total_tokens) as total_tokens,

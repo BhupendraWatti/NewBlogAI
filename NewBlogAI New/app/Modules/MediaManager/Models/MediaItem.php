@@ -12,16 +12,19 @@ class MediaItem extends Model
 
     protected $fillable = [
         'generated_content_id',
+        'site_id',
         'filename',
         'filepath',
         'url',
+        'file_size',
         'driver',
         'prompt',
         'metadata',
     ];
 
     protected $casts = [
-        'metadata' => 'array',
+        'metadata'  => 'array',
+        'file_size' => 'integer',
     ];
 
     /**

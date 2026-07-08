@@ -11,6 +11,7 @@ use App\Modules\ScheduleManager\Models\PublishingSchedule;
 use App\Modules\SiteManager\Models\Site;
 use App\Modules\SubscriptionManager\Exceptions\EntitlementDeniedException;
 use App\Modules\SubscriptionManager\Models\Subscription;
+use App\Modules\MediaManager\Models\MediaItem;
 use App\Modules\TopicManager\Models\Topic;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -384,6 +385,40 @@ class EntitlementService
         }
 
         return $this->activeSubscription($site->customer_id);
+    }
+
+    /**
+     * Assert that the customer's total stored media is within the plan's storage_limit (in MB).
+     *
+     * Called by MediaPreparationService before generating and storing new images.
+     * A storage_limit of 0 means unlimited.
+     */
+    public function assertStorageWithinLimit(Site $site): void
+    {
+        $subscription = $this->subscriptionForSite($site);
+        if (! $subscription) {
+            return;
+        }
+
+        $limitMb = (int) $this->limits($subscription)['storage_limit'];
+        if ($limitMb <= 0) {
+            // 0 = unlimited
+            return;
+        }
+
+        // Sum file_size (bytes) for all media items owned by this customer's sites
+        $siteIds = Site::where('customer_id', $site->customer_id)->pluck('id');
+        $usedBytes = MediaItem::whereIn('site_id', $siteIds)->sum('file_size');
+        $usedMb = (int) ceil($usedBytes / 1024 / 1024);
+
+        if ($usedMb >= $limitMb) {
+            throw new EntitlementDeniedException(
+                "Storage quota exceeded: {$usedMb} MB used of {$limitMb} MB allowed.",
+                'storage_limit',
+                $limitMb,
+                $usedMb,
+            );
+        }
     }
 
     private function assertBelowLimit(string $entitlement, int $usage, int $limit): void

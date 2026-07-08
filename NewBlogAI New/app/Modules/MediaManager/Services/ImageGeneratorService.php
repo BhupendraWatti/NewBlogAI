@@ -118,14 +118,25 @@ class ImageGeneratorService
         }
 
         // 4. Save to Database
+        $fileSize = 0;
+        if ($filepath) {
+            try {
+                $fileSize = (int) Storage::disk('public')->size($filepath);
+            } catch (\Throwable) {
+                $fileSize = 0;
+            }
+        }
+
         return MediaItem::create([
             'generated_content_id' => $generatedContentId,
-            'filename' => $filename,
-            'filepath' => $filepath,
-            'url' => $url,
-            'driver' => $driverName,
-            'prompt' => $prompt,
-            'metadata' => $metadata,
+            'site_id'              => $options['site_id'] ?? null,
+            'filename'             => $filename,
+            'filepath'             => $filepath,
+            'url'                  => $url,
+            'file_size'            => $fileSize,
+            'driver'               => $driverName,
+            'prompt'               => $prompt,
+            'metadata'             => $metadata,
         ]);
     }
 }
