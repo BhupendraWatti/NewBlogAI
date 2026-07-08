@@ -1,3 +1,22 @@
+# Sprint Progress: Phase 5: Newsroom Coverage Workflow (Coverage → 9 Candidates → Select One → Full Generation)
+
+## Current Sprint Objectives (Phase 5)
+- [x] **Task 0: Repository verification audit** (Verified Phases 1–4 against code. Confirmed missing: 9-candidate generation, employee selection gate, headline/body duplicate detection. Confirmed broken: `CoverageService::getCategoryStatus()` topic relation crash. Confirmed duplicates/dead code: identical `newsblogify-client/` + `wordpress-plugin/` dirs, 3 zip artifacts, `list_users.php`, `state_task.md` — cleanup deferred to a dedicated commit after Coverage is stable).
+- [x] **Task 1: Fix CoverageService freshness bug** (Rewrote `getCategoryStatus()` to join `content_pipelines.news_category`; rewrote `CoverageFreshnessTest` to category-driven model).
+- [ ] **Task 2: Coverage newsroom architecture** (Add `run_type` to `pipeline_runs` (`full`|`discovery`), new `news_candidates` table, `NewsDiscoveryService`, `DuplicateDetectionService`, `CandidateSelectionService`, `GenerateNewsCandidatesJob`, `CoverageController` + routes. Discovery run stops at status `ready` with exactly 9 unique candidates).
+- [ ] **Task 3: Pipeline integration** (Selection triggers standard full run via `PipelineService::triggerRun()` with `properties.selected_candidate`; `ContentGeneratorService` anchors generation to the selected event; retry endpoint dispatches by `run_type`).
+- [ ] **Task 4: Analytics & usage tracking integration** (Discovery calls reserved via `EntitlementService::reserveGeneration` and logged to `ai_request_logs` with `run_type` metadata).
+- [ ] **Task 5: Tests** (Feature, integration, and queue tests for discovery, duplicate detection, selection guards, and failure recovery).
+
+## Risks
+- Similarity thresholds in `DuplicateDetectionService` are heuristic (headline + keyword overlap); embeddings-based detection is a follow-up.
+- Prompt templates should adopt `{{headline}}`/`{{summary}}` variables to fully anchor generation to the selected candidate.
+
+## Dependencies
+- `pipeline_runs.properties` JSON column (exists), `EntitlementService` quotas, `AIProviderService` drivers, `WorkflowService` approval queue (all verified working).
+
+---
+
 # Sprint Progress: Phase 4: Category-Driven News Generation
 
 ## Current Sprint Objectives (Phase 4)

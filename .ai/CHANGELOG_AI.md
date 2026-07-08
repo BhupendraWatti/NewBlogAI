@@ -11,6 +11,7 @@
   - Aligned `PromptEngine` system instructions to news reporting and journalism styles, configuring raw markdown formatting defaults.
 
 ### Fixed
+- **CoverageService category freshness runtime crash**: `getCategoryStatus()` still queried the removed `topic` relation on `GeneratedContent` (throwing `RelationNotFoundException` at runtime). Rewritten to join `content_pipelines.news_category` (case-insensitive), consistent with `getRecommendations()`. `CoverageFreshnessTest` rewritten to the category-driven domain model (it previously created pipelines with the dropped `topic_id` column). Backward compatible: method signatures and return values unchanged.
 - **Database & UI Exceptions**
   - **Blade 500 error**: Fixed Blade compiler crash (`Undefined constant "category"`) in `prompts.blade.php` by escaping variables (e.g., `@{{category}}`, `@{{tone}}`, etc.) inside the default textarea component.
   - **Integrity constraint violation (1048)**: Added a targeted database migration to make `topic_id` nullable in the `generated_contents` table, resolving a generation crash when trying to save generated articles without a topic FK.
