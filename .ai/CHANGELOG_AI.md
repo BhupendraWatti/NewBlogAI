@@ -2,6 +2,17 @@
 
 ## [2026-07-08]
 ### Added
+- **Phase 5: Newsroom Coverage Workflow (Coverage → 9 Candidates → Select One → Full Generation)**
+  - Added `run_type` discriminator (`full`|`discovery`) to `pipeline_runs` and the new `news_candidates` table (the only new table; coverage runs reuse `ContentPipeline`/`PipelineRun` per ADR-001/ADR-003).
+  - Implemented `NewsDiscoveryService`: researches the pipeline's news category and persists exactly 9 unique candidates (title, summary, source references, keywords, trend/freshness scores, uniqueness hash); overgenerates 12, filters duplicates, retries once on shortfall, fails explicitly otherwise. Discovery stops at run status `ready` — full articles are never generated for all candidates.
+  - Implemented `DuplicateDetectionService`: normalized title similarity + keyword Jaccard + hash fast-path against 90-day site history (articles + previously selected candidates) and sibling candidates; internals swappable for embeddings without caller changes.
+  - Implemented `CandidateSelectionService`: employee selects exactly one candidate; selection re-checks duplicates, records `selected_by`/`selected_at`, completes the discovery run, and triggers a standard full generation run with `properties.selected_candidate`.
+  - Added `GenerateNewsCandidatesJob` (queued discovery workload) and `run_type`-aware retry dispatch in `PipelineService::retryRun()`.
+  - Backward-compatible hooks: `PipelineService::triggerRun()` optional `$properties`; `ContentGenerationService` seeds `selected_news` context; `ContentGeneratorService` adds `{{headline}}`/`{{summary}}`/`{{sources}}` prompt variables when a candidate anchors the run.
+  - New endpoints: `POST /api/v1/pipelines/{id}/discover`, `GET /api/v1/pipelines/runs/{run}/candidates`, `POST /api/v1/coverage/candidates/{id}/select`.
+  - Usage tracking: discovery reserved via `EntitlementService::reserveGeneration` with tokens/cost aggregated across attempts and `run_type: discovery` metadata in `ai_request_logs`.
+  - Tests: `CoverageNewsroomWorkflowTest` (queue, integration, failure recovery, selection guards, duplicate heuristics). Also fixed `CoverageService::getCategoryStatus()` runtime crash (see Fixed).
+  - Backward compatibility: additive migration only; all existing endpoints, run statuses, plugin contract, and full-run behavior unchanged.
 - **Phase 4: Category-Driven News Generation**
   - Replaced user-defined `topics` with a predefined set of global `news_categories` (`global`, `trending`, `local`, `technology`, `business`, `politics`, `sports`, `health`, `science`, `entertainment`).
   - Added string column `news_category` to `content_pipelines` table and dropped the `topic_id` foreign key.
