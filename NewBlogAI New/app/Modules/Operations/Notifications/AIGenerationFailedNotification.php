@@ -7,9 +7,11 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
+use App\Modules\Operations\Notifications\Concerns\RoutesToConfiguredChannels;
+
 class AIGenerationFailedNotification extends Notification
 {
-    use Queueable;
+    use Queueable, RoutesToConfiguredChannels;
 
     public function __construct(
         protected PipelineRun $run
@@ -17,7 +19,7 @@ class AIGenerationFailedNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        return $this->configuredChannels();
     }
 
     public function toMail(object $notifiable): MailMessage

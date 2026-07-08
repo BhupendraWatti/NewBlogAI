@@ -7,9 +7,11 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
+use App\Modules\Operations\Notifications\Concerns\RoutesToConfiguredChannels;
+
 class PublishingFailedNotification extends Notification
 {
-    use Queueable;
+    use Queueable, RoutesToConfiguredChannels;
 
     public function __construct(
         protected PublishingLog $log
@@ -18,7 +20,7 @@ class PublishingFailedNotification extends Notification
     public function via(object $notifiable): array
     {
         // Deliver to both email and database (in-app) channels
-        return ['database', 'mail'];
+        return $this->configuredChannels();
     }
 
     public function toMail(object $notifiable): MailMessage

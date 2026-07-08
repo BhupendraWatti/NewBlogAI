@@ -76,11 +76,11 @@ class AIContentGenerationTest extends TestCase
 
         $this->pipeline = ContentPipeline::create([
             'site_id' => $this->site->id,
-            'topic_id' => $this->topic->id,
+            'news_category' => 'technology',
             'prompt_id' => $this->prompt->id,
             'ai_provider_id' => $this->provider->id,
             'language' => 'hi',
-            'generation_type' => 'article',
+            'generation_type' => 'news',
             'is_active' => true,
         ]);
 
@@ -122,7 +122,7 @@ class AIContentGenerationTest extends TestCase
         $this->assertDatabaseHas('generated_contents', [
             'id' => $article->id,
             'pipeline_id' => $this->pipeline->id,
-            'title' => '[Translated to hi]: Article: Venture Capital in India - '.now()->format('Y-m-d'),
+            'title' => '[Translated to hi]: Technology News: '.now()->format('F j, Y'),
             'status' => 'generated',
         ]);
 

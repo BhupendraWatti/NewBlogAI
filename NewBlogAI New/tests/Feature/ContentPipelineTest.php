@@ -73,11 +73,11 @@ class ContentPipelineTest extends TestCase
         $response = $this->actingAs($this->admin)
             ->postJson('/api/v1/pipelines', [
                 'site_id' => $this->site->id,
-                'topic_id' => $this->topic->id,
+                'news_category' => 'technology',
                 'prompt_id' => $this->prompt->id,
                 'ai_provider_id' => $this->provider->id,
                 'language' => 'en',
-                'generation_type' => 'article',
+                'generation_type' => 'news',
                 'is_active' => true,
             ]);
 
@@ -86,7 +86,7 @@ class ContentPipelineTest extends TestCase
 
         $this->assertDatabaseHas('content_pipelines', [
             'site_id' => $this->site->id,
-            'topic_id' => $this->topic->id,
+            'news_category' => 'technology',
             'prompt_id' => $this->prompt->id,
             'ai_provider_id' => $this->provider->id,
         ]);
@@ -99,11 +99,11 @@ class ContentPipelineTest extends TestCase
         $response = $this->actingAs($this->admin)
             ->postJson('/api/v1/pipelines', [
                 'site_id' => $this->site->id,
-                'topic_id' => $this->topic->id,
+                'news_category' => 'technology',
                 'prompt_id' => $this->prompt->id,
                 'ai_provider_id' => $this->provider->id,
                 'language' => 'en',
-                'generation_type' => 'article',
+                'generation_type' => 'news',
             ]);
 
         $response->assertStatus(500); // throws validation exception due to inactive site
@@ -116,11 +116,11 @@ class ContentPipelineTest extends TestCase
         $response = $this->actingAs($this->admin)
             ->postJson('/api/v1/pipelines', [
                 'site_id' => $this->site->id,
-                'topic_id' => $this->topic->id,
+                'news_category' => 'technology',
                 'prompt_id' => $this->prompt->id,
                 'ai_provider_id' => $this->provider->id,
                 'language' => 'en',
-                'generation_type' => 'article',
+                'generation_type' => 'news',
             ]);
 
         $response->assertStatus(500); // throws validation exception due to disabled AI provider
@@ -132,11 +132,11 @@ class ContentPipelineTest extends TestCase
 
         $pipeline = ContentPipeline::create([
             'site_id' => $this->site->id,
-            'topic_id' => $this->topic->id,
+            'news_category' => 'technology',
             'prompt_id' => $this->prompt->id,
             'ai_provider_id' => $this->provider->id,
             'language' => 'en',
-            'generation_type' => 'article',
+            'generation_type' => 'news',
             'is_active' => true,
         ]);
 

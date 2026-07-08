@@ -130,11 +130,11 @@ class BackendSourceOfTruthTest extends TestCase
 
         ContentPipeline::create([
             'site_id' => $this->site->id,
-            'topic_id' => $topic->id,
+            'news_category' => 'technology',
             'prompt_id' => $prompt->id,
             'ai_provider_id' => $provider->id,
             'language' => 'en',
-            'generation_type' => 'article',
+            'generation_type' => 'news',
             'is_active' => true,
         ]);
     }
@@ -188,7 +188,7 @@ class BackendSourceOfTruthTest extends TestCase
 
         // Legacy compatibility keys
         $this->assertEquals($this->site->id, $config['site_id']);
-        $this->assertContains('Tech', $config['selected_topics']);
+        $this->assertContains('technology', $config['selected_topics']);
         $this->assertEquals('daily', $config['slot']);
 
         // Assert WP and AI credentials are excluded

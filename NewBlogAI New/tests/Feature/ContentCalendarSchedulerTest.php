@@ -298,7 +298,7 @@ class ContentCalendarSchedulerTest extends TestCase
         // Create an article generated today, making the "AI" category fresh
         $article = new GeneratedContent([
             'site_id' => $this->site->id,
-            'topic_id' => $this->topic->id,
+            'pipeline_id' => $this->pipeline->id,
             'title' => 'Recent Article',
             'content' => 'Content',
             'status' => 'published',

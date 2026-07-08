@@ -431,6 +431,74 @@ erDiagram
   }
   ```
 
+### D. Notification Feed Endpoints (Enterprise API)
+
+#### **1. List Notifications**
+* **Method & Path**: `GET /api/v1/notifications`
+* **Query Parameters**:
+  * `unread` (optional, boolean/integer): Pass `1` or `true` to return only unread notifications.
+  * `limit` (optional, integer): Number of items per page. Default is 15.
+* **Headers**: `Authorization: Bearer <access_token>`
+* **Response (200 OK)**:
+  ```json
+  {
+    "data": [
+      {
+        "id": "c8b4fb9b-449e-4e31-8cc6-464a78cb47d9",
+        "type": "App\\Modules\\Operations\\Notifications\\AIGenerationFailedNotification",
+        "notifiable_type": "App\\Models\\User",
+        "notifiable_id": 1,
+        "data": {
+          "type": "ai_generation_failed",
+          "pipeline_run_id": 1,
+          "pipeline_id": 1,
+          "error_message": "API limit exceeded"
+        },
+        "read_at": null,
+        "created_at": "2026-07-08T22:00:00.000000Z",
+        "updated_at": "2026-07-08T22:00:00.000000Z"
+      }
+    ],
+    "first_page_url": "...",
+    "next_page_url": "...",
+    "prev_page_url": "...",
+    "path": "...",
+    "per_page": 15,
+    "to": 1,
+    "total": 1
+  }
+  ```
+
+#### **2. Get Unread Notifications Count**
+* **Method & Path**: `GET /api/v1/notifications/unread-count`
+* **Headers**: `Authorization: Bearer <access_token>`
+* **Response (200 OK)**:
+  ```json
+  {
+    "unread_count": 1
+  }
+  ```
+
+#### **3. Mark Single Notification as Read**
+* **Method & Path**: `POST /api/v1/notifications/{id}/read`
+* **Headers**: `Authorization: Bearer <access_token>`
+* **Response (200 OK)**:
+  ```json
+  {
+    "message": "Notification marked as read."
+  }
+  ```
+
+#### **4. Mark All Notifications as Read**
+* **Method & Path**: `POST /api/v1/notifications/read-all`
+* **Headers**: `Authorization: Bearer <access_token>`
+* **Response (200 OK)**:
+  ```json
+  {
+    "message": "All notifications marked as read."
+  }
+  ```
+
 ---
 
 ## 6. Queue & Job Lifecycle Diagram

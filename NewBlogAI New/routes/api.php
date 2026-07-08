@@ -9,6 +9,7 @@ use App\Modules\ContentPipeline\Controllers\PipelineController;
 use App\Modules\CustomerManager\Controllers\CustomerController;
 use App\Modules\CustomerManager\Controllers\WorkspaceController;
 use App\Modules\Licensing\Controllers\LicenseController;
+use App\Modules\Operations\Controllers\NotificationsController;
 use App\Modules\Operations\Controllers\OperationsController;
 use App\Modules\PromptManager\Controllers\PromptController;
 use App\Modules\Publishing\Controllers\PublishingController;
@@ -117,6 +118,12 @@ Route::prefix('v1')->group(function () {
             Route::get('operations/jobs', [OperationsController::class, 'jobLogs']);
             Route::post('operations/jobs/{id}/retry', [OperationsController::class, 'retryJob']);
             Route::apiResource('users', UserController::class);
+
+            // In-app Notifications Feed (Enterprise)
+            Route::get('notifications', [NotificationsController::class, 'index']);
+            Route::get('notifications/unread-count', [NotificationsController::class, 'unreadCount']);
+            Route::post('notifications/read-all', [NotificationsController::class, 'markAllRead']);
+            Route::post('notifications/{id}/read', [NotificationsController::class, 'markRead']);
 
             // Staging -> Production Site Analytics Routes
             Route::get('sites/{siteId}/analytics/coverage', [\App\Modules\Analytics\Controllers\AnalyticsController::class, 'coverage']);

@@ -6,11 +6,20 @@
   - Implemented HTTP layer for Workspace & Team management: added `StoreWorkspaceRequest`, `UpdateWorkspaceRequest`, `StoreEmployeeRequest`, `UpdateEmployeeRequest`, `WorkspaceResource`, `EmployeeResource`, and `WorkspaceController` with tenant isolation.
   - Added new feature test suite `WorkspaceApiTest` verifying tenant isolation, Owner auto-assignment on workspace creation, user customer limits validation, and last-Owner deletion protection.
   - Registered all 8 workspace and team routes in `routes/api.php` under auth middleware group.
+- **Phase 5: Webhook Channels & In-App Notification Feed (Increment 2)**
+  - Created new outbound channels `SlackWebhookChannel`, `DiscordWebhookChannel`, and `GenericWebhookChannel` utilizing framework Http clients to post notification payloads without external packages.
+  - Created `RoutesToConfiguredChannels` concern to route notifications based on `SystemSettingsService` webhook configurations, swallowing delivery exceptions gracefully to prevent pipeline disruption.
+  - Implemented database notification feed operations in a new `NotificationsController` providing paginated feeds, unread badge counters, individual read marking, and read-all actions.
+  - Registered feed API routes in `routes/api.php` under the Operations authorization group.
+  - Added comprehensive feature test suite `NotificationChannelsTest` verifying default and configured channel routing, mocking webhook payloads with `Http::fake`, and asserting in-app feed tenant isolation.
 
 ### Fixed
 - **Workspace Model**: Removed nonexistent phantom column `site_id` from `$fillable` array in `Workspace` model to prevent SQL unknown column mass assignment errors.
 - **GeneratedContent model**: Added the missing `topic()` belongsTo relationship method, fixing category resolution failure in `WordPressPublishingEnhancementTest`.
 - **Pipeline and Prompt Engine tests**: Refactored `PipelineServicesImplementationTest` and `PromptEngineImprovementTest` to use the updated newsroom category-based prompt schema rather than legacy copywriter/topic defaults, restoring 100% test suite compatibility.
+- **Integration Test Suite Validation**:
+  - Fixed `ContentCalendarSchedulerTest` to set pipeline ID on mock generated contents to allow proper SQL join queries in coverage checks.
+  - Fixed `BackendSourceOfTruthTest` and `AIContentGenerationTest` pipeline setups and assertions to use news category mapping instead of legacy topic fields.
 
 ## [2026-07-08]
 ### Added

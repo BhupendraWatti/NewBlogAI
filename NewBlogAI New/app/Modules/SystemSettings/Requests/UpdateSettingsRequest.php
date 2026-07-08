@@ -23,6 +23,9 @@ class UpdateSettingsRequest extends FormRequest
             'ai_default_model' => ['sometimes', 'required', 'string', 'max:255'],
             'image_generator_driver' => ['sometimes', 'required', 'string', 'in:pollinations,unsplash,dalle,dall-e'],
             'unsplash_access_key' => ['sometimes', 'nullable', 'string'],
+            'notify_slack_webhook_url' => ['sometimes', 'nullable', 'url', 'max:2048'],
+            'notify_discord_webhook_url' => ['sometimes', 'nullable', 'url', 'max:2048'],
+            'notify_generic_webhook_url' => ['sometimes', 'nullable', 'url', 'max:2048'],
         ];
     }
 }
