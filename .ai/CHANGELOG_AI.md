@@ -1,6 +1,9 @@
 # Changelog AI
 
 ## [2026-07-09]
+### Added
+- **Hybrid Discovery Architecture**: Implemented separate provider selection for news discovery vs full article generation. Discovery now defaults to Groq (free & fast, 5-10 seconds) while full article generation uses the user's preferred provider (Gemini/OpenAI/Claude). Frontend sends `discovery_provider` in POST body to `/api/v1/pipelines/{id}/discover`.
+
 ### Fixed
 - **AIProvider API Key Cast (CRITICAL)**: Changed invalid cast `'api_key' => '[REDACTED]'` to `'api_key' => 'encrypted'` in `AIProvider.php`. The previous value was not a valid Laravel cast type, causing API keys to be corrupted/null when read from the database. This was the root cause of "Failed to queue coverage discovery run" and all AI provider authentication failures.
 - **DatabaseSeeder Groq Model**: Updated default Groq model from deprecated `llama-3.1-70b-versatile` to active `llama-3.3-70b-versatile`. Removed mock API keys from seeder (empty strings instead of fake keys).

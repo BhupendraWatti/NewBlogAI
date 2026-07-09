@@ -123,14 +123,6 @@ class PipelineService
         }
     }
 
-    /**
-     * Trigger a Coverage discovery run for a pipeline.
-     *
-     * Produces exactly 9 unique news candidates and stops at status 'ready'
-     * pending employee selection. Never generates full articles.
-     *
-     * @param string $discoveryProvider Provider key for discovery (e.g., 'groq' for fast/free)
-     */
     public function triggerDiscovery(ContentPipeline $pipeline, string $discoveryProvider = 'groq'): PipelineRun
     {
         if (! $pipeline->is_active) {
@@ -141,12 +133,19 @@ class PipelineService
         $this->entitlements->assertCanGenerate($pipeline->site);
         
         // Validate the discovery provider exists and is enabled
-        $discoveryProviderModel = \App\Modules\AIProviderManager\Models\AIProvider::where('provider_key', $discoveryProvider)
+        $discoveryProviderModel = AIProvider::where('provider_key', $discoveryProvider)
             ->where('is_enabled', true)
             ->first();
         
         if (! $discoveryProviderModel) {
-            throw new InvalidArgumentException("Discovery provider '{$discoveryProvider}' is not available or not enabled.");
+            // Fall back to pipeline's configured provider if discovery provider not available
+            Log::warning("Discovery provider '{$discoveryProvider}' not available, falling back to pipeline provider.");
+            $discoveryProviderModel = $pipeline->provider;
+            $discoveryProvider = $pipeline->provider->provider_key;
+        }
+        
+        if (empty($discoveryProviderModel->api_key)) {
+            throw new InvalidArgumentException("Discovery provider '{$discoveryProvider}' has no API key configured.");
         }
 
         try {

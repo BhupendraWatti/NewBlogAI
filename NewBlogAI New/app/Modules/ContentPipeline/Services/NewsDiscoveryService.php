@@ -61,14 +61,17 @@ class NewsDiscoveryService
 
         $pipeline = $run->pipeline;
         $site = $pipeline?->site;
-        // Use discovery-specific provider if specified in run properties, otherwise fall back to pipeline provider
+        $prompt = $pipeline?->prompt;
+
+        // Use discovery-specific provider if specified in run properties (e.g., Groq for fast discovery)
+        // Otherwise fall back to pipeline's configured provider
         $discoveryProviderId = $run->properties['discovery_provider_id'] ?? null;
         if ($discoveryProviderId) {
             $provider = \App\Modules\AIProviderManager\Models\AIProvider::find($discoveryProviderId);
+            Log::info("NewsDiscoveryService: Using discovery provider ID {$discoveryProviderId} ({$provider?->provider_key})");
         } else {
             $provider = $pipeline?->provider;
         }
-        $prompt = $pipeline?->prompt;
 
         if (! $pipeline || ! $site || ! $provider || ! $prompt) {
             throw new RuntimeException('Discovery run has incomplete pipeline dependencies.');
