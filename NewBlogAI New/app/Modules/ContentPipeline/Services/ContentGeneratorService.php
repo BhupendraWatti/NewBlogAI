@@ -33,6 +33,16 @@ class ContentGeneratorService implements ContentGeneratorInterface
                 throw new \RuntimeException('Incomplete pipeline dependencies in context.');
             }
 
+            // Validate prompt template has content - the field is 'prompt' not 'template'
+            $promptText = $promptTemplate->prompt ?? null;
+            if (empty($promptText)) {
+                Log::warning('ContentGeneratorService: Prompt template is empty, using default.', [
+                    'prompt_id' => $promptTemplate->id,
+                    'prompt_name' => $promptTemplate->name,
+                ]);
+                $promptText = 'Write a comprehensive news article about {{category}} covering the latest developments. Include relevant facts, quotes from sources, and analysis. Target audience: general readers interested in {{category}} news.';
+            }
+
             // 1. Resolve variables from category context (no topic model needed)
             $category = $context->metadata['news_category']
                 ?? strtolower($pipeline->news_category ?? 'global');
@@ -102,9 +112,15 @@ class ContentGeneratorService implements ContentGeneratorInterface
             // 2. Modular prompt compilation
             $compiledPrompt = $this->promptEngine->buildFullPrompt(
                 $context,
-                $promptTemplate->prompt,
+                $promptText,
                 $variables
             );
+
+            Log::debug('ContentGeneratorService: Compiled prompt for generation.', [
+                'prompt_id' => $promptTemplate->id,
+                'prompt_name' => $promptTemplate->name,
+                'prompt_length' => strlen($promptText),
+            ]);
 
             // 3. Resolve driver and decrypt api key
             $client = $this->providerService->getDriver($provider->provider_key);
