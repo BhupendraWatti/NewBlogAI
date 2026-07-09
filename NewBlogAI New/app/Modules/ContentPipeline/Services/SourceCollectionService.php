@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 namespace App\Modules\ContentPipeline\Services;
 
+use App\Modules\AIProviderManager\Services\AIProviderService;
 use App\Modules\ContentPipeline\Contracts\SourceCollectorInterface;
 use App\Modules\ContentPipeline\DTOs\PipelineContext;
 use App\Modules\ContentPipeline\DTOs\SourceDTO;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class SourceCollectionService implements SourceCollectorInterface
 {
+    public function __construct(
+        protected AIProviderService $providerService
+    ) {}
     /**
      * Process the current stage of the content pipeline.
      * Simulates source collection based on research queries, normalizing and deduplicating them.
@@ -44,11 +49,19 @@ class SourceCollectionService implements SourceCollectorInterface
                 }
             }
 
-            // 2. Gather simulated sources
+            // 2. Gather real sources using the pipeline's AI provider
+            $pipeline    = $context->pipeline;
+            $provider    = $pipeline?->provider;
+            $providerKey = $provider?->provider_key ?? 'gemini';
+            $apiKey      = $provider?->api_key ?? '';
+            $model       = $provider?->default_model ?? null;
+
             foreach ($queries as $query) {
-                $simulatedSources = $this->simulateSearch($query, $topic ?? '');
-                foreach ($simulatedSources as $source) {
-                    $rawSources[] = $source;
+                if (!empty($apiKey)) {
+                    $realSources = $this->searchWithProvider($query, $topic ?? '', $providerKey, $apiKey, $model);
+                    foreach ($realSources as $source) {
+                        $rawSources[] = $source;
+                    }
                 }
             }
 
@@ -380,74 +393,179 @@ class SourceCollectionService implements SourceCollectorInterface
     }
 
     /**
-     * Simulate source collection search results for a query.
+     * Perform a real AI-grounded web search for a query.
+     * Uses Gemini Google Search grounding if provider is Gemini,
+     * otherwise falls back to a prompt-based source extraction call.
      */
     protected function simulateSearch(string $query, string $topic): array
     {
-        $slugifiedQuery = Str::slug($query);
-        $domain = 'techblog.org';
-        if (str_contains(strtolower($query), 'finance') || str_contains(strtolower($query), 'invest')) {
-            $domain = 'marketwatchers.com';
-        } elseif (str_contains(strtolower($query), 'health') || str_contains(strtolower($query), 'medical')) {
-            $domain = 'healthscience.net';
+        return [];
+    }
+
+    /**
+     * Perform real web search using the pipeline's AI provider.
+     * Uses Gemini's Google Search grounding tool when available.
+     * Falls back to prompt-based source extraction for other providers.
+     *
+     * @param string $query The search query
+     * @param string $topic The news topic/category
+     * @param string $providerKey The AI provider key (e.g. 'gemini')
+     * @param string $apiKey The decrypted API key
+     * @param string|null $model The model name
+     * @return array<int, array> Normalized source arrays
+     */
+    public function searchWithProvider(
+        string $query,
+        string $topic,
+        string $providerKey,
+        string $apiKey,
+        ?string $model = null
+    ): array {
+        try {
+            if (strtolower($providerKey) === 'gemini') {
+                return $this->searchViaGeminiGrounding($query, $topic, $apiKey, $model);
+            }
+
+            return $this->searchViaPrompt($query, $topic, $providerKey, $apiKey, $model);
+        } catch (\Exception $e) {
+            Log::warning('SourceCollectionService: Real search failed, skipping query.', [
+                'query' => $query,
+                'error' => $e->getMessage(),
+            ]);
+            return [];
+        }
+    }
+
+    /**
+     * Use Gemini's native Google Search grounding to find current news sources.
+     */
+    protected function searchViaGeminiGrounding(
+        string $query,
+        string $topic,
+        string $apiKey,
+        ?string $model = null
+    ): array {
+        $model = $model ?: 'gemini-2.5-flash';
+        $url   = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+
+        $payload = [
+            'contents' => [
+                [
+                    'parts' => [
+                        ['text' => "Search for the latest news about: {$query}. List the top 3 most relevant, real, current news sources with their URLs, titles, and brief summaries. Focus on news from the last 48 hours."],
+                    ],
+                ],
+            ],
+            'tools' => [
+                ['google_search' => (object) []],
+            ],
+            'generationConfig' => [
+                'maxOutputTokens' => 1024,
+                'temperature' => 0.1,
+            ],
+        ];
+
+        $response = Http::timeout(30)->post($url, $payload);
+
+        if (!$response->successful()) {
+            Log::warning('Gemini grounding search failed', ['status' => $response->status(), 'query' => $query]);
+            return [];
+        }
+
+        $data = $response->json();
+
+        // Extract grounding metadata (web search results)
+        $groundingChunks = $data['candidates'][0]['groundingMetadata']['groundingChunks'] ?? [];
+        $sources = [];
+
+        foreach ($groundingChunks as $chunk) {
+            $web = $chunk['web'] ?? null;
+            if (!$web || empty($web['uri'])) {
+                continue;
+            }
+
+            $sources[] = [
+                'url'     => $web['uri'],
+                'title'   => $web['title'] ?? $topic . ' News',
+                'snippet' => '',
+                'metadata' => [
+                    'query'          => $query,
+                    'publisher'      => parse_url($web['uri'], PHP_URL_HOST) ?? 'Unknown',
+                    'published_date' => now()->format('Y-m-d'),
+                    'keywords'       => array_filter(explode(' ', strtolower($topic))),
+                    'origin'         => 'gemini_grounding',
+                ],
+            ];
+        }
+
+        // Also extract inline text content as a fallback snippet source
+        $generatedText = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+        if (!empty($generatedText) && !empty($sources)) {
+            // Distribute snippets across found sources
+            $sentences = array_filter(explode('.', $generatedText));
+            foreach ($sources as $idx => &$src) {
+                if (isset($sentences[$idx])) {
+                    $src['snippet'] = trim($sentences[$idx]) . '.';
+                }
+            }
+            unset($src);
+        }
+
+        return $sources;
+    }
+
+    /**
+     * For non-Gemini providers: use a structured prompt to extract source references.
+     */
+    protected function searchViaPrompt(
+        string $query,
+        string $topic,
+        string $providerKey,
+        string $apiKey,
+        ?string $model = null
+    ): array {
+        $today = now()->format('F j, Y');
+        $prompt = "You are a news research assistant. Today is {$today}.\n\n"
+            . "Search your knowledge for the top 3 most CURRENT real news sources about: {$query}\n\n"
+            . "Respond ONLY with a valid JSON array (no markdown) of exactly 3 objects, each with:\n"
+            . '{"url": "https://...", "title": "...", "snippet": "...", "publisher": "..."}' . "\n\n"
+            . "Focus only on REAL, CURRENT events from the last 48-72 hours. Use real, working URLs from major news outlets.";
+
+        $driver = $this->providerService->getDriver($providerKey);
+        $result = $driver->generate($apiKey, $prompt, $model, ['max_tokens' => 512, 'temperature' => 0.1]);
+        $text   = trim($result['text'] ?? '');
+
+        // Strip markdown fences
+        $text = preg_replace('/^```(?:json)?|```$/m', '', $text) ?? $text;
+        $start = strpos($text, '[');
+        $end   = strrpos($text, ']');
+        if ($start === false || $end === false) {
+            return [];
+        }
+
+        $decoded = json_decode(substr($text, $start, $end - $start + 1), true);
+        if (!is_array($decoded)) {
+            return [];
         }
 
         $sources = [];
-
-        // Source 1 (Standard)
-        $sources[] = [
-            'url' => "https://www.{$domain}/articles/{$slugifiedQuery}/", // trailing slash to test normalization
-            'title' => 'Understanding ' . $topic . ': A Comprehensive Guide (' . now()->format('Y') . ')',
-            'snippet' => "This article covers the essential concepts of {$query}. It highlights critical findings, real-world applications, and future trends that professionals must be aware of in " . now()->format('Y') . '.',
-            'metadata' => [
-                'query' => $query,
-                'author' => 'Jane Doe',
-                'publisher' => ucfirst(explode('.', $domain)[0]),
-                'published_date' => now()->subDays(rand(1, 30))->format('Y-m-d'),
-                'keywords' => ['intelligence', 'pipeline', 'source', 'technology']
-            ]
-        ];
-
-        // Source 2 (Duplicate URL to test deduplication)
-        $sources[] = [
-            'url' => "HTTPS://WWW.{$domain}/articles/{$slugifiedQuery}", 
-            'title' => 'Duplicate - Understanding ' . $topic,
-            'snippet' => 'Should be filtered by deduplication.',
-            'metadata' => [
-                'query' => $query,
-                'author' => 'Jane Doe',
-                'publisher' => ucfirst(explode('.', $domain)[0]),
-                'published_date' => now()->subDays(rand(1, 30))->format('Y-m-d'),
-            ]
-        ];
-
-        // Source 3 (Regional UK source)
-        $sources[] = [
-            'url' => "https://www.ukblog.co.uk/articles/{$slugifiedQuery}",
-            'title' => 'UK Perspective on ' . $topic,
-            'snippet' => "A London perspective on {$query}. Discussing how UK companies adopt {$topic} and standardise regional processes.",
-            'metadata' => [
-                'query' => $query,
-                'author' => 'John Smith',
-                'publisher' => 'UK Tech Journal',
-                'published_date' => now()->subDays(5)->format('Y-m-d'),
-                'keywords' => ['intelligence', 'uk', 'london', 'regional']
-            ]
-        ];
-
-        // Source 4 (German source, high relevance / high keyword density)
-        $sources[] = [
-            'url' => "https://web.de/science/{$slugifiedQuery}",
-            'title' => "Specialized analysis of {$topic} and {$query}",
-            'snippet' => "Comprehensive scientific analysis of {$topic} and {$query} in Germany. Details deep tech insights about {$topic} and {$query}.",
-            'metadata' => [
-                'query' => $query,
-                'author' => 'Dr. Fritz',
-                'publisher' => 'German Science Web',
-                'published_date' => now()->subDays(10)->format('Y-m-d'),
-                'keywords' => ['intelligence', 'pipeline', 'germany', 'science']
-            ]
-        ];
+        foreach ($decoded as $item) {
+            if (empty($item['url'])) {
+                continue;
+            }
+            $sources[] = [
+                'url'     => $item['url'],
+                'title'   => $item['title'] ?? $topic . ' news',
+                'snippet' => $item['snippet'] ?? '',
+                'metadata' => [
+                    'query'          => $query,
+                    'publisher'      => $item['publisher'] ?? parse_url($item['url'], PHP_URL_HOST),
+                    'published_date' => now()->format('Y-m-d'),
+                    'keywords'       => array_filter(explode(' ', strtolower($topic))),
+                    'origin'         => 'prompt_search',
+                ],
+            ];
+        }
 
         return $sources;
     }
