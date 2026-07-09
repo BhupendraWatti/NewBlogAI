@@ -143,12 +143,12 @@
                                             <h4 class="text-xs font-mono uppercase tracking-widest text-muted">Variable Mock Inputs</h4>
                                             <div class="space-y-3">
                                                 <div>
-                                                    <label class="block text-[10px] font-mono text-muted mb-1">&#123;&#123;category&#125;&#125;</label>
-                                                    <input class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent" type="text" value="Technology"/>
+                                                    <label class="block text-[10px] font-mono text-muted mb-1" for="test-category">&#123;&#123;category&#125;&#125;</label>
+                                                    <input id="test-category" class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent" type="text" value="Technology"/>
                                                 </div>
                                                 <div>
-                                                    <label class="block text-[10px] font-mono text-muted mb-1">&#123;&#123;keywords&#125;&#125;</label>
-                                                    <input class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent" type="text" value="AI, machine learning, OpenAI"/>
+                                                    <label class="block text-[10px] font-mono text-muted mb-1" for="test-keywords">&#123;&#123;keywords&#125;&#125;</label>
+                                                    <input id="test-keywords" class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent" type="text" value="AI, machine learning, OpenAI"/>
                                                 </div>
                                                 <button onclick="runPromptTestSimulation()" class="w-full bg-secondary hover:bg-secondary/80 text-background font-medium text-xs py-2 rounded-xl transition">Execute Prompt Dry-Run</button>
                                             </div>

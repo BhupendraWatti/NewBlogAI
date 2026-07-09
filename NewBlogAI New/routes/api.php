@@ -143,8 +143,8 @@ Route::prefix('v1')->group(function () {
             Route::post('license/deactivate', [LicenseController::class, 'deactivate']);
         });
 
-        Route::middleware('auth')->group(function () {
             Route::apiResource('prompts', PromptController::class);
+            Route::post('prompts/{id}/test', [PromptController::class, 'test']);
 
             // Customer & Plan Management (SuperAdmin/Support only)
             Route::middleware('role:1,3')->group(function () {

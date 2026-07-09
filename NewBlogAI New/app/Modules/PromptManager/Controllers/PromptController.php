@@ -105,4 +105,58 @@ class PromptController extends Controller
             'message' => 'Prompt template deleted successfully.',
         ]);
     }
+
+    /**
+     * Test a prompt template with mock variable inputs (dry-run).
+     */
+    public function test(Request $request, string $id): JsonResponse
+    {
+        $prompt = Prompt::findOrFail($id);
+        $variables = $request->input('variables', []);
+
+        // Retrieve default provider or the one passed in variables
+        $providerId = $request->input('ai_provider_id');
+        $provider = $providerId ? \App\Modules\AIProviderManager\Models\AIProvider::find($providerId) : \App\Modules\AIProviderManager\Models\AIProvider::where('is_default', true)->first();
+
+        if (!$provider || !$provider->is_enabled || empty($provider->api_key)) {
+            return response()->json([
+                'message' => 'No active AI Provider with API key configured.',
+            ], 422);
+        }
+
+        // Add standard fallback mock variables if not provided
+        $mockVars = array_merge([
+            'category' => 'Technology',
+            'keywords' => 'AI, tech, innovation',
+            'language' => 'en',
+            'website' => 'https://example.com',
+            'tone' => 'Professional',
+            'date' => now()->format('F j, Y'),
+            'headline' => 'AI Revolutionizes Modern Workflows',
+            'summary' => 'Artificial intelligence tools are drastically transforming productivity and software development across sectors.',
+            'sources' => 'https://techcrunch.com',
+        ], $variables);
+
+        // Compile prompt
+        $promptEngine = app(\App\Modules\ContentPipeline\Services\PromptEngine::class);
+        $compiledPrompt = $promptEngine->compileUserPrompt($prompt->prompt, $mockVars);
+
+        try {
+            $driver = app(\App\Modules\AIProviderManager\Services\AIProviderService::class)->getDriver($provider->provider_key);
+            
+            // Limit output to avoid excessive costs during testing
+            $result = $driver->generate($provider->api_key, $compiledPrompt, $provider->default_model, [
+                'max_tokens' => 500
+            ]);
+
+            return response()->json([
+                'text' => $result['text'] ?? '',
+                'compiled_prompt' => $compiledPrompt
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'AI generation failed: ' . $e->getMessage()
+            ], 502);
+        }
+    }
 }

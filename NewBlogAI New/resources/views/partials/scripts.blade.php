@@ -2094,30 +2094,46 @@
         }
 
 
-        // Simulate live testing outputs
-        function runPromptTestSimulation() {
+        // Execute live prompt testing dry-run
+        async function runPromptTestSimulation() {
             const outWindow = document.getElementById('prompt-test-output-window');
-            outWindow.innerText = "Connecting to pipeline stub...\n";
-            
-            let lines = [
-                "Sending test payload...",
-                "Running validation checks...",
-                "Received model completion response:\n",
-                "### IBM releases new 433-qubit Osprey processor.",
-                "- Highlights massive quantum computing performance improvements.",
-                "- Increases noise protection structures.",
-                "- Employs standard multi-layered layout architectures."
-            ];
-            
-            let i = 0;
-            let timer = setInterval(() => {
-                if (i < lines.length) {
-                    outWindow.innerText += lines[i] + "\n";
-                    i++;
-                } else {
-                    clearInterval(timer);
+            if (!outWindow) return;
+
+            if (!activePromptId || activePromptId === 'new' || isNaN(activePromptId)) {
+                outWindow.innerText = "Error: Please save the prompt template settings first before executing a dry-run.";
+                return;
+            }
+
+            const category = document.getElementById('test-category')?.value || 'Technology';
+            const keywords = document.getElementById('test-keywords')?.value || 'AI, tech';
+
+            outWindow.innerText = "Connecting to AI Provider...\n";
+            outWindow.innerText += "Sending mock variables (Category: '" + category + "', Keywords: '" + keywords + "')...\n";
+            outWindow.innerText += "Compiling prompt template and waiting for response...\n\n";
+
+            try {
+                const response = await apiFetch(`/api/v1/prompts/${activePromptId}/test`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        variables: {
+                            category: category,
+                            keywords: keywords
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.message || "Failed to execute prompt test.");
                 }
-            }, 300);
+
+                const result = await response.json();
+                outWindow.innerText = result.text || "Model execution returned an empty response.";
+            } catch (err) {
+                console.error("Prompt dry-run error:", err);
+                outWindow.innerText = "Dry-run Failed:\n" + err.message;
+            }
         }
 
         // Simulate real-time pipeline run loops
