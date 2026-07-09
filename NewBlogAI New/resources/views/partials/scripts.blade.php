@@ -3701,34 +3701,26 @@
 
         let lastGeneratedText = '';
         let lastGeneratedTitle = '';
+        let lastGeneratedArticleId = null;
+        let currentPipelineId = null;
+        let currentRunId = null;
 
-
-        window.triggerContentGeneration = async function() {
+        // ── Step 1: Discover 9 trending news stories ──────────────────────────────
+        window.triggerDiscover = async function() {
             const siteId   = document.getElementById('gen-site')?.value;
             const provider = document.getElementById('gen-provider')?.value;
             const category = document.getElementById('gen-category')?.value;
             const country  = document.getElementById('gen-country')?.value;
             const promptId = document.getElementById('gen-prompt')?.value;
             const lang     = document.getElementById('gen-language')?.value;
-            const output   = document.getElementById('gen-output');
-            const badge    = document.getElementById('gen-status-badge');
-            const container   = document.getElementById('gen-preview-container');
-            const generateBtn = document.getElementById('generate-btn');
-            const copyBtn     = document.getElementById('btn-copy-gen');
-            const queueBtn    = document.getElementById('btn-queue-gen');
+            const btn      = document.getElementById('discover-btn');
 
             if (!siteId || !provider || !category || !promptId) return;
 
-            if (container) container.classList.remove('hidden');
-            if (badge) badge.classList.remove('hidden');
-            if (generateBtn) generateBtn.disabled = true;
-            if (copyBtn) copyBtn.disabled = true;
-            if (queueBtn) queueBtn.disabled = true;
-
-            if (output) output.innerHTML = '<div class="flex items-center gap-2"><span class="material-symbols-outlined text-warning animate-spin text-base">autorenew</span><span>Synthesizing news content via AI pipeline...</span></div>';
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">autorenew</span> Discovering stories...'; }
 
             try {
-                // Create pipeline directly with news_category — no topic needed
+                // Create a pipeline
                 const pipelinePayload = {
                     site_id:        parseInt(siteId),
                     news_category:  category,
@@ -3739,86 +3731,281 @@
                     is_active:      true
                 };
 
-                const createPipeRes = await apiFetch('/api/v1/pipelines', {
+                const createRes = await apiFetch('/api/v1/pipelines', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(pipelinePayload)
                 });
-
-                if (!createPipeRes.ok) {
-                    const errRes = await createPipeRes.json();
-                    throw new Error(errRes.message || "Failed to configure pipeline.");
+                if (!createRes.ok) {
+                    const errData = await createRes.json();
+                    throw new Error(errData.message || 'Failed to create pipeline.');
                 }
+                const newPipe = await createRes.json();
+                currentPipelineId = newPipe.data?.id ?? newPipe.id;
 
-                const newPipe = await createPipeRes.json();
-                const pipeId = newPipe.data ? newPipe.data.id : newPipe.id;
-
-                // Execute the pipeline!
-                const execRes = await apiFetch(`/api/v1/pipelines/${pipeId}/execute`, { method: 'POST' });
-                if (!execRes.ok) {
-                    throw new Error("Failed to execute content generation pipeline.");
+                // Run discovery
+                const discoverRes = await apiFetch(`/api/v1/pipelines/${currentPipelineId}/discover`, { method: 'POST' });
+                if (!discoverRes.ok) {
+                    const errData = await discoverRes.json();
+                    throw new Error(errData.message || 'Discovery failed.');
                 }
+                const discoverData = await discoverRes.json();
+                currentRunId = discoverData.data?.run_id ?? discoverData.run_id ?? null;
 
-                setTimeout(async () => {
-                    await fetchRecentRuns();
-                    
-                    try {
-                        const articlesRes = await apiFetch('/api/v1/articles');
-                        if (articlesRes.ok) {
-                            const articles = await articlesRes.json();
-                            const list = articles.data || articles;
-                            
-                            if (list.length > 0) {
-                                const latest = list.find(article => article.pipeline_id === pipeId || article.pipeline?.id === pipeId) || list[0];
-                                lastGeneratedTitle = latest.title;
-                                lastGeneratedText = latest.content;
-
-                                if (output) {
-                                    output.innerHTML = `
-                                        <div class="space-y-3 font-sans">
-                                            <h3 class="text-sm font-bold text-accent">${latest.title}</h3>
-                                            <div class="text-xs text-text leading-relaxed max-h-[250px] overflow-y-auto custom-scrollbar pr-2">${latest.content}</div>
-                                            <p class="text-[10px] text-muted border-t border-border pt-2 font-mono">Database Log ID: ${latest.id} | Status: ${latest.status}</p>
-                                        </div>
-                                    `;
-                                }
-                            } else {
-                                // No articles found — clear spinner with a message
-                                if (output) {
-                                    output.innerHTML = `<div class="text-xs text-warning flex items-center gap-2"><span class="material-symbols-outlined text-sm">warning</span><span>Generation completed but no article was saved. Check AI provider configuration and Laravel logs.</span></div>`;
-                                }
-                            }
-                        } else {
-                            if (output) {
-                                output.innerHTML = `<div class="text-xs text-danger flex items-center gap-2"><span class="material-symbols-outlined text-sm">error</span><span>Could not retrieve generated articles. Server returned ${articlesRes.status}.</span></div>`;
-                            }
-                        }
-                    } catch (fetchErr) {
-                        if (output) {
-                            output.innerHTML = `<div class="text-xs text-danger flex items-center gap-2"><span class="material-symbols-outlined text-sm">error</span><span>Error loading article preview: ${fetchErr.message}</span></div>`;
-                        }
-                    }
-
-                    if (badge) badge.classList.add('hidden');
-                    if (generateBtn) generateBtn.disabled = false;
-                    if (copyBtn) copyBtn.disabled = false;
-                    if (queueBtn) queueBtn.disabled = false;
-                    
-                    if (window.refreshDashboardStats) {
-                        await window.refreshDashboardStats();
-                    }
-                    showSuccess("Content Generated", "Content generation completed and saved to database.");
-                }, 5000);
-
+                // If run_id returned, fetch candidates; otherwise poll
+                if (currentRunId) {
+                    await loadCandidates(currentRunId);
+                } else {
+                    // Poll for run completion
+                    if (btn) btn.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">autorenew</span> AI is searching the web...';
+                    await pollForCandidates(currentPipelineId);
+                }
             } catch (err) {
-                console.error("Error generating content:", err);
-                showError("Generation Failed", err.message || "Could not generate content.");
-                if (badge) badge.classList.add('hidden');
-                if (generateBtn) generateBtn.disabled = false;
-                if (copyBtn) copyBtn.disabled = false;
-                if (queueBtn) queueBtn.disabled = false;
+                console.error('Discover error:', err);
+                showError('Discovery Failed', err.message || 'Could not discover news stories.');
+                if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined text-sm">travel_explore</span> Discover Top News Stories'; }
             }
         };
+
+        async function pollForCandidates(pipelineId, maxAttempts = 20, intervalMs = 3000) {
+            for (let i = 0; i < maxAttempts; i++) {
+                await new Promise(r => setTimeout(r, intervalMs));
+                try {
+                    const runsRes = await apiFetch(`/api/v1/pipelines/${pipelineId}/runs`);
+                    if (runsRes.ok) {
+                        const runsData = await runsRes.json();
+                        const runs = runsData.data ?? runsData;
+                        const ready = Array.isArray(runs) ? runs.find(r => r.status === 'ready' || r.status === 'completed') : null;
+                        if (ready) {
+                            currentRunId = ready.id;
+                            await loadCandidates(ready.id);
+                            return;
+                        }
+                        const failed = Array.isArray(runs) ? runs.find(r => r.status === 'failed') : null;
+                        if (failed) throw new Error(failed.error_message || 'Discovery run failed.');
+                    }
+                } catch (err) {
+                    throw err;
+                }
+            }
+            throw new Error('Discovery timed out. Check AI provider configuration.');
+        }
+
+        async function loadCandidates(runId) {
+            const res = await apiFetch(`/api/v1/pipelines/runs/${runId}/candidates`);
+            if (!res.ok) throw new Error('Could not load news candidates.');
+            const data = await res.json();
+            const candidates = data.data ?? data;
+
+            if (!Array.isArray(candidates) || candidates.length === 0) {
+                throw new Error('No news candidates returned. Try a different topic or check provider.');
+            }
+
+            renderCandidates(candidates);
+        }
+
+        function renderCandidates(candidates) {
+            const grid = document.getElementById('candidates-grid');
+            const countEl = document.getElementById('candidates-count');
+            if (countEl) countEl.textContent = candidates.length;
+
+            grid.innerHTML = '';
+            candidates.forEach((c, idx) => {
+                const trend = c.trend_score ?? 0;
+                const fresh = c.freshness_score ?? 0;
+                const keywords = Array.isArray(c.keywords) ? c.keywords.slice(0, 4) : [];
+                const sources = Array.isArray(c.source_references) ? c.source_references.slice(0, 2) : [];
+
+                const trendColor = trend >= 70 ? 'text-green-400' : trend >= 40 ? 'text-yellow-400' : 'text-muted';
+
+                const card = document.createElement('div');
+                card.className = 'glass-surface rounded-2xl p-4 space-y-3 border border-border hover:border-accent/50 transition-all cursor-pointer group';
+                card.innerHTML = `
+                    <div class="flex items-start justify-between gap-2">
+                        <span class="text-[10px] font-mono text-muted bg-surface border border-border px-2 py-0.5 rounded-full">#${idx + 1}</span>
+                        <div class="flex gap-1.5">
+                            <span class="text-[9px] font-mono ${trendColor} border border-current/30 px-1.5 py-0.5 rounded-full">⚡ ${trend}% trend</span>
+                            <span class="text-[9px] font-mono text-blue-400 border border-blue-400/30 px-1.5 py-0.5 rounded-full">🕐 ${fresh}% fresh</span>
+                        </div>
+                    </div>
+                    <h4 class="text-xs font-semibold text-text leading-snug group-hover:text-accent transition-colors">${(c.title || 'Untitled').replace(/</g, '&lt;')}</h4>
+                    <p class="text-[10px] text-muted leading-relaxed line-clamp-3">${(c.summary || 'No summary available.').replace(/</g, '&lt;')}</p>
+                    ${keywords.length ? `<div class="flex flex-wrap gap-1">${keywords.map(k => `<span class="text-[9px] text-accent/70 bg-accent/10 border border-accent/20 px-1.5 py-0.5 rounded-full">${k}</span>`).join('')}</div>` : ''}
+                    ${sources.length ? `<div class="text-[9px] text-muted font-mono border-t border-border pt-2">${sources.map(s => `<div class="truncate">📰 ${s.name || s.url || ''}</div>`).join('')}</div>` : ''}
+                    <button onclick="generateFromCandidate(${c.id})" class="w-full bg-accent/10 hover:bg-accent text-accent hover:text-background font-bold text-[10px] py-2 rounded-xl transition flex items-center justify-center gap-1.5 border border-accent/30 hover:border-accent mt-1">
+                        <span class="material-symbols-outlined text-xs">auto_awesome</span>
+                        Generate Article
+                    </button>
+                `;
+                grid.appendChild(card);
+            });
+
+            // Switch to step 2
+            setStep(2);
+            const btn = document.getElementById('discover-btn');
+            if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined text-sm">travel_explore</span> Discover Top News Stories'; }
+        }
+
+        // ── Step 2 → 3: Generate article from selected candidate ──────────────────
+        window.generateFromCandidate = async function(candidateId) {
+            const btn = event?.target?.closest('button');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined text-xs animate-spin">autorenew</span> Writing...'; }
+
+            try {
+                const res = await apiFetch(`/api/v1/coverage/candidates/${candidateId}/select`, { method: 'POST' });
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.message || 'Generation failed.');
+                }
+                const data = await res.json();
+
+                // Poll for the generated article
+                showSuccess('Generating...', 'Article is being written. This may take 10–30 seconds.');
+                await pollForArticle(currentPipelineId, candidateId, data);
+            } catch (err) {
+                console.error('generateFromCandidate error:', err);
+                showError('Generation Failed', err.message || 'Could not generate article.');
+                if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined text-xs">auto_awesome</span> Generate Article'; }
+            }
+        };
+
+        async function pollForArticle(pipelineId, candidateId, selectResponse, maxAttempts = 30, intervalMs = 3000) {
+            // The select endpoint may return the article directly
+            const direct = selectResponse.data ?? selectResponse;
+            if (direct?.content || direct?.article?.content) {
+                const article = direct.article ?? direct;
+                showArticle(article);
+                return;
+            }
+
+            // Otherwise poll articles list
+            for (let i = 0; i < maxAttempts; i++) {
+                await new Promise(r => setTimeout(r, intervalMs));
+                const res = await apiFetch('/api/v1/articles');
+                if (!res.ok) continue;
+                const data = await res.json();
+                const list = data.data ?? data;
+                const latest = Array.isArray(list) && list.length > 0 ? list[0] : null;
+                if (latest && (latest.pipeline_id === pipelineId || i > 5)) {
+                    showArticle(latest);
+                    return;
+                }
+            }
+            throw new Error('Article generation timed out. Check Laravel logs.');
+        }
+
+        function showArticle(article) {
+            lastGeneratedTitle = article.title || '';
+            lastGeneratedText  = article.content || '';
+            lastGeneratedArticleId = article.id || null;
+
+            // Article preview
+            const output = document.getElementById('gen-output');
+            if (output) output.textContent = lastGeneratedText;
+
+            // Meta panel
+            const meta = document.getElementById('article-meta');
+            if (meta) {
+                meta.innerHTML = `
+                    <div class="flex justify-between"><span class="text-muted">Title:</span><span class="text-text font-medium text-right max-w-[160px] truncate">${(article.title || '').replace(/</g,'&lt;')}</span></div>
+                    <div class="flex justify-between"><span class="text-muted">Status:</span><span class="px-2 py-0.5 rounded bg-accent/20 text-accent border border-accent/30 text-[9px] font-mono">${article.status || 'generated'}</span></div>
+                    <div class="flex justify-between"><span class="text-muted">DB ID:</span><span class="font-mono text-muted">#${article.id || '—'}</span></div>
+                    <div class="flex justify-between"><span class="text-muted">Words:</span><span class="font-mono text-muted">${lastGeneratedText.split(/\s+/).filter(Boolean).length}</span></div>
+                `;
+            }
+
+            setStep(3);
+            fetchRecentRuns();
+            if (window.refreshDashboardStats) window.refreshDashboardStats();
+        }
+
+        // ── Copy / Queue actions ──────────────────────────────────────────────────
+        window.copyGeneratedArticle = function() {
+            if (!lastGeneratedText) { showError('Nothing to Copy', 'No article has been generated yet.'); return; }
+            if (navigator.clipboard?.writeText) {
+                navigator.clipboard.writeText(lastGeneratedText)
+                    .then(() => showSuccess('Copied!', 'Article content copied to clipboard.'))
+                    .catch(() => fallbackCopyText(lastGeneratedText));
+            } else {
+                fallbackCopyText(lastGeneratedText);
+            }
+        };
+
+        window.queueGeneratedArticle = async function() {
+            if (!lastGeneratedArticleId) { showError('No Article', 'Generate an article first.'); return; }
+            const siteId = document.getElementById('gen-site')?.value;
+            if (!siteId) { showError('No Site', 'Select a target website.'); return; }
+            try {
+                const res = await apiFetch(`/api/v1/articles/${lastGeneratedArticleId}/publish`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ site_id: parseInt(siteId), wp_status: 'draft' })
+                });
+                if (!res.ok) throw new Error('Failed to queue article.');
+                showSuccess('Queued!', 'Article sent to publishing queue.');
+                fetchRecentRuns();
+            } catch (err) {
+                showError('Queue Failed', err.message);
+            }
+        };
+
+        // ── Step navigation helpers ───────────────────────────────────────────────
+        function setStep(step) {
+            document.getElementById('newsroom-step-1').classList.toggle('hidden', step !== 1);
+            document.getElementById('newsroom-step-2').classList.toggle('hidden', step !== 2);
+            document.getElementById('newsroom-step-3').classList.toggle('hidden', step !== 3);
+
+            ['step-badge-1', 'step-badge-2', 'step-badge-3'].forEach((id, i) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                if (i + 1 === step) {
+                    el.className = 'px-2.5 py-1 rounded-full bg-accent text-background font-bold';
+                } else {
+                    el.className = 'px-2.5 py-1 rounded-full bg-surface border border-border text-muted font-bold';
+                }
+            });
+        }
+
+        window.resetToStep1 = function() { setStep(1); currentPipelineId = null; currentRunId = null; };
+        window.resetToStep2 = function() { setStep(2); };
+
+        // ── Form validation — enable discover button ───────────────────────────────
+        function validatePipelineForm() {
+            const site     = document.getElementById('gen-site')?.value;
+            const provider = document.getElementById('gen-provider')?.value;
+            const category = document.getElementById('gen-category')?.value;
+            const prompt   = document.getElementById('gen-prompt')?.value;
+            const btn      = document.getElementById('discover-btn');
+            if (btn) btn.disabled = !(site && provider && category && prompt);
+        }
+
+        document.addEventListener('change', function(e) {
+            if (e.target.matches('#node-pipeline select, #node-pipeline input')) {
+                validatePipelineForm();
+            }
+        });
+
+        document.addEventListener('input', function(e) {
+            if (e.target.matches('#node-pipeline input')) {
+                validatePipelineForm();
+            }
+        });
+
+        function fallbackCopyText(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showSuccess('Copied', 'Article content copied to clipboard!');
+            } catch (err) {
+                showError('Copy Failed', 'Unable to copy text.');
+            }
+            document.body.removeChild(textArea);
+        }
 
         window.previewArticleText = async function(id) {
             try {
@@ -3962,64 +4149,7 @@
             }
         };
 
-        // Enable generate button only when all required fields are set
-        function validatePipelineForm() {
-            const site     = document.getElementById('gen-site')?.value;
-            const provider = document.getElementById('gen-provider')?.value;
-            const category = document.getElementById('gen-category')?.value;
-            const prompt   = document.getElementById('gen-prompt')?.value;
-            const btn      = document.getElementById('generate-btn');
-            if (btn) btn.disabled = !(site && provider && category && prompt);
-        }
 
-        document.addEventListener('change', function(e) {
-            if (e.target.matches('#node-pipeline select, #node-pipeline input')) {
-                validatePipelineForm();
-            }
-        });
-
-        document.addEventListener('input', function(e) {
-            if (e.target.matches('#node-pipeline input')) {
-                validatePipelineForm();
-            }
-        });
-
-        // Copy generated content to clipboard
-        document.addEventListener('click', function(e) {
-            const btn = e.target.closest('#btn-copy-gen');
-            if (!btn) return;
-
-            if (!lastGeneratedText) {
-                showError("Copy Failed", "No content available to copy.");
-                return;
-            }
-
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(lastGeneratedText)
-                    .then(() => showSuccess("Copied", "Article content copied to clipboard!"))
-                    .catch(err => {
-                        fallbackCopyText(lastGeneratedText);
-                    });
-            } else {
-                fallbackCopyText(lastGeneratedText);
-            }
-        });
-
-        function fallbackCopyText(text) {
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-            textArea.style.position = "fixed"; // avoid scrolling
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            try {
-                document.execCommand('copy');
-                showSuccess("Copied", "Article content copied to clipboard!");
-            } catch (err) {
-                showError("Copy Failed", "Unable to copy text.");
-            }
-            document.body.removeChild(textArea);
-        }
 
         // Insert prompt placeholder variable chip into textarea at current cursor position
         document.addEventListener('click', function(e) {
