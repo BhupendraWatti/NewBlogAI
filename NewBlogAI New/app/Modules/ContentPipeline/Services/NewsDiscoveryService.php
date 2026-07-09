@@ -112,6 +112,8 @@ class NewsDiscoveryService
                         'max_tokens'  => self::DISCOVERY_MAX_TOKENS,
                         // Low temperature: we want factual structured output, not creativity
                         'temperature' => 0.2,
+                        // Extended timeout for discovery (9 JSON objects with 8192 tokens)
+                        'timeout'     => 150,
                     ]
                 );
 

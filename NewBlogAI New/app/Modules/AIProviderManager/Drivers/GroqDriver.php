@@ -14,7 +14,7 @@ class GroqDriver implements AIProviderClientInterface
 
         try {
             $response = Http::withToken($apiKey)
-                ->timeout(10)
+                ->timeout(15)
                 ->post('https://api.groq.com/openai/v1/chat/completions', [
                     'model' => $model,
                     'messages' => [
@@ -41,9 +41,12 @@ class GroqDriver implements AIProviderClientInterface
     {
         $model = $model ?: 'llama-3.3-70b-versatile';
 
+        // Groq is fast but large JSON outputs still need reasonable timeout
+        $timeout = $options['timeout'] ?? 120;
+
         try {
             $response = Http::withToken($apiKey)
-                ->timeout($options['timeout'] ?? 90)
+                ->timeout($timeout)
                 ->post('https://api.groq.com/openai/v1/chat/completions', [
                     'model' => $model,
                     'messages' => [
@@ -64,8 +67,8 @@ class GroqDriver implements AIProviderClientInterface
             $completionTokens = $usage['completion_tokens'] ?? 0;
             $totalTokens = $usage['total_tokens'] ?? 0;
 
-            // Groq Pricing estimation (llama-3-70b rates)
-            $cost = (($promptTokens * 0.00005) + ($completionTokens * 0.00005)) / 1000;
+            // Groq Pricing estimation (llama-3.3-70b rates)
+            $cost = (($promptTokens * 0.00059) + ($completionTokens * 0.00079)) / 1000;
 
             return [
                 'text' => $text,

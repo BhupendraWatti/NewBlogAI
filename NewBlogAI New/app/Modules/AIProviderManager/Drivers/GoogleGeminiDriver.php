@@ -14,7 +14,7 @@ class GoogleGeminiDriver implements AIProviderClientInterface
         $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
 
         try {
-            $response = Http::timeout(10)->post($url, [
+            $response = Http::timeout(15)->post($url, [
                 'contents' => [
                     [
                         'parts' => [
@@ -46,8 +46,11 @@ class GoogleGeminiDriver implements AIProviderClientInterface
         $model = $model ?: 'gemini-2.5-flash';
         $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
 
+        // Gemini 2.5 "thinking" models need longer timeouts for large token outputs
+        $timeout = $options['timeout'] ?? 180;
+
         try {
-            $response = Http::timeout($options['timeout'] ?? 90)->post($url, [
+            $response = Http::timeout($timeout)->post($url, [
                 'contents' => [
                     [
                         'parts' => [
