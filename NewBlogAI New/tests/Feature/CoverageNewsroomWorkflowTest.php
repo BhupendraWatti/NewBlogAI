@@ -91,6 +91,7 @@ class CoverageNewsroomWorkflowTest extends TestCase
         $entitlements = Mockery::mock(EntitlementService::class);
         $entitlements->shouldReceive('assertCanGenerate')->andReturnNull();
         $entitlements->shouldReceive('assertProviderAvailable')->andReturnNull();
+        $entitlements->shouldReceive('assertAnyProviderAvailable')->andReturnNull();
         $entitlements->shouldReceive('reserveGeneration')->andReturnUsing(function () {
             return AIRequestLog::create([
                 'provider' => 'openai',

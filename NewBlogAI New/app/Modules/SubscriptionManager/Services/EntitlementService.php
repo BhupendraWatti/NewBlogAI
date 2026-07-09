@@ -245,6 +245,65 @@ class EntitlementService
         }
     }
 
+    /**
+     * Assert that at least one enabled+configured AI provider is allowed by
+     * this site's subscription plan.
+     *
+     * Used by the run-trigger path so that the subscription check does NOT
+     * block execution when the pipeline's *preferred* provider is temporarily
+     * unavailable (429/503). The failover loop in ContentGenerationService /
+     * NewsDiscoveryService selects the actual working provider at runtime.
+     *
+     * Passes when:
+     *  - The site has no subscription (treated as unrestricted).
+     *  - The subscription plan has no provider restrictions (empty allowlist).
+     *  - At least one AIProvider that is enabled and has a valid API key
+     *    appears in the subscription plan's allowlist.
+     *
+     * @throws EntitlementDeniedException when zero enabled+keyed providers are
+     *   allowed by the subscription plan.
+     */
+    public function assertAnyProviderAvailable(Site $site): void
+    {
+        $subscription = $this->subscriptionForSite($site);
+        if (! $subscription) {
+            // No subscription → no restrictions
+            return;
+        }
+
+        $planAllowed = array_map(
+            'strtolower',
+            $this->limits($subscription)['ai_providers_available']
+        );
+
+        if ($planAllowed === []) {
+            // Empty allowlist means all providers are permitted on this plan
+            return;
+        }
+
+        // Check that at least one enabled provider with a valid API key is in
+        // the plan's allowed list. We deliberately avoid caching — this query
+        // is cheap and we want the freshest state at trigger time.
+        $enabledKeys = \App\Modules\AIProviderManager\Models\AIProvider::where('is_enabled', true)
+            ->whereNotNull('api_key')
+            ->pluck('provider_key')
+            ->map('strtolower')
+            ->toArray();
+
+        $intersection = array_intersect($planAllowed, $enabledKeys);
+
+        if (empty($intersection)) {
+            throw new EntitlementDeniedException(
+                'No AI provider allowed by this subscription is currently enabled and configured. '
+                    .'Please add a valid API key for one of: '.implode(', ', $planAllowed).'.',
+                'ai_providers_available',
+                implode(',', $planAllowed),
+                'none',
+            );
+        }
+    }
+
+
     public function assertCanGenerate(Site $site): ?Subscription
     {
         $subscription = $this->subscriptionForSite($site);

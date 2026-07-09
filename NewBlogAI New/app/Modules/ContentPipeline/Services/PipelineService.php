@@ -89,6 +89,13 @@ class PipelineService
 
     /**
      * Trigger execution run for a pipeline.
+     *
+     * The provider check here deliberately uses assertAnyProviderAvailable()
+     * rather than assertProviderAvailable() so that a temporarily rate-limited
+     * or overloaded preferred provider does not block the job from being queued.
+     * ContentGenerationService::generateWithFailover() tries providers in
+     * priority order at execution time and recovers from 429/503 errors
+     * automatically.
      */
     public function triggerRun(ContentPipeline $pipeline, array $properties = []): PipelineRun
     {
@@ -98,7 +105,21 @@ class PipelineService
 
         $pipeline->loadMissing(['site', 'provider']);
         $this->entitlements->assertCanGenerate($pipeline->site);
-        $this->entitlements->assertProviderAvailable($pipeline->site, $pipeline->provider->provider_key);
+
+        // Failover-aware provider check: passes when ANY enabled+configured
+        // provider is permitted by the subscription plan — not just the
+        // pipeline's single preferred provider.
+        $this->entitlements->assertAnyProviderAvailable($pipeline->site);
+
+        // Warn (but do not block) when the pipeline's preferred provider is
+        // not currently enabled / keyed — failover will handle it at runtime.
+        $preferred = $pipeline->provider;
+        if (! $preferred || ! $preferred->is_enabled || empty($preferred->api_key)) {
+            Log::warning('PipelineService: Preferred provider unavailable at trigger time; failover will be used.', [
+                'pipeline_id'        => $pipeline->id,
+                'preferred_provider' => $preferred?->provider_key ?? 'none',
+            ]);
+        }
 
         try {
             return DB::transaction(function () use ($pipeline, $properties) {
@@ -122,6 +143,7 @@ class PipelineService
             throw new \RuntimeException('Failed to queue pipeline execution run.', 0, $e);
         }
     }
+
 
     /**
      * Trigger a coverage discovery run for a pipeline.
