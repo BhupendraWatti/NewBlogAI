@@ -82,7 +82,7 @@ class DatabaseSeeder extends Seeder
         AIProvider::create([
             'provider_key' => 'openai',
             'name' => 'OpenAI',
-            'api_key' => 'sk-proj-mockopenaiapikeyvaluehere',
+            'api_key' => '',
             'default_model' => 'gpt-4o',
             'is_default' => true,
             'is_enabled' => true,
@@ -90,7 +90,7 @@ class DatabaseSeeder extends Seeder
         AIProvider::create([
             'provider_key' => 'gemini',
             'name' => 'Google Gemini',
-            'api_key' => 'AIzaSy-mockgeminiapikeyvaluehere',
+            'api_key' => '',
             'default_model' => 'gemini-2.5-flash',
             'is_default' => false,
             'is_enabled' => true,
@@ -98,7 +98,7 @@ class DatabaseSeeder extends Seeder
         AIProvider::create([
             'provider_key' => 'claude',
             'name' => 'Claude (Anthropic)',
-            'api_key' => 'sk-ant-mockclaudeapikeyvaluehere',
+            'api_key' => '',
             'default_model' => 'claude-3-5-sonnet-20241022',
             'is_default' => false,
             'is_enabled' => true,
@@ -106,15 +106,15 @@ class DatabaseSeeder extends Seeder
         AIProvider::create([
             'provider_key' => 'groq',
             'name' => 'Groq',
-            'api_key' => 'gsk_mockgroqapikeyvaluehere',
-            'default_model' => 'llama-3.1-70b-versatile',
+            'api_key' => '',
+            'default_model' => 'llama-3.3-70b-versatile',
             'is_default' => false,
             'is_enabled' => true,
         ]);
         AIProvider::create([
             'provider_key' => 'openrouter',
             'name' => 'OpenRouter',
-            'api_key' => 'sk-or-mockopenrouterapikeyvaluehere',
+            'api_key' => '',
             'default_model' => 'openai/gpt-4o',
             'is_default' => false,
             'is_enabled' => true,
