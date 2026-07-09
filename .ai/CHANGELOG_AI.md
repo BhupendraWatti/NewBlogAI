@@ -1,6 +1,10 @@
 # Changelog AI
 
 ## [2026-07-09]
+### Fixed
+- **AIProvider API Key Cast (CRITICAL)**: Changed invalid cast `'api_key' => '[REDACTED]'` to `'api_key' => 'encrypted'` in `AIProvider.php`. The previous value was not a valid Laravel cast type, causing API keys to be corrupted/null when read from the database. This was the root cause of "Failed to queue coverage discovery run" and all AI provider authentication failures.
+- **DatabaseSeeder Groq Model**: Updated default Groq model from deprecated `llama-3.1-70b-versatile` to active `llama-3.3-70b-versatile`. Removed mock API keys from seeder (empty strings instead of fake keys).
+
 ### Added
 - **Phase 5: Enterprise Workspace & Team API (Increment 1)**
   - Implemented HTTP layer for Workspace & Team management: added `StoreWorkspaceRequest`, `UpdateWorkspaceRequest`, `StoreEmployeeRequest`, `UpdateEmployeeRequest`, `WorkspaceResource`, `EmployeeResource`, and `WorkspaceController` with tenant isolation.
