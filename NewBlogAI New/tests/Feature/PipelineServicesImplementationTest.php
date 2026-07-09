@@ -130,6 +130,17 @@ class PipelineServicesImplementationTest extends TestCase
             'Laravel 12 Features latest updates', // exact duplicate query
         ]);
 
+        // Pre-seed one source so the test is network-independent.
+        // SourceCollectionService validates deduplication and normalisation logic;
+        // live API calls are not the concern of this unit-level test.
+        $context->addSource([
+            'url'       => 'https://laravel-news.com/laravel-12-features',
+            'title'     => 'Laravel 12 Features: What\'s New in the Framework',
+            'snippet'   => 'Laravel 12 brings exciting new features including improved routing and better performance.',
+            'publisher' => 'Laravel News',
+            'metadata'  => ['origin' => 'test_seed'],
+        ]);
+
         $context = $collector->handle($context);
 
         $this->assertFalse($context->hasErrors());

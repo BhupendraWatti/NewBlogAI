@@ -14,7 +14,7 @@ class GoogleGeminiDriver implements AIProviderClientInterface
         $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
 
         try {
-            $response = Http::timeout(15)->post($url, [
+            $response = Http::timeout(90)->post($url, [
                 'contents' => [
                     [
                         'parts' => [
