@@ -77,6 +77,8 @@ class NewsDiscoveryService
      */
     public function discover(PipelineRun $run): void
     {
+        @set_time_limit(300); // 5 minutes execution limit for candidate discovery
+
         if (! $run->isDiscovery()) {
             throw new RuntimeException("Run ID {$run->id} is not a discovery run.");
         }

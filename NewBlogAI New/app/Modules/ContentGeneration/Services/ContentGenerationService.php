@@ -75,6 +75,8 @@ class ContentGenerationService
      */
     public function generateContentForRun(PipelineRun $run): GeneratedContent
     {
+        @set_time_limit(300); // 5 minutes execution limit for full article generation
+
         $pipeline = $run->pipeline;
         if (! $pipeline) {
             throw new InvalidArgumentException('Pipeline run has no associated pipeline config.');

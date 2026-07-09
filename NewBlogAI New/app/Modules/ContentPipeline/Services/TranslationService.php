@@ -50,7 +50,7 @@ class TranslationService implements TranslationInterface
                     return $context;
                 }
 
-                $provider = $pipeline->provider ?? null;
+                $provider = $context->overrideProvider ?? $pipeline->provider ?? null;
                 $apiKey = $provider?->api_key;
 
                 if ($provider && !empty($apiKey) && !app()->runningUnitTests() && $apiKey !== 'some-api-key') {

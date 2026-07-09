@@ -51,7 +51,7 @@ class SourceCollectionService implements SourceCollectorInterface
 
             // 2. Gather real sources using the pipeline's AI provider
             $pipeline    = $context->pipeline;
-            $provider    = $pipeline?->provider;
+            $provider    = $context->overrideProvider ?? $pipeline?->provider;
             $providerKey = $provider?->provider_key ?? 'gemini';
             $apiKey      = $provider?->api_key ?? '';
             $model       = $provider?->default_model ?? null;
