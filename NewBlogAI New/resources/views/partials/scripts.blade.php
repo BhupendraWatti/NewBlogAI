@@ -3755,7 +3755,7 @@
                     throw new Error(errData.message || 'Discovery failed.');
                 }
                 const discoverData = await discoverRes.json();
-                currentRunId = discoverData.data?.run_id ?? discoverData.run_id ?? null;
+                currentRunId = discoverData.data?.id ?? discoverData.data?.run_id ?? discoverData.run_id ?? null;
 
                 // If run_id returned, fetch candidates; otherwise poll
                 if (currentRunId) {
@@ -3800,7 +3800,7 @@
             const res = await apiFetch(`/api/v1/pipelines/runs/${runId}/candidates`);
             if (!res.ok) throw new Error('Could not load news candidates.');
             const data = await res.json();
-            const candidates = data.data ?? data;
+            const candidates = data.data?.candidates ?? data.data ?? data;
 
             if (!Array.isArray(candidates) || candidates.length === 0) {
                 throw new Error('No news candidates returned. Try a different topic or check provider.');
