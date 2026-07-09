@@ -3743,8 +3743,13 @@
                 const newPipe = await createRes.json();
                 currentPipelineId = newPipe.data?.id ?? newPipe.id;
 
-                // Run discovery
-                const discoverRes = await apiFetch(`/api/v1/pipelines/${currentPipelineId}/discover`, { method: 'POST' });
+                // Run discovery (use Groq for fast, free discovery)
+                const discoveryProvider = document.getElementById('gen-discovery-provider')?.value || 'groq';
+                const discoverRes = await apiFetch(`/api/v1/pipelines/${currentPipelineId}/discover`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ discovery_provider: discoveryProvider })
+                });
                 if (!discoverRes.ok) {
                     const errData = await discoverRes.json();
                     throw new Error(errData.message || 'Discovery failed.');
