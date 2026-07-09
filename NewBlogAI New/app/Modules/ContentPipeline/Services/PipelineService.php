@@ -123,7 +123,16 @@ class PipelineService
         }
     }
 
-    public function triggerDiscovery(ContentPipeline $pipeline, string $discoveryProvider = 'groq'): PipelineRun
+    /**
+     * Trigger a coverage discovery run for a pipeline.
+     *
+     * @param string $discoveryProvider
+     *   Provider key to use for discovery ('groq', 'gemini', 'openai', 'claude',
+     *   'openrouter', 'ollama') OR 'auto' (default) to let the failover logic in
+     *   NewsDiscoveryService pick the best available provider automatically.
+     *   Explicit provider keys are still supported for backward compatibility.
+     */
+    public function triggerDiscovery(ContentPipeline $pipeline, string $discoveryProvider = 'auto'): PipelineRun
     {
         if (! $pipeline->is_active) {
             throw new InvalidArgumentException('Cannot run coverage discovery on an inactive content pipeline.');
@@ -131,33 +140,50 @@ class PipelineService
 
         $pipeline->loadMissing(['site', 'provider']);
         $this->entitlements->assertCanGenerate($pipeline->site);
-        
-        // Validate the discovery provider exists and is enabled
-        $discoveryProviderModel = AIProvider::where('provider_key', $discoveryProvider)
-            ->where('is_enabled', true)
-            ->first();
-        
-        if (! $discoveryProviderModel) {
-            // Fall back to pipeline's configured provider if discovery provider not available
-            Log::warning("Discovery provider '{$discoveryProvider}' not available, falling back to pipeline provider.");
-            $discoveryProviderModel = $pipeline->provider;
-            $discoveryProvider = $pipeline->provider->provider_key;
+
+        // ── Resolve the discovery provider model ─────────────────────────────
+        $discoveryProviderModel = null;
+        $resolvedProviderKey    = null;
+
+        if ($discoveryProvider !== 'auto') {
+            // Explicit provider requested — validate it exists and is enabled
+            $discoveryProviderModel = AIProvider::where('provider_key', $discoveryProvider)
+                ->where('is_enabled', true)
+                ->first();
+
+            if (! $discoveryProviderModel) {
+                // Requested provider unavailable — warn and fall back to pipeline default
+                Log::warning("Discovery provider '{$discoveryProvider}' not available, falling back to pipeline provider.");
+                $discoveryProviderModel = $pipeline->provider;
+                $resolvedProviderKey    = $pipeline->provider->provider_key;
+            } else {
+                $resolvedProviderKey = $discoveryProvider;
+            }
+
+            if (empty($discoveryProviderModel->api_key)) {
+                throw new InvalidArgumentException("Discovery provider '{$resolvedProviderKey}' has no API key configured.");
+            }
         }
-        
-        if (empty($discoveryProviderModel->api_key)) {
-            throw new InvalidArgumentException("Discovery provider '{$discoveryProvider}' has no API key configured.");
-        }
+        // When $discoveryProvider === 'auto', we store no provider ID in run
+        // properties so that NewsDiscoveryService::discover() falls back to the
+        // pipeline's configured provider as the *preferred* first attempt, then
+        // automatically tries every other enabled provider via failover.
 
         try {
-            return DB::transaction(function () use ($pipeline, $discoveryProvider, $discoveryProviderModel) {
+            return DB::transaction(function () use ($pipeline, $resolvedProviderKey, $discoveryProviderModel) {
+                $properties = [];
+                if ($discoveryProviderModel) {
+                    $properties = [
+                        'discovery_provider_key' => $resolvedProviderKey,
+                        'discovery_provider_id'  => $discoveryProviderModel->id,
+                    ];
+                }
+
                 $run = PipelineRun::create([
                     'pipeline_id' => $pipeline->id,
                     'status'      => 'queued',
                     'run_type'    => PipelineRun::TYPE_DISCOVERY,
-                    'properties'  => [
-                        'discovery_provider_key' => $discoveryProvider,
-                        'discovery_provider_id'  => $discoveryProviderModel->id,
-                    ],
+                    'properties'  => $properties ?: null,
                 ]);
 
                 GenerateNewsCandidatesJob::dispatch($run->id);
@@ -169,6 +195,7 @@ class PipelineService
             throw new \RuntimeException('Failed to queue coverage discovery run.', 0, $e);
         }
     }
+
 
     /**
      * Retry a failed pipeline run. Dispatches by run_type so both full
