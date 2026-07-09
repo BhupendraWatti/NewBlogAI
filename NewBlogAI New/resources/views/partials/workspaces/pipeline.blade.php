@@ -39,18 +39,16 @@
 
                                 <!-- News Category -->
                                 <div class="space-y-1">
-                                    <label class="block text-[10px] font-mono text-muted uppercase tracking-widest" for="gen-category">News Category</label>
-                                    <select id="gen-category" class="w-full bg-background border border-border text-text text-xs rounded-xl py-2 px-3 focus:outline-none focus:border-accent">
-                                        <option value="global">Global</option>
-                                        <option value="trending">Trending</option>
-                                        <option value="local">Local</option>
-                                        <option value="technology">Technology</option>
-                                        <option value="business">Business</option>
-                                        <option value="politics">Politics</option>
-                                        <option value="sports">Sports</option>
-                                        <option value="health">Health</option>
-                                    </select>
-                                    <p class="text-[10px] text-muted">Select the news classification and tone.</p>
+                                    <label class="block text-[10px] font-mono text-muted uppercase tracking-widest" for="gen-category">News Topic / Category</label>
+                                    <input type="text" id="gen-category" placeholder="e.g. Indian Startups, Politics, Cricket" class="w-full bg-background border border-border text-text text-xs rounded-xl py-2.5 px-3 focus:outline-none focus:border-accent">
+                                    <p class="text-[10px] text-muted">Enter a custom topic or category string.</p>
+                                </div>
+
+                                <!-- Target Country -->
+                                <div class="space-y-1">
+                                    <label class="block text-[10px] font-mono text-muted uppercase tracking-widest" for="gen-country">Target Country</label>
+                                    <input type="text" id="gen-country" placeholder="e.g. India, United States" class="w-full bg-background border border-border text-text text-xs rounded-xl py-2.5 px-3 focus:outline-none focus:border-accent">
+                                    <p class="text-[10px] text-muted">Filter discovery search results to this country.</p>
                                 </div>
 
                                 <!-- Prompt Template -->
@@ -65,9 +63,10 @@
 
                                 <!-- Language -->
                                 <div class="space-y-1">
-                                    <label class="block text-[10px] font-mono text-muted uppercase tracking-widest">Output Language</label>
+                                    <label class="block text-[10px] font-mono text-muted uppercase tracking-widest" for="gen-language">Output Language</label>
                                     <select id="gen-language" class="w-full bg-background border border-border text-text text-xs rounded-xl py-2 px-3 focus:outline-none focus:border-accent">
                                         <option value="en">English</option>
+                                        <option value="hi">Hindi</option>
                                         <option value="es">Spanish</option>
                                         <option value="fr">French</option>
                                         <option value="de">German</option>

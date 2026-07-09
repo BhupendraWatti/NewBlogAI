@@ -3691,6 +3691,7 @@
             const siteId   = document.getElementById('gen-site')?.value;
             const provider = document.getElementById('gen-provider')?.value;
             const category = document.getElementById('gen-category')?.value;
+            const country  = document.getElementById('gen-country')?.value;
             const promptId = document.getElementById('gen-prompt')?.value;
             const lang     = document.getElementById('gen-language')?.value;
             const output   = document.getElementById('gen-output');
@@ -3715,6 +3716,7 @@
                 const pipelinePayload = {
                     site_id:        parseInt(siteId),
                     news_category:  category,
+                    target_country: country || null,
                     prompt_id:      parseInt(promptId),
                     ai_provider_id: parseInt(provider),
                     language:       lang || 'en',
