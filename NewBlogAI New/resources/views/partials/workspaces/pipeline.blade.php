@@ -67,12 +67,6 @@
                                     <select id="gen-language" class="w-full bg-background border border-border text-text text-xs rounded-xl py-2 px-3 focus:outline-none focus:border-accent">
                                         <option value="en">English</option>
                                         <option value="hi">Hindi</option>
-                                        <option value="es">Spanish</option>
-                                        <option value="fr">French</option>
-                                        <option value="de">German</option>
-                                        <option value="pt">Portuguese</option>
-                                        <option value="ar">Arabic</option>
-                                        <option value="zh">Chinese (Simplified)</option>
                                     </select>
                                 </div>
 
@@ -93,7 +87,7 @@
                                     <h4 class="text-xs font-mono uppercase tracking-widest text-muted">Output Preview</h4>
                                     <span id="gen-status-badge" class="hidden px-2 py-0.5 rounded bg-warning/20 text-warning border border-warning/30 text-[9px] font-mono">generating...</span>
                                 </div>
-                                <div id="gen-output" class="min-h-[180px] bg-background border border-border rounded-xl p-4 text-xs font-mono text-text flex items-center justify-center">
+                                <div id="gen-output" class="min-h-[180px] bg-background border border-border rounded-xl p-4 text-xs font-mono text-text flex items-center justify-center select-text" style="user-select: text !important; -webkit-user-select: text !important;">
                                     <div class="text-center space-y-2">
                                         <span class="material-symbols-outlined text-3xl text-muted/50">article</span>
                                         <p>Generated content will appear here.</p>

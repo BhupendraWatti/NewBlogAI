@@ -3968,6 +3968,43 @@
             }
         });
 
+        // Copy generated content to clipboard
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('#btn-copy-gen');
+            if (!btn) return;
+
+            if (!lastGeneratedText) {
+                showError("Copy Failed", "No content available to copy.");
+                return;
+            }
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(lastGeneratedText)
+                    .then(() => showSuccess("Copied", "Article content copied to clipboard!"))
+                    .catch(err => {
+                        fallbackCopyText(lastGeneratedText);
+                    });
+            } else {
+                fallbackCopyText(lastGeneratedText);
+            }
+        });
+
+        function fallbackCopyText(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed"; // avoid scrolling
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showSuccess("Copied", "Article content copied to clipboard!");
+            } catch (err) {
+                showError("Copy Failed", "Unable to copy text.");
+            }
+            document.body.removeChild(textArea);
+        }
+
         // Insert prompt placeholder variable chip into textarea at current cursor position
         document.addEventListener('click', function(e) {
             const chip = e.target.closest('.prompt-var-chip');
