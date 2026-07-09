@@ -45,50 +45,80 @@ class WPClientService
 
         Log::info("Dispatching WP sync request to: {$wpUrl}");
 
-        try {
-            $response = Http::timeout(15)
-                ->withoutVerifying()
-                ->withHeaders([
-                    'Authorization' => 'Bearer '.$apiKey,
-                ])
-                ->post($wpUrl, $payload);
+        // Retry configuration for timeout resilience
+        $maxRetries = 3;
+        $retryDelay = 2; // seconds, will double each retry
+        $lastException = null;
 
-            if ($response->successful()) {
-                $responseData = $response->json() ?? [];
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            try {
+                Log::info("WP sync attempt {$attempt}/{$maxRetries} for site {$site->id}");
 
-                // Update database state
+                $response = Http::timeout(60) // Increased from 15s to 60s
+                    ->connectTimeout(30)
+                    ->withoutVerifying()
+                    ->withHeaders([
+                        'Authorization' => 'Bearer '.$apiKey,
+                    ])
+                    ->post($wpUrl, $payload);
+
+                if ($response->successful()) {
+                    $responseData = $response->json() ?? [];
+
+                    // Update database state
+                    $site->update([
+                        'last_synced_at' => now(),
+                        'last_sync_status' => 'success',
+                        'error_log' => null,
+                    ]);
+
+                    event(new SiteSyncCompleted($site, $responseData));
+
+                    return $responseData;
+                }
+
+                $statusCode = $response->status();
+                $body = $response->body();
+                $error = "WordPress API returned status {$statusCode}: {$body}";
+
                 $site->update([
-                    'last_synced_at' => now(),
-                    'last_sync_status' => 'success',
-                    'error_log' => null,
+                    'last_sync_status' => 'failed',
+                    'error_log' => $error,
                 ]);
 
-                event(new SiteSyncCompleted($site, $responseData));
+                event(new SiteSyncFailed($site, $error));
+                throw new \RuntimeException($error);
 
-                return $responseData;
+            } catch (\Illuminate\Http\Client\ConnectionException $e) {
+                $lastException = $e;
+                Log::warning("WP sync timeout on attempt {$attempt}/{$maxRetries} for site {$site->id}: ".$e->getMessage());
+
+                if ($attempt < $maxRetries) {
+                    sleep($retryDelay);
+                    $retryDelay *= 2; // Exponential backoff
+                    continue;
+                }
+
+                // All retries exhausted
+                $error = "Sync failed after {$maxRetries} attempts: Connection timed out. The WordPress site may be slow or unreachable. Please check your site's server performance and try again.";
+                $site->update([
+                    'last_sync_status' => 'failed',
+                    'error_log' => $error,
+                ]);
+                event(new SiteSyncFailed($site, $error));
+                throw new \RuntimeException($error, 0, $e);
+
+            } catch (\Exception $e) {
+                $error = 'Sync exception: '.$e->getMessage();
+
+                $site->update([
+                    'last_sync_status' => 'failed',
+                    'error_log' => $error,
+                ]);
+
+                event(new SiteSyncFailed($site, $error));
+                throw $e;
             }
-
-            $statusCode = $response->status();
-            $body = $response->body();
-            $error = "WordPress API returned status {$statusCode}: {$body}";
-
-            $site->update([
-                'last_sync_status' => 'failed',
-                'error_log' => $error,
-            ]);
-
-            event(new SiteSyncFailed($site, $error));
-            throw new \RuntimeException($error);
-        } catch (\Exception $e) {
-            $error = 'Sync exception: '.$e->getMessage();
-
-            $site->update([
-                'last_sync_status' => 'failed',
-                'error_log' => $error,
-            ]);
-
-            event(new SiteSyncFailed($site, $error));
-            throw $e;
         }
     }
 
