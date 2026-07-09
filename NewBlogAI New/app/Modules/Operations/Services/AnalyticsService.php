@@ -19,7 +19,7 @@ class AnalyticsService
         $baseQuery = AIRequestLog::query()
             ->when($customerId, fn ($query) => $query->where('customer_id', $customerId));
 
-        $aggregates = (clone $baseQuery)->selectRaw('
+        $aggregates = (clone $baseQuery)->selectRaw("
             COUNT(id) as total_requests,
             SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as successful_requests,
             SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_requests,
@@ -27,7 +27,8 @@ class AnalyticsService
             SUM(completion_tokens) as total_completion_tokens,
             SUM(total_tokens) as total_tokens,
             SUM(estimated_cost) as total_cost
-        ')->first();
+        ")->first();
+
 
         // Provider breakdown
         $providers = (clone $baseQuery)->select('provider', DB::raw('COUNT(id) as count'), DB::raw('SUM(estimated_cost) as cost'))
