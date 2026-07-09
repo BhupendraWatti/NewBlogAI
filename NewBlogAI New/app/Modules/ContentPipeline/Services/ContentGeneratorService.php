@@ -93,6 +93,10 @@ class ContentGeneratorService implements ContentGeneratorInterface
                     $variables['keywords'] = implode(', ', array_slice($candidateKeywords, 0, 5));
                     $variables['Keywords'] = $variables['keywords'];
                 }
+            } else {
+                $variables['headline'] = $categoryLabel . " Updates";
+                $variables['summary']  = "Latest current events, news developments, and analysis on " . $categoryLabel . " in " . ($pipeline->target_country ?: "Global");
+                $variables['sources']  = $website;
             }
 
             // 2. Modular prompt compilation

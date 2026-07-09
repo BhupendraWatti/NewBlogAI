@@ -239,9 +239,9 @@ class PipelineService
         }
 
         // 2. Validate news_category value
-        $category = strtolower(trim($data['news_category'] ?? ''));
-        if (empty($category) || ! in_array($category, self::VALID_CATEGORIES, true)) {
-            throw new InvalidArgumentException('Invalid or missing news category. Allowed: '.implode(', ', self::VALID_CATEGORIES).'.');
+        $category = trim($data['news_category'] ?? '');
+        if (empty($category)) {
+            throw new InvalidArgumentException('News category / topic is required.');
         }
 
         // 3. Validate prompt template
