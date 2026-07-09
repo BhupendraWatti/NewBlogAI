@@ -211,11 +211,13 @@
                                 <div class="space-y-1">
                                     <label class="block text-[10px] font-mono text-muted uppercase tracking-widest">Default Model</label>
                                     <select data-role="model" class="w-full bg-background border border-border text-text text-xs rounded-xl py-1.5 px-2 focus:outline-none focus:border-accent">
-                                        <option value="llama-3.1-70b-versatile" selected>llama-3.1-70b-versatile</option>
-                                        <option value="mixtral-8x7b-32768">mixtral-8x7b-32768</option>
-                                        <option value="gemma-7b-it">gemma-7b-it</option>
+                                        <option value="llama-3.3-70b-versatile" selected>llama-3.3-70b-versatile (Production)</option>
+                                        <option value="llama-3.1-8b-instant">llama-3.1-8b-instant (Fast)</option>
+                                        <option value="qwen/qwen3.6-27b">qwen3.6-27b (Reasoning/Coding)</option>
+                                        <option value="openai/gpt-oss-20b">gpt-oss-20b (Production)</option>
                                     </select>
                                 </div>
+
                                 <div class="flex items-center gap-2 pt-1">
                                     <input type="checkbox" id="chk-default-groq" class="rounded bg-background border-border text-accent focus:ring-accent/20 provider-default-chk" onchange="setDefaultProvider('groq')"/>
                                     <label for="chk-default-groq" class="text-[10px] font-mono text-muted uppercase cursor-pointer select-none">Set as Default Provider</label>

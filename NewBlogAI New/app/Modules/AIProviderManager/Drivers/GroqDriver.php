@@ -10,7 +10,7 @@ class GroqDriver implements AIProviderClientInterface
 {
     public function testConnection(string $apiKey, ?string $model = null): bool
     {
-        $model = $model ?: 'llama-3.1-70b-versatile';
+        $model = $model ?: 'llama-3.3-70b-versatile';
 
         try {
             $response = Http::withToken($apiKey)
@@ -39,7 +39,7 @@ class GroqDriver implements AIProviderClientInterface
 
     public function generate(string $apiKey, string $prompt, ?string $model = null, array $options = []): array
     {
-        $model = $model ?: 'llama-3.1-70b-versatile';
+        $model = $model ?: 'llama-3.3-70b-versatile';
 
         try {
             $response = Http::withToken($apiKey)
