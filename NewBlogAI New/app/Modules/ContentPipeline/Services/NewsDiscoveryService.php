@@ -61,7 +61,13 @@ class NewsDiscoveryService
 
         $pipeline = $run->pipeline;
         $site = $pipeline?->site;
-        $provider = $pipeline?->provider;
+        // Use discovery-specific provider if specified in run properties, otherwise fall back to pipeline provider
+        $discoveryProviderId = $run->properties['discovery_provider_id'] ?? null;
+        if ($discoveryProviderId) {
+            $provider = \App\Modules\AIProviderManager\Models\AIProvider::find($discoveryProviderId);
+        } else {
+            $provider = $pipeline?->provider;
+        }
         $prompt = $pipeline?->prompt;
 
         if (! $pipeline || ! $site || ! $provider || ! $prompt) {

@@ -43,8 +43,11 @@ class CoverageController extends Controller
             return $denied;
         }
 
+        // Get discovery provider from request body (defaults to 'groq' for fast, free discovery)
+        $discoveryProvider = $request->input('discovery_provider', 'groq');
+
         try {
-            $run = $this->pipelineService->triggerDiscovery($pipeline);
+            $run = $this->pipelineService->triggerDiscovery($pipeline, $discoveryProvider);
         } catch (InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }

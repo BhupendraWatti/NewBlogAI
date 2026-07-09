@@ -128,8 +128,10 @@ class PipelineService
      *
      * Produces exactly 9 unique news candidates and stops at status 'ready'
      * pending employee selection. Never generates full articles.
+     *
+     * @param string $discoveryProvider Provider key for discovery (e.g., 'groq' for fast/free)
      */
-    public function triggerDiscovery(ContentPipeline $pipeline): PipelineRun
+    public function triggerDiscovery(ContentPipeline $pipeline, string $discoveryProvider = 'groq'): PipelineRun
     {
         if (! $pipeline->is_active) {
             throw new InvalidArgumentException('Cannot run coverage discovery on an inactive content pipeline.');
@@ -137,14 +139,26 @@ class PipelineService
 
         $pipeline->loadMissing(['site', 'provider']);
         $this->entitlements->assertCanGenerate($pipeline->site);
-        $this->entitlements->assertProviderAvailable($pipeline->site, $pipeline->provider->provider_key);
+        
+        // Validate the discovery provider exists and is enabled
+        $discoveryProviderModel = \App\Modules\AIProviderManager\Models\AIProvider::where('provider_key', $discoveryProvider)
+            ->where('is_enabled', true)
+            ->first();
+        
+        if (! $discoveryProviderModel) {
+            throw new InvalidArgumentException("Discovery provider '{$discoveryProvider}' is not available or not enabled.");
+        }
 
         try {
-            return DB::transaction(function () use ($pipeline) {
+            return DB::transaction(function () use ($pipeline, $discoveryProvider, $discoveryProviderModel) {
                 $run = PipelineRun::create([
                     'pipeline_id' => $pipeline->id,
                     'status'      => 'queued',
                     'run_type'    => PipelineRun::TYPE_DISCOVERY,
+                    'properties'  => [
+                        'discovery_provider_key' => $discoveryProvider,
+                        'discovery_provider_id'  => $discoveryProviderModel->id,
+                    ],
                 ]);
 
                 GenerateNewsCandidatesJob::dispatch($run->id);
