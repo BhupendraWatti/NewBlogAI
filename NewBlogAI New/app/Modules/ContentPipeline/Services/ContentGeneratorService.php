@@ -25,7 +25,9 @@ class ContentGeneratorService implements ContentGeneratorInterface
             Log::info('ContentGeneratorService: Starting news content generation.');
 
             $pipeline       = $context->pipeline;
-            $provider       = $pipeline->provider;
+            // Use an override provider injected by the failover loop when present,
+            // otherwise fall back to the pipeline's own configured provider.
+            $provider       = $context->overrideProvider ?? $pipeline->provider;
             $promptTemplate = $pipeline->prompt;
             $site           = $pipeline->site;
 

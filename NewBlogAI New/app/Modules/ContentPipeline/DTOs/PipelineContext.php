@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\ContentPipeline\DTOs;
 
+use App\Modules\AIProviderManager\Models\AIProvider;
 use App\Modules\ContentPipeline\Models\ContentPipeline;
 use App\Modules\ContentPipeline\Models\PipelineRun;
 
@@ -19,7 +20,9 @@ class PipelineContext
         public ?string $title = null,
         public array $mediaItems = [],
         public array $metadata = [],
-        public array $errors = []
+        public array $errors = [],
+        /** Override the pipeline's AI provider for a single generation attempt (used by failover). */
+        public ?AIProvider $overrideProvider = null,
     ) {}
 
     /**
