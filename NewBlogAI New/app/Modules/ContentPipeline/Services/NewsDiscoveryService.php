@@ -25,11 +25,22 @@ class NewsDiscoveryService
     /** The newsroom contract: exactly this many candidates per coverage run. */
     public const CANDIDATE_TARGET = 9;
 
-    /** Overgenerate so duplicate filtering can still yield the target. */
-    public const OVERGENERATION_COUNT = 12;
+    /**
+     * How many candidates to request per attempt.
+     * Kept equal to CANDIDATE_TARGET to keep the prompt short enough that
+     * Gemini can return the full JSON in a single response without truncation.
+     */
+    public const OVERGENERATION_COUNT = 9;
 
     /** Total generation attempts (initial + one retry) before hard failure. */
     public const MAX_ATTEMPTS = 2;
+
+    /**
+     * Token budget for the discovery generate call.
+     * 9 JSON objects with titles, summaries, sources etc. easily need 4-6 k tokens;
+     * 8192 gives comfortable headroom while staying within Gemini free-tier limits.
+     */
+    private const DISCOVERY_MAX_TOKENS = 8192;
 
     public function __construct(
         protected AIProviderService $providerService,
@@ -92,7 +103,17 @@ class NewsDiscoveryService
                 ), $country);
 
                 $driver = $this->providerService->getDriver($provider->provider_key);
-                $result = $driver->generate($provider->api_key, $promptText, $provider->default_model);
+                $result = $driver->generate(
+                    $provider->api_key,
+                    $promptText,
+                    $provider->default_model,
+                    [
+                        // Large token budget so 9 JSON objects are never truncated
+                        'max_tokens'  => self::DISCOVERY_MAX_TOKENS,
+                        // Low temperature: we want factual structured output, not creativity
+                        'temperature' => 0.2,
+                    ]
+                );
 
                 $totalTokens['prompt'] += (int) ($result['prompt_tokens'] ?? 0);
                 $totalTokens['completion'] += (int) ($result['completion_tokens'] ?? 0);
@@ -194,43 +215,98 @@ class NewsDiscoveryService
         $regionContext = $country ? " focusing specifically on national news events relevant to or occurring in {$country}" : '';
 
         return <<<PROMPT
-You are a newsroom research editor. Today is {$today}.
+You are a JSON-only news data API. Today is {$today}.
 
-Research the most significant CURRENT real-world news events in the "{$category}" category from the last 48 hours{$regionContext} and identify exactly {$count} DIFFERENT events. Each item must describe a DISTINCT real-world event — no two items may cover the same story, announcement, match, or incident.
+TASK: Return exactly {$count} current real-world news events from the "{$category}" category from the last 48 hours{$regionContext}.
 
-Write the "title" and "summary" of each item in this language: {$language}.
+STRICT OUTPUT RULES — VIOLATIONS WILL BREAK THE PARSER:
+- Your ENTIRE response must be a single valid JSON array starting with [ and ending with ]
+- Do NOT write any text, explanation, or commentary before or after the JSON array
+- Do NOT use markdown code fences (no ```)
+- Each event must be a DISTINCT real-world story — no duplicates
 
-Respond with ONLY a valid JSON array (no markdown fences, no commentary) of exactly {$count} objects, each with these fields:
-- "title": concise news headline (max 120 characters)
-- "summary": 2-3 sentence factual summary of the event
-- "source_references": array of 1-3 objects {"name": "trusted outlet name", "url": "https://..."}
-- "keywords": array of 3-6 lowercase keywords
-- "trend_score": integer 0-100 (how much current attention the event has)
-- "freshness_score": integer 0-100 (100 = happened in the last few hours)
-- "event_date": ISO 8601 date of the event
+Write "title" and "summary" in this language code: {$language}
+
+Return exactly this JSON structure (no extra fields, no missing fields):
+[
+  {
+    "title": "concise headline max 120 chars",
+    "summary": "2-3 sentence factual summary of the real event",
+    "source_references": [{"name": "Outlet Name", "url": "https://real-url.com"}],
+    "keywords": ["keyword1", "keyword2", "keyword3"],
+    "trend_score": 85,
+    "freshness_score": 90,
+    "event_date": "2024-01-15"
+  }
+]
 {$exclusions}
 PROMPT;
     }
 
+
     /**
-     * Parse the AI response into candidate arrays. Tolerates code fences and
-     * surrounding prose; requires a JSON array of objects with titles.
+     * Parse the AI response into candidate arrays.
+     *
+     * Handles:
+     *  - Markdown code fences (```json … ```)
+     *  - Gemini 2.5 "thinking" preamble text before the JSON array
+     *  - Partial/truncated arrays (keeps whatever objects are fully closed)
      *
      * @return array<int, array>
      */
     protected function parseCandidates(string $text): array
     {
         $text = trim($text);
-        $text = preg_replace('/^```(?:json)?|```$/m', '', $text) ?? $text;
 
+        // Strip markdown code fences (```json … ``` or ``` … ```)
+        $text = preg_replace('/^```(?:json)?\s*/m', '', $text) ?? $text;
+        $text = preg_replace('/^```\s*$/m', '', $text) ?? $text;
+
+        // Find the FIRST '[' (start of JSON array) — any thinking-model preamble
+        // text appears before the array and is safely skipped this way.
         $start = strpos($text, '[');
-        $end = strrpos($text, ']');
-        if ($start === false || $end === false || $end <= $start) {
+        if ($start === false) {
+            Log::error('NewsDiscoveryService: No JSON array found in discovery response.', [
+                'response_preview' => mb_substr($text, 0, 500),
+            ]);
             throw new RuntimeException('Discovery response did not contain a JSON array.');
         }
 
-        $decoded = json_decode(substr($text, $start, $end - $start + 1), true);
+        // Find the LAST ']' — this handles truncated responses by closing the array
+        // at whatever the last complete object boundary is.
+        $end = strrpos($text, ']');
+        if ($end === false || $end <= $start) {
+            // Response was truncated before any closing bracket — try to recover
+            // by finding the last fully-closed object and appending "]}" manually.
+            $lastClose = strrpos($text, '}');
+            if ($lastClose !== false && $lastClose > $start) {
+                $text = substr($text, $start, $lastClose - $start + 1) . ']';
+                $end   = strlen($text) - 1;
+                $start = 0;
+                Log::warning('NewsDiscoveryService: Truncated JSON array — recovered by closing at last "}".');
+            } else {
+                throw new RuntimeException('Discovery response JSON array was malformed or empty.');
+            }
+        }
+
+        $jsonSlice = substr($text, $start, $end - $start + 1);
+        $decoded   = json_decode($jsonSlice, true);
+
+        // If strict parse fails, attempt a lenient recovery:
+        // strip everything after the last '}' before ']' and retry.
         if (! is_array($decoded)) {
+            $lastBrace = strrpos($jsonSlice, '}');
+            if ($lastBrace !== false) {
+                $recovered = substr($jsonSlice, 0, $lastBrace + 1) . ']';
+                $decoded   = json_decode($recovered, true);
+            }
+        }
+
+        if (! is_array($decoded)) {
+            Log::error('NewsDiscoveryService: JSON decode failed after recovery attempts.', [
+                'json_error'       => json_last_error_msg(),
+                'response_preview' => mb_substr($jsonSlice, 0, 500),
+            ]);
             throw new RuntimeException('Discovery response JSON could not be parsed: '.json_last_error_msg());
         }
 
@@ -240,19 +316,23 @@ PROMPT;
                 continue;
             }
             $candidates[] = [
-                'title' => trim((string) $item['title']),
-                'summary' => isset($item['summary']) ? trim((string) $item['summary']) : null,
+                'title'             => mb_substr(trim((string) $item['title']), 0, 200),
+                'summary'           => isset($item['summary']) ? trim((string) $item['summary']) : null,
                 'source_references' => is_array($item['source_references'] ?? null) ? $item['source_references'] : [],
-                'keywords' => is_array($item['keywords'] ?? null) ? array_values($item['keywords']) : [],
-                'trend_score' => $item['trend_score'] ?? 0,
-                'freshness_score' => $item['freshness_score'] ?? 0,
-                'event_date' => $item['event_date'] ?? null,
+                'keywords'          => is_array($item['keywords'] ?? null) ? array_values($item['keywords']) : [],
+                'trend_score'       => $item['trend_score'] ?? 0,
+                'freshness_score'   => $item['freshness_score'] ?? 0,
+                'event_date'        => $item['event_date'] ?? null,
             ];
         }
 
         if (empty($candidates)) {
             throw new RuntimeException('Discovery response contained no usable candidates.');
         }
+
+        Log::info('NewsDiscoveryService: parseCandidates succeeded.', [
+            'count' => count($candidates),
+        ]);
 
         return $candidates;
     }
