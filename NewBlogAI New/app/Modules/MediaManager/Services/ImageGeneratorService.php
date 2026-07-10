@@ -37,6 +37,11 @@ class ImageGeneratorService
      */
     public function generateAndStore(string $prompt, array $options = [], ?int $generatedContentId = null): MediaItem
     {
+        $isEnabled = (bool) $this->settingsService->get('enable_image_generation', true);
+        if (! $isEnabled) {
+            throw new \RuntimeException('Image generation is disabled in system settings.');
+        }
+
         // 1. Determine driver
         $driverName = $options['driver'] ?? $this->settingsService->get('image_generator_driver', 'pollinations');
         $driver = $this->getDriver($driverName);

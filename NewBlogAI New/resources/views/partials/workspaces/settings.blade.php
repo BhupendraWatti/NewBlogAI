@@ -70,6 +70,13 @@
                         <div class="glass-surface rounded-2xl p-5 space-y-4 max-w-2xl bg-surface/30">
                             <h3 class="text-xs font-mono uppercase tracking-widest text-accent">Image Generator Settings</h3>
                             <div class="space-y-3 font-mono text-xs">
+                                <div class="flex items-center justify-between p-3 bg-white/5 border border-border rounded-xl mb-2">
+                                    <div>
+                                        <p class="font-bold">Enable Image Generation</p>
+                                        <p class="text-[10px] text-muted">Generate featured and inline placeholder images for articles. If disabled, only text will be generated.</p>
+                                    </div>
+                                    <input type="checkbox" id="setting-enable-img-gen" class="rounded bg-background border-border text-accent focus:ring-accent/20"/>
+                                </div>
                                 <div class="grid grid-cols-2 gap-4">
                                     <div class="space-y-1">
                                         <label class="text-[10px] text-muted uppercase">Image Generator Driver</label>

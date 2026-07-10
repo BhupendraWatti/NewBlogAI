@@ -144,8 +144,13 @@ class MediaPreparationService implements MediaPreparatorInterface
                 // Update status in mediaSpecs
                 $mediaSpecs['images']['featured']['status'] = 'generated';
             } catch (\Exception $e) {
-                Log::error("Failed to generate featured image: " . $e->getMessage());
-                $mediaSpecs['images']['featured']['status'] = 'failed';
+                if ($e->getMessage() === 'Image generation is disabled in system settings.') {
+                    Log::info("Skipping featured image: " . $e->getMessage());
+                    $mediaSpecs['images']['featured']['status'] = 'disabled';
+                } else {
+                    Log::error("Failed to generate featured image: " . $e->getMessage());
+                    $mediaSpecs['images']['featured']['status'] = 'failed';
+                }
             }
 
             // 3. Execute inline image generations
@@ -172,8 +177,13 @@ class MediaPreparationService implements MediaPreparatorInterface
                     $spec['status'] = 'generated';
                     $generatedMediaItems[$index] = $mediaItem;
                 } catch (\Exception $e) {
-                    Log::error("Failed to generate inline image for prompt '{$spec['prompt']}': " . $e->getMessage());
-                    $spec['status'] = 'failed';
+                    if ($e->getMessage() === 'Image generation is disabled in system settings.') {
+                        Log::info("Skipping inline image: " . $e->getMessage());
+                        $spec['status'] = 'disabled';
+                    } else {
+                        Log::error("Failed to generate inline image for prompt '{$spec['prompt']}': " . $e->getMessage());
+                        $spec['status'] = 'failed';
+                    }
                     $generatedMediaItems[$index] = null;
                 }
             }

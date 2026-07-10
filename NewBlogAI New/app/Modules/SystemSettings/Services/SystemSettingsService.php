@@ -55,6 +55,7 @@ class SystemSettingsService
                 'language' => 'en',
                 'ai_default_provider' => 'gemini',
                 'ai_default_model' => 'gemini-2.5-flash',
+                'enable_image_generation' => true,
             ];
 
             foreach ($defaults as $k => $v) {

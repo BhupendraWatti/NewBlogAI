@@ -49,9 +49,13 @@ class ContentPostProcessor
                     e($parsed['caption'])
                 );
             } catch (\Exception $e) {
-                Log::error("Failed to generate inline image for placeholder '{$rawContent}': ".$e->getMessage());
+                if ($e->getMessage() === 'Image generation is disabled in system settings.') {
+                    Log::info("Skipping inline image: " . $e->getMessage());
+                } else {
+                    Log::error("Failed to generate inline image for placeholder '{$rawContent}': ".$e->getMessage());
+                }
 
-                return '<!-- image-placeholder-failed: '.e($parsed['prompt']).' -->';
+                return '';
             }
         };
 
@@ -84,7 +88,11 @@ class ContentPostProcessor
             $metadata['featured_image_id'] = $mediaItem->id;
             $metadata['featured_image_url'] = $mediaItem->url;
         } catch (\Exception $e) {
-            Log::error("Failed to generate featured image for GeneratedContent ID {$generatedContent->id}: ".$e->getMessage());
+            if ($e->getMessage() === 'Image generation is disabled in system settings.') {
+                Log::info("Skipping featured image: " . $e->getMessage());
+            } else {
+                Log::error("Failed to generate featured image for GeneratedContent ID {$generatedContent->id}: ".$e->getMessage());
+            }
             // We do not crash the pipeline if image generation fails, just proceed with HTML content
         }
 
@@ -136,114 +144,111 @@ class ContentPostProcessor
     {
         // Normalize line endings
         $markdown = str_replace(["\r\n", "\r"], "\n", $markdown);
-
-        // Split by double newlines to process block-level elements
-        $blocks = explode("\n\n", $markdown);
+        $lines = explode("\n", $markdown);
         $htmlBlocks = [];
 
         $inUnorderedList = false;
         $inOrderedList = false;
+        $inBlockquote = false;
+        $paragraphLines = [];
+        $blockquoteLines = [];
         $ulContent = [];
         $olContent = [];
 
         $closeActiveLists = function () use (&$inUnorderedList, &$inOrderedList, &$ulContent, &$olContent, &$htmlBlocks) {
             if ($inUnorderedList) {
-                $htmlBlocks[] = "<ul>\n".implode("\n", $ulContent)."\n</ul>";
+                $htmlBlocks[] = "<ul>\n" . implode("\n", $ulContent) . "\n</ul>";
                 $inUnorderedList = false;
                 $ulContent = [];
             }
             if ($inOrderedList) {
-                $htmlBlocks[] = "<ol>\n".implode("\n", $olContent)."\n</ol>";
+                $htmlBlocks[] = "<ol>\n" . implode("\n", $olContent) . "\n</ol>";
                 $inOrderedList = false;
                 $olContent = [];
             }
         };
 
-        foreach ($blocks as $block) {
-            $block = trim($block);
-            if ($block === '') {
+        $closeParagraph = function () use (&$paragraphLines, &$htmlBlocks) {
+            if (!empty($paragraphLines)) {
+                $text = implode(" ", $paragraphLines);
+                $htmlBlocks[] = "<p>" . $this->parseInlineMarkdown($text) . "</p>";
+                $paragraphLines = [];
+            }
+        };
+
+        $closeBlockquote = function () use (&$inBlockquote, &$blockquoteLines, &$htmlBlocks) {
+            if ($inBlockquote) {
+                $quoteContent = implode("\n", $blockquoteLines);
+                $quoteHtml = $this->convertMarkdownToHtml($quoteContent);
+                $htmlBlocks[] = "<blockquote>\n{$quoteHtml}\n</blockquote>";
+                $inBlockquote = false;
+                $blockquoteLines = [];
+            }
+        };
+
+        foreach ($lines as $line) {
+            $lineTrimmed = trim($line);
+
+            if ($lineTrimmed === '') {
+                $closeActiveLists();
+                $closeParagraph();
+                $closeBlockquote();
                 continue;
             }
 
-            // 1. Check if it's a heading
-            if (preg_match('/^(#{1,6})\s+(.+)$/m', $block, $matches)) {
+            if (str_starts_with($lineTrimmed, '>')) {
                 $closeActiveLists();
+                $closeParagraph();
+                $inBlockquote = true;
+                $blockquoteLines[] = ltrim(preg_replace('/^>\s?/', '', $lineTrimmed));
+                continue;
+            } else {
+                $closeBlockquote();
+            }
+
+            if (preg_match('/^(#{1,6})\s+(.+)$/', $lineTrimmed, $matches)) {
+                $closeActiveLists();
+                $closeParagraph();
                 $level = strlen($matches[1]);
                 $content = $this->parseInlineMarkdown($matches[2]);
                 $htmlBlocks[] = "<h{$level}>{$content}</h{$level}>";
-
                 continue;
             }
 
-            // 2. Check if it's a blockquote
-            if (str_starts_with($block, '>')) {
+            if (str_starts_with($lineTrimmed, '<!--') && str_ends_with($lineTrimmed, '-->')) {
                 $closeActiveLists();
-                $lines = explode("\n", $block);
-                $quoteLines = [];
-                foreach ($lines as $line) {
-                    $quoteLines[] = ltrim(preg_replace('/^>\s?/', '', $line));
-                }
-                $quoteContent = implode("\n", $quoteLines);
-                $quoteHtml = $this->convertMarkdownToHtml($quoteContent);
-                $htmlBlocks[] = "<blockquote>\n{$quoteHtml}\n</blockquote>";
-
+                $closeParagraph();
+                $htmlBlocks[] = "<p>" . htmlspecialchars($lineTrimmed, ENT_NOQUOTES, 'UTF-8') . "</p>";
                 continue;
             }
 
-            // 3. Check if it's an unordered list block
-            $lines = explode("\n", $block);
-            $firstLine = trim($lines[0]);
-            if (preg_match('/^[\*\-\+]\s+(.+)$/', $firstLine, $matches)) {
+            if (preg_match('/^[\*\-\+]\s+(.+)$/', $lineTrimmed, $matches)) {
+                $closeParagraph();
                 if ($inOrderedList) {
                     $closeActiveLists();
                 }
                 $inUnorderedList = true;
-                foreach ($lines as $line) {
-                    $lineTrimmed = trim($line);
-                    if (preg_match('/^[\*\-\+]\s+(.+)$/', $lineTrimmed, $liMatches)) {
-                        $ulContent[] = '  <li>'.$this->parseInlineMarkdown($liMatches[1]).'</li>';
-                    } else {
-                        // Continuation of previous list item
-                        if (! empty($ulContent)) {
-                            $lastIdx = count($ulContent) - 1;
-                            $ulContent[$lastIdx] = substr($ulContent[$lastIdx], 0, -5).' '.$this->parseInlineMarkdown($lineTrimmed).'</li>';
-                        }
-                    }
-                }
-
+                $ulContent[] = '  <li>' . $this->parseInlineMarkdown($matches[1]) . '</li>';
                 continue;
             }
 
-            // 4. Check if it's an ordered list block
-            if (preg_match('/^\d+\.\s+(.+)$/', $firstLine, $matches)) {
+            if (preg_match('/^\d+\.\s+(.+)$/', $lineTrimmed, $matches)) {
+                $closeParagraph();
                 if ($inUnorderedList) {
                     $closeActiveLists();
                 }
                 $inOrderedList = true;
-                foreach ($lines as $line) {
-                    $lineTrimmed = trim($line);
-                    if (preg_match('/^\d+\.\s+(.+)$/', $lineTrimmed, $liMatches)) {
-                        $olContent[] = '  <li>'.$this->parseInlineMarkdown($liMatches[1]).'</li>';
-                    } else {
-                        // Continuation of previous list item
-                        if (! empty($olContent)) {
-                            $lastIdx = count($olContent) - 1;
-                            $olContent[$lastIdx] = substr($olContent[$lastIdx], 0, -5).' '.$this->parseInlineMarkdown($lineTrimmed).'</li>';
-                        }
-                    }
-                }
-
+                $olContent[] = '  <li>' . $this->parseInlineMarkdown($matches[1]) . '</li>';
                 continue;
             }
 
-            // Paragraph block
             $closeActiveLists();
-            $content = $this->parseInlineMarkdown($block);
-            $htmlBlocks[] = "<p>{$content}</p>";
+            $paragraphLines[] = $lineTrimmed;
         }
 
-        // Close any remaining open lists
         $closeActiveLists();
+        $closeParagraph();
+        $closeBlockquote();
 
         return implode("\n\n", $htmlBlocks);
     }

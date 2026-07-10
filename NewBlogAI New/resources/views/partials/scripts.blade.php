@@ -3021,10 +3021,12 @@
         window.triggerSystemSaveSimulation = async function(btn) {
             const driver = document.getElementById('setting-img-driver')?.value;
             const key = document.getElementById('setting-img-key')?.value;
+            const enableImgGen = document.getElementById('setting-enable-img-gen')?.checked ? 1 : 0;
 
             const payload = {
                 image_generator_driver: driver,
-                unsplash_access_key: key
+                unsplash_access_key: key,
+                enable_image_generation: enableImgGen
             };
 
             await apiRequest('/api/v1/settings', {
@@ -3050,6 +3052,12 @@
                     const imgKey = document.getElementById('setting-img-key');
                     if (imgDriver) imgDriver.value = settings.image_generator_driver || 'pollinations';
                     if (imgKey) imgKey.value = settings.unsplash_access_key || '';
+
+                    const enableImgGen = document.getElementById('setting-enable-img-gen');
+                    if (enableImgGen) {
+                        const val = settings.enable_image_generation !== undefined ? (String(settings.enable_image_generation) === '1' || settings.enable_image_generation === true) : true;
+                        enableImgGen.checked = val;
+                    }
 
                     window.toggleImageDriverKeyField();
                 }
