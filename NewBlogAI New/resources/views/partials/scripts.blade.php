@@ -3494,6 +3494,15 @@
                         if (saveBtn) {
                             saveBtn.disabled = false;
                         }
+
+                        const refreshBtn = card.querySelector('.provider-refresh-btn');
+                        if (refreshBtn) {
+                            if (p.has_api_key && key !== 'ollama') {
+                                refreshBtn.classList.remove('hidden');
+                            } else {
+                                refreshBtn.classList.add('hidden');
+                            }
+                        }
                     } else {
                         // Render dynamic custom provider card
                         const meta = _providerMeta.custom;
@@ -3579,6 +3588,16 @@
                 submitBtn: btn,
                 onSuccess: async () => {
                     await fetchAIProviders();
+                    // Auto-refresh credits on save
+                    const updatedCard = document.getElementById('provider-card-' + providerKey);
+                    if (updatedCard && providerKey !== 'ollama') {
+                        const refreshBtn = updatedCard.querySelector('.provider-refresh-btn');
+                        if (refreshBtn) {
+                            setTimeout(() => {
+                                refreshProviderCredits(refreshBtn, providerKey);
+                            }, 300);
+                        }
+                    }
                 }
             });
         };
@@ -3600,6 +3619,33 @@
                 defaultErrorMessage: "Failed to update default provider.",
                 onSuccess: async () => {
                     await fetchAIProviders();
+                }
+            });
+        };
+
+        window.refreshProviderCredits = async function(btn, providerKey) {
+            const card = btn.closest('.glass-surface');
+            const dbId = card.getAttribute('data-db-id');
+            if (!dbId) {
+                showError("Configuration Required", "Configure and save provider credentials first before refreshing credits.");
+                return;
+            }
+
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Refreshing...';
+
+            await apiRequest(`/api/v1/providers/${dbId}/refresh-credits`, { method: 'POST' }, {
+                loadingMessage: "Refreshing credits from API...",
+                successTitle: "Credits Refreshed",
+                successMessage: `Successfully updated credit metrics for ${providerKey.toUpperCase()}.`,
+                defaultErrorMessage: "Failed to refresh credits. Please check your API key and network connection.",
+                onSuccess: async () => {
+                    await fetchAIProviders();
+                },
+                onComplete: () => {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
                 }
             });
         };

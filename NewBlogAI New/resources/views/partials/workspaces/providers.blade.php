@@ -122,6 +122,7 @@
                             </div>
                             <div class="flex gap-2 pt-2 border-t border-border">
                                 <button onclick="saveProviderKey(this, 'gemini')" class="flex-1 bg-accent hover:bg-accent/80 text-background font-medium text-xs py-1.5 rounded-xl transition" disabled>Save Settings</button>
+                                <button type="button" onclick="refreshProviderCredits(this, 'gemini')" class="px-3 bg-muted/20 hover:bg-muted/30 text-text font-medium text-xs py-1.5 rounded-xl transition provider-refresh-btn hidden">Refresh Credits</button>
                             </div>
                         </div>
 
@@ -177,6 +178,7 @@
                             </div>
                             <div class="flex gap-2 pt-2 border-t border-border">
                                 <button onclick="saveProviderKey(this, 'openai')" class="flex-1 bg-accent hover:bg-accent/80 text-background font-medium text-xs py-1.5 rounded-xl transition" disabled>Save Settings</button>
+                                <button type="button" onclick="refreshProviderCredits(this, 'openai')" class="px-3 bg-muted/20 hover:bg-muted/30 text-text font-medium text-xs py-1.5 rounded-xl transition provider-refresh-btn hidden">Refresh Credits</button>
                             </div>
                         </div>
 
@@ -232,6 +234,7 @@
                             </div>
                             <div class="flex gap-2 pt-2 border-t border-border">
                                 <button onclick="saveProviderKey(this, 'claude')" class="flex-1 bg-accent hover:bg-accent/80 text-background font-medium text-xs py-1.5 rounded-xl transition" disabled>Save Settings</button>
+                                <button type="button" onclick="refreshProviderCredits(this, 'claude')" class="px-3 bg-muted/20 hover:bg-muted/30 text-text font-medium text-xs py-1.5 rounded-xl transition provider-refresh-btn hidden">Refresh Credits</button>
                             </div>
                         </div>
 
@@ -289,6 +292,7 @@
                             </div>
                             <div class="flex gap-2 pt-2 border-t border-border">
                                 <button onclick="saveProviderKey(this, 'groq')" class="flex-1 bg-accent hover:bg-accent/80 text-background font-medium text-xs py-1.5 rounded-xl transition" disabled>Save Settings</button>
+                                <button type="button" onclick="refreshProviderCredits(this, 'groq')" class="px-3 bg-muted/20 hover:bg-muted/30 text-text font-medium text-xs py-1.5 rounded-xl transition provider-refresh-btn hidden">Refresh Credits</button>
                             </div>
                         </div>
 
@@ -344,6 +348,7 @@
                             </div>
                             <div class="flex gap-2 pt-2 border-t border-border">
                                 <button onclick="saveProviderKey(this, 'openrouter')" class="flex-1 bg-accent hover:bg-accent/80 text-background font-medium text-xs py-1.5 rounded-xl transition" disabled>Save Settings</button>
+                                <button type="button" onclick="refreshProviderCredits(this, 'openrouter')" class="px-3 bg-muted/20 hover:bg-muted/30 text-text font-medium text-xs py-1.5 rounded-xl transition provider-refresh-btn hidden">Refresh Credits</button>
                             </div>
                         </div>
 

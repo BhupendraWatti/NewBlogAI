@@ -48,6 +48,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware(['auth', 'role:1,2,3'])->group(function () {
             Route::post('providers/{provider}/test-connection', [AIProviderController::class, 'testConnection']);
             Route::post('providers/{provider}/set-default', [AIProviderController::class, 'setDefault']);
+            Route::post('providers/{provider}/refresh-credits', [AIProviderController::class, 'refreshCredits']);
             Route::apiResource('providers', AIProviderController::class);
         });
 

@@ -108,6 +108,61 @@ class AIProviderController extends Controller
     }
 
     /**
+     * Make a minimal API call to fetch and persist live rate-limit / credit headers.
+     * This allows the dashboard to show real credit data without running a full generation.
+     */
+    public function refreshCredits(string $id): JsonResponse
+    {
+        $provider = AIProvider::findOrFail($id);
+
+        if (empty($provider->api_key)) {
+            return response()->json([
+                'message' => 'No API key configured for this provider.',
+            ], 422);
+        }
+
+        if (strtolower($provider->provider_key) === 'ollama') {
+            return response()->json([
+                'message' => 'Ollama is local — no credit tracking needed.',
+                'provider' => new AIProviderResource($provider),
+            ]);
+        }
+
+        try {
+            $driver = $this->providerService->getDriver($provider->provider_key);
+            $result = $driver->generate(
+                $provider->api_key,
+                'Reply with the single word: OK',
+                $provider->default_model,
+                ['max_tokens' => 5, 'timeout' => 30]
+            );
+
+            $limits = $result['rate_limits'] ?? [];
+            $provider->updateRateLimits(
+                isset($limits['limit']) && $limits['limit'] !== null ? intval($limits['limit']) : null,
+                isset($limits['remaining']) && $limits['remaining'] !== null ? intval($limits['remaining']) : null,
+                $limits['reset'] ?? null
+            );
+
+            $provider->refresh();
+
+            return response()->json([
+                'message'  => 'Credits refreshed successfully.',
+                'provider' => new AIProviderResource($provider),
+            ]);
+
+        } catch (\Throwable $e) {
+            $provider->handleFailure($e);
+            $provider->refresh();
+
+            return response()->json([
+                'message'  => 'Could not refresh credits: '.$e->getMessage(),
+                'provider' => new AIProviderResource($provider),
+            ], 502);
+        }
+    }
+
+    /**
      * Set default AI provider status.
      */
     public function setDefault(string $id): JsonResponse
