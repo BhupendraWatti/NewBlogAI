@@ -85,9 +85,9 @@ class OpenAIDriver implements AIProviderClientInterface
             $completionRate = $isGpt4 ? 0.015 : 0.0015; // per 1k tokens
             $cost = (($promptTokens * $promptRate) + ($completionTokens * $completionRate)) / 1000;
 
-            $limit = $response->header('x-ratelimit-limit-tokens') ?: $response->header('x-ratelimit-limit-requests');
-            $remaining = $response->header('x-ratelimit-remaining-tokens') ?: $response->header('x-ratelimit-remaining-requests');
-            $reset = $response->header('x-ratelimit-reset-tokens') ?: $response->header('x-ratelimit-reset-requests');
+            $limit     = $response->header('x-ratelimit-limit-tokens') ?: ($response->header('x-ratelimit-limit-requests') ?: null);
+            $remaining = $response->header('x-ratelimit-remaining-tokens') ?: ($response->header('x-ratelimit-remaining-requests') ?: null);
+            $reset     = $response->header('x-ratelimit-reset-tokens') ?: ($response->header('x-ratelimit-reset-requests') ?: null);
 
             return [
                 'text' => $text,

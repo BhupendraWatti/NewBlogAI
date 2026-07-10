@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\ContentPipeline\Services;
 
+use App\Modules\AIProviderManager\Models\AIProvider;
 use App\Modules\AIProviderManager\Services\AIProviderService;
 use App\Modules\ContentPipeline\Contracts\ContentGeneratorInterface;
 use App\Modules\ContentPipeline\DTOs\PipelineContext;

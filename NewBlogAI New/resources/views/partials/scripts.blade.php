@@ -3425,17 +3425,30 @@
                         if (creditsPanel) {
                             if (p.has_api_key && key !== 'ollama') {
                                 creditsPanel.classList.remove('hidden');
-                                
+
                                 const totalEl = creditsPanel.querySelector('.credits-total');
                                 if (totalEl) {
-                                    totalEl.textContent = p.credits_total ? Number(p.credits_total).toLocaleString() : 'Unlimited / Untracked';
+                                    if (p.credits_total !== null && p.credits_total !== undefined) {
+                                        totalEl.textContent = Number(p.credits_total).toLocaleString() + ' tokens';
+                                        totalEl.classList.remove('text-muted');
+                                    } else {
+                                        totalEl.textContent = 'Not tracked yet';
+                                        totalEl.classList.add('text-muted');
+                                    }
                                 }
-                                
+
                                 const remainingEl = creditsPanel.querySelector('.credits-remaining');
                                 if (remainingEl) {
-                                    remainingEl.textContent = p.credits_remaining ? Number(p.credits_remaining).toLocaleString() : 'Unlimited / Untracked';
+                                    if (p.credits_remaining !== null && p.credits_remaining !== undefined) {
+                                        const pct = p.credits_total ? Math.round((p.credits_remaining / p.credits_total) * 100) : null;
+                                        remainingEl.textContent = Number(p.credits_remaining).toLocaleString() + ' tokens' + (pct !== null ? ` (${pct}%)` : '');
+                                        remainingEl.className = 'credits-remaining font-bold ' + (pct !== null && pct < 20 ? 'text-danger' : pct !== null && pct < 50 ? 'text-warning' : 'text-text');
+                                    } else {
+                                        remainingEl.textContent = 'Not tracked yet';
+                                        remainingEl.className = 'credits-remaining font-bold text-muted';
+                                    }
                                 }
-                                
+
                                 const resetEl = creditsPanel.querySelector('.credits-reset');
                                 if (resetEl) {
                                     if (p.reset_at) {
@@ -3447,18 +3460,24 @@
                                             const m = Math.floor((diffSec % 3600) / 60);
                                             const s = diffSec % 60;
                                             resetEl.textContent = `${h > 0 ? h + 'h ' : ''}${m > 0 ? m + 'm ' : ''}${s}s`;
+                                            resetEl.classList.add('text-warning');
+                                            resetEl.classList.remove('text-text', 'text-muted');
                                         } else {
-                                            resetEl.textContent = 'Active / Reset';
+                                            resetEl.textContent = 'Limit reset — ready';
+                                            resetEl.classList.add('text-success');
+                                            resetEl.classList.remove('text-text', 'text-warning', 'text-muted');
                                         }
                                     } else {
-                                        resetEl.textContent = 'Active / Reset';
+                                        resetEl.textContent = 'No limit active';
+                                        resetEl.classList.add('text-muted');
+                                        resetEl.classList.remove('text-text', 'text-warning', 'text-success');
                                     }
                                 }
-                                
+
                                 const errorEl = creditsPanel.querySelector('.provider-error-msg');
                                 if (errorEl) {
                                     if (p.last_error) {
-                                        errorEl.textContent = p.last_error;
+                                        errorEl.textContent = '⚠ ' + p.last_error;
                                         errorEl.classList.remove('hidden');
                                     } else {
                                         errorEl.classList.add('hidden');

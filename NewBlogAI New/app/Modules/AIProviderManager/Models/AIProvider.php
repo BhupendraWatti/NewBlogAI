@@ -63,7 +63,7 @@ class AIProvider extends Model
     /**
      * Update credit/rate limit metrics from successful response details.
      */
-    public function updateRateLimits(?int $limit, ?int $remaining, ?string $reset, ?string $error = null): void
+    public function updateRateLimits(?int $limit, ?int $remaining, ?string $reset): void
     {
         $update = [];
         if ($limit !== null) {
@@ -83,12 +83,13 @@ class AIProvider extends Model
             if (preg_match('/(\d+\.?\d*)\s*s/i', $reset, $m)) {
                 $seconds += intval(round(floatval($m[1])));
             }
-            
+
             $update['reset_at'] = $seconds > 0 ? now()->addSeconds($seconds) : null;
         }
-        
-        $update['last_error'] = $error;
-        $this->update($update);
+
+        if (!empty($update)) {
+            $this->update($update);
+        }
     }
 
     /**
@@ -100,34 +101,37 @@ class AIProvider extends Model
         $message = $e->getMessage();
         $this->last_error = $message;
 
-        if (str_contains(strtolower($message), 'rate limit') || str_contains(strtolower($message), '429')) {
-            $this->last_error = 'API rate Limit exceed';
-            
+        if (str_contains(strtolower($message), 'rate limit') || str_contains($message, '429')) {
+            $this->last_error = 'Rate limit exceeded';
+
+            // Parse reset time from error message.
+            // Groq format: "Please try again in 1h34m7.968s"
+            // Generic:     "reset in 2m30s"
             $seconds = 0;
-            if (preg_match('/(?:try again in|reset in)\s+([\w\.\s]+)/i', $message, $matches)) {
+            if (preg_match('/(?:try again in|reset in)\s*([\dh m s\.]+)/i', $message, $matches)) {
                 $resetStr = $matches[1];
                 if (preg_match('/(\d+)\s*h/i', $resetStr, $m)) {
-                    $seconds += intval($m[1]) * 3600;
+                    $seconds += (int) $m[1] * 3600;
                 }
-                if (preg_match('/(\d+)\s*m/i', $resetStr, $m)) {
-                    $seconds += intval($m[1]) * 60;
+                if (preg_match('/(\d+)\s*m(?!s)/i', $resetStr, $m)) {
+                    $seconds += (int) $m[1] * 60;
                 }
-                if (preg_match('/(\d+\.?\d*)\s*s/i', $resetStr, $m)) {
-                    $seconds += intval(round(floatval($m[1])));
+                if (preg_match('/(\d+(?:\.\d+)?)\s*s/i', $resetStr, $m)) {
+                    $seconds += (int) ceil((float) $m[1]);
                 }
-            }
-            
-            $this->reset_at = $seconds > 0 ? now()->addSeconds($seconds) : now()->addSeconds(60);
-        } else {
-            $isPermanent = false;
-            // Check for 401 Unauthorized, 402 Payment Required / Out of Credits, or 403 Forbidden
-            if (preg_match('/Status\s+(401|402|403)/', $message)) {
-                $isPermanent = true;
             }
 
-            if ($isPermanent) {
+            $this->reset_at = now()->addSeconds(max($seconds, 60));
+        } else {
+            // 401 Unauthorized or 403 Forbidden → bad/expired key → disable immediately
+            // 402 Payment Required → out of credits → disable immediately
+            if (preg_match('/Status\s+(401|402|403)/', $message, $m)) {
                 $this->is_enabled = false;
-                $this->last_error = 'Disabled: ' . (preg_match('/Status\s+402/', $message) ? 'Payment Required / Out of Credits' : 'Invalid API Key');
+                $this->last_error = match ((int) $m[1]) {
+                    402     => 'Disabled: Payment Required / Out of Credits',
+                    403     => 'Disabled: Forbidden (check key permissions)',
+                    default => 'Disabled: Invalid API Key',
+                };
             }
         }
 

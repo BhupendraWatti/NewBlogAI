@@ -83,6 +83,11 @@ class GoogleGeminiDriver implements AIProviderClientInterface
             $completionRate = $isPro ? 0.00375 : 0.000375;
             $cost = (($promptTokens * $promptRate) + ($completionTokens * $completionRate)) / 1000;
 
+            // Gemini uses x-ratelimit-* headers on the v1beta endpoint
+            $limit     = $response->header('x-ratelimit-limit-requests') ?: $response->header('x-ratelimit-limit-tokens');
+            $remaining = $response->header('x-ratelimit-remaining-requests') ?: $response->header('x-ratelimit-remaining-tokens');
+            $reset     = $response->header('x-ratelimit-reset-requests') ?: $response->header('x-ratelimit-reset-tokens');
+
             return [
                 'text' => $text,
                 'prompt_tokens' => $promptTokens,
@@ -90,6 +95,11 @@ class GoogleGeminiDriver implements AIProviderClientInterface
                 'total_tokens' => $totalTokens,
                 'estimated_cost' => $cost,
                 'raw_response' => $data,
+                'rate_limits' => [
+                    'limit'     => $limit ?: null,
+                    'remaining' => $remaining ?: null,
+                    'reset'     => $reset ?: null,
+                ],
             ];
 
         } catch (\Exception $e) {
