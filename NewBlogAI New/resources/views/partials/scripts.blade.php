@@ -3392,8 +3392,13 @@
                         
                         const statusBadge = card.querySelector('.provider-status');
                         if (statusBadge) {
-                            statusBadge.textContent = 'configured';
-                            statusBadge.className = 'provider-status px-2 py-0.5 rounded bg-success/20 text-success border border-success/30 text-[9px] font-mono';
+                            if (!p.is_enabled) {
+                                statusBadge.textContent = 'disabled / error';
+                                statusBadge.className = 'provider-status px-2 py-0.5 rounded bg-danger/20 text-danger border border-danger/30 text-[9px] font-mono';
+                            } else {
+                                statusBadge.textContent = 'configured';
+                                statusBadge.className = 'provider-status px-2 py-0.5 rounded bg-success/20 text-success border border-success/30 text-[9px] font-mono';
+                            }
                         }
 
                         const keyInput = card.querySelector('input[type="password"], input[type="text"]');
@@ -3413,6 +3418,57 @@
                         const chkDefault = card.querySelector('.provider-default-chk');
                         if (chkDefault) {
                             chkDefault.checked = p.is_default;
+                        }
+
+                        // Populate Rate Limit & Credit information
+                        const creditsPanel = card.querySelector('.provider-credits-panel');
+                        if (creditsPanel) {
+                            if (p.has_api_key && key !== 'ollama') {
+                                creditsPanel.classList.remove('hidden');
+                                
+                                const totalEl = creditsPanel.querySelector('.credits-total');
+                                if (totalEl) {
+                                    totalEl.textContent = p.credits_total ? Number(p.credits_total).toLocaleString() : 'Unlimited / Untracked';
+                                }
+                                
+                                const remainingEl = creditsPanel.querySelector('.credits-remaining');
+                                if (remainingEl) {
+                                    remainingEl.textContent = p.credits_remaining ? Number(p.credits_remaining).toLocaleString() : 'Unlimited / Untracked';
+                                }
+                                
+                                const resetEl = creditsPanel.querySelector('.credits-reset');
+                                if (resetEl) {
+                                    if (p.reset_at) {
+                                        const resetDate = new Date(p.reset_at);
+                                        const diffMs = resetDate - new Date();
+                                        if (diffMs > 0) {
+                                            const diffSec = Math.ceil(diffMs / 1000);
+                                            const h = Math.floor(diffSec / 3600);
+                                            const m = Math.floor((diffSec % 3600) / 60);
+                                            const s = diffSec % 60;
+                                            resetEl.textContent = `${h > 0 ? h + 'h ' : ''}${m > 0 ? m + 'm ' : ''}${s}s`;
+                                        } else {
+                                            resetEl.textContent = 'Active / Reset';
+                                        }
+                                    } else {
+                                        resetEl.textContent = 'Active / Reset';
+                                    }
+                                }
+                                
+                                const errorEl = creditsPanel.querySelector('.provider-error-msg');
+                                if (errorEl) {
+                                    if (p.last_error) {
+                                        errorEl.textContent = p.last_error;
+                                        errorEl.classList.remove('hidden');
+                                    } else {
+                                        errorEl.classList.add('hidden');
+                                    }
+                                }
+                            } else if (key === 'ollama') {
+                                creditsPanel.classList.remove('hidden');
+                            } else {
+                                creditsPanel.classList.add('hidden');
+                            }
                         }
 
                         const saveBtn = card.querySelector('button[onclick^="saveProviderKey"]');
@@ -3823,6 +3879,9 @@
 
                 const trendColor = trend >= 70 ? 'text-green-400' : trend >= 40 ? 'text-yellow-400' : 'text-muted';
 
+                const relativeAge = c.metadata?.published_at_relative || '';
+                const ageText = relativeAge ? relativeAge : `${fresh}% fresh`;
+
                 const card = document.createElement('div');
                 card.className = 'glass-surface rounded-2xl p-4 space-y-3 border border-border hover:border-accent/50 transition-all cursor-pointer group';
                 card.innerHTML = `
@@ -3830,7 +3889,7 @@
                         <span class="text-[10px] font-mono text-muted bg-surface border border-border px-2 py-0.5 rounded-full">#${idx + 1}</span>
                         <div class="flex gap-1.5">
                             <span class="text-[9px] font-mono ${trendColor} border border-current/30 px-1.5 py-0.5 rounded-full">⚡ ${trend}% trend</span>
-                            <span class="text-[9px] font-mono text-blue-400 border border-blue-400/30 px-1.5 py-0.5 rounded-full">🕐 ${fresh}% fresh</span>
+                            <span class="text-[9px] font-mono text-blue-400 border border-blue-400/30 px-1.5 py-0.5 rounded-full">🕐 ${ageText}</span>
                         </div>
                     </div>
                     <h4 class="text-xs font-semibold text-text leading-snug group-hover:text-accent transition-colors">${(c.title || 'Untitled').replace(/</g, '&lt;')}</h4>

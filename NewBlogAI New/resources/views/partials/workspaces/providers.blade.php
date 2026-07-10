@@ -104,6 +104,22 @@
                                     <label for="chk-default-gemini" class="text-[10px] font-mono text-muted uppercase cursor-pointer select-none">Set as Default Provider</label>
                                 </div>
                             </div>
+                            <!-- Rate Limits & Credits Panel -->
+                            <div class="provider-credits-panel hidden pt-3 border-t border-border/50 space-y-1.5 text-[11px] font-mono text-muted">
+                                <div class="flex justify-between">
+                                    <span>Daily/Monthly Limit:</span>
+                                    <span class="credits-total text-text font-bold">—</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Remaining Credit:</span>
+                                    <span class="credits-remaining text-text font-bold">—</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Reset Time:</span>
+                                    <span class="credits-reset text-text font-bold">—</span>
+                                </div>
+                                <div class="provider-error-msg hidden text-danger text-[10px] whitespace-pre-wrap mt-1"></div>
+                            </div>
                             <div class="flex gap-2 pt-2 border-t border-border">
                                 <button onclick="saveProviderKey(this, 'gemini')" class="flex-1 bg-accent hover:bg-accent/80 text-background font-medium text-xs py-1.5 rounded-xl transition" disabled>Save Settings</button>
                             </div>
@@ -143,6 +159,22 @@
                                     <label for="chk-default-openai" class="text-[10px] font-mono text-muted uppercase cursor-pointer select-none">Set as Default Provider</label>
                                 </div>
                             </div>
+                            <!-- Rate Limits & Credits Panel -->
+                            <div class="provider-credits-panel hidden pt-3 border-t border-border/50 space-y-1.5 text-[11px] font-mono text-muted">
+                                <div class="flex justify-between">
+                                    <span>Daily/Monthly Limit:</span>
+                                    <span class="credits-total text-text font-bold">—</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Remaining Credit:</span>
+                                    <span class="credits-remaining text-text font-bold">—</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Reset Time:</span>
+                                    <span class="credits-reset text-text font-bold">—</span>
+                                </div>
+                                <div class="provider-error-msg hidden text-danger text-[10px] whitespace-pre-wrap mt-1"></div>
+                            </div>
                             <div class="flex gap-2 pt-2 border-t border-border">
                                 <button onclick="saveProviderKey(this, 'openai')" class="flex-1 bg-accent hover:bg-accent/80 text-background font-medium text-xs py-1.5 rounded-xl transition" disabled>Save Settings</button>
                             </div>
@@ -181,6 +213,22 @@
                                     <input type="checkbox" id="chk-default-claude" class="rounded bg-background border-border text-accent focus:ring-accent/20 provider-default-chk" onchange="setDefaultProvider('claude')"/>
                                     <label for="chk-default-claude" class="text-[10px] font-mono text-muted uppercase cursor-pointer select-none">Set as Default Provider</label>
                                 </div>
+                            </div>
+                            <!-- Rate Limits & Credits Panel -->
+                            <div class="provider-credits-panel hidden pt-3 border-t border-border/50 space-y-1.5 text-[11px] font-mono text-muted">
+                                <div class="flex justify-between">
+                                    <span>Daily/Monthly Limit:</span>
+                                    <span class="credits-total text-text font-bold">—</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Remaining Credit:</span>
+                                    <span class="credits-remaining text-text font-bold">—</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Reset Time:</span>
+                                    <span class="credits-reset text-text font-bold">—</span>
+                                </div>
+                                <div class="provider-error-msg hidden text-danger text-[10px] whitespace-pre-wrap mt-1"></div>
                             </div>
                             <div class="flex gap-2 pt-2 border-t border-border">
                                 <button onclick="saveProviderKey(this, 'claude')" class="flex-1 bg-accent hover:bg-accent/80 text-background font-medium text-xs py-1.5 rounded-xl transition" disabled>Save Settings</button>
@@ -223,6 +271,22 @@
                                     <label for="chk-default-groq" class="text-[10px] font-mono text-muted uppercase cursor-pointer select-none">Set as Default Provider</label>
                                 </div>
                             </div>
+                            <!-- Rate Limits & Credits Panel -->
+                            <div class="provider-credits-panel hidden pt-3 border-t border-border/50 space-y-1.5 text-[11px] font-mono text-muted">
+                                <div class="flex justify-between">
+                                    <span>Daily/Monthly Limit:</span>
+                                    <span class="credits-total text-text font-bold">—</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Remaining Credit:</span>
+                                    <span class="credits-remaining text-text font-bold">—</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Reset Time:</span>
+                                    <span class="credits-reset text-text font-bold">—</span>
+                                </div>
+                                <div class="provider-error-msg hidden text-danger text-[10px] whitespace-pre-wrap mt-1"></div>
+                            </div>
                             <div class="flex gap-2 pt-2 border-t border-border">
                                 <button onclick="saveProviderKey(this, 'groq')" class="flex-1 bg-accent hover:bg-accent/80 text-background font-medium text-xs py-1.5 rounded-xl transition" disabled>Save Settings</button>
                             </div>
@@ -262,6 +326,22 @@
                                     <label for="chk-default-openrouter" class="text-[10px] font-mono text-muted uppercase cursor-pointer select-none">Set as Default Provider</label>
                                 </div>
                             </div>
+                            <!-- Rate Limits & Credits Panel -->
+                            <div class="provider-credits-panel hidden pt-3 border-t border-border/50 space-y-1.5 text-[11px] font-mono text-muted">
+                                <div class="flex justify-between">
+                                    <span>Daily/Monthly Limit:</span>
+                                    <span class="credits-total text-text font-bold">—</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Remaining Credit:</span>
+                                    <span class="credits-remaining text-text font-bold">—</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Reset Time:</span>
+                                    <span class="credits-reset text-text font-bold">—</span>
+                                </div>
+                                <div class="provider-error-msg hidden text-danger text-[10px] whitespace-pre-wrap mt-1"></div>
+                            </div>
                             <div class="flex gap-2 pt-2 border-t border-border">
                                 <button onclick="saveProviderKey(this, 'openrouter')" class="flex-1 bg-accent hover:bg-accent/80 text-background font-medium text-xs py-1.5 rounded-xl transition" disabled>Save Settings</button>
                             </div>
@@ -290,6 +370,13 @@
                                 <div class="flex items-center gap-2 pt-1">
                                     <input type="checkbox" id="chk-default-ollama" class="rounded bg-background border-border text-accent focus:ring-accent/20 provider-default-chk" onchange="setDefaultProvider('ollama')"/>
                                     <label for="chk-default-ollama" class="text-[10px] font-mono text-muted uppercase cursor-pointer select-none">Set as Default Provider</label>
+                                </div>
+                            </div>
+                            <!-- Rate Limits & Credits Panel -->
+                            <div class="provider-credits-panel hidden pt-3 border-t border-border/50 space-y-1.5 text-[11px] font-mono text-muted">
+                                <div class="flex justify-between">
+                                    <span>Type:</span>
+                                    <span class="text-text font-bold">Local / Offline</span>
                                 </div>
                             </div>
                             <div class="flex gap-2 pt-2 border-t border-border">

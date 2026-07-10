@@ -75,6 +75,10 @@ class ClaudeDriver implements AIProviderClientInterface
             // Claude Pricing estimation (Sonnet 3.5 defaults)
             $cost = (($promptTokens * 0.003) + ($completionTokens * 0.015)) / 1000;
 
+            $limit = $response->header('anthropic-ratelimit-tokens-limit') ?: $response->header('anthropic-ratelimit-requests-limit');
+            $remaining = $response->header('anthropic-ratelimit-tokens-remaining') ?: $response->header('anthropic-ratelimit-requests-remaining');
+            $reset = $response->header('anthropic-ratelimit-tokens-reset') ?: $response->header('anthropic-ratelimit-requests-reset');
+
             return [
                 'text' => $text,
                 'prompt_tokens' => $promptTokens,
@@ -82,6 +86,11 @@ class ClaudeDriver implements AIProviderClientInterface
                 'total_tokens' => $totalTokens,
                 'estimated_cost' => $cost,
                 'raw_response' => $data,
+                'rate_limits' => [
+                    'limit' => $limit,
+                    'remaining' => $remaining,
+                    'reset' => $reset,
+                ],
             ];
 
         } catch (\Exception $e) {

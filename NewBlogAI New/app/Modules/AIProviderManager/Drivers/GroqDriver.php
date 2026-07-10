@@ -70,6 +70,10 @@ class GroqDriver implements AIProviderClientInterface
             // Groq Pricing estimation (llama-3.3-70b rates)
             $cost = (($promptTokens * 0.00059) + ($completionTokens * 0.00079)) / 1000;
 
+            $limit = $response->header('x-ratelimit-limit-tokens') ?: $response->header('x-ratelimit-limit-requests');
+            $remaining = $response->header('x-ratelimit-remaining-tokens') ?: $response->header('x-ratelimit-remaining-requests');
+            $reset = $response->header('x-ratelimit-reset-tokens') ?: $response->header('x-ratelimit-reset-requests');
+
             return [
                 'text' => $text,
                 'prompt_tokens' => $promptTokens,
@@ -77,6 +81,11 @@ class GroqDriver implements AIProviderClientInterface
                 'total_tokens' => $totalTokens,
                 'estimated_cost' => $cost,
                 'raw_response' => $data,
+                'rate_limits' => [
+                    'limit' => $limit,
+                    'remaining' => $remaining,
+                    'reset' => $reset,
+                ],
             ];
 
         } catch (\Exception $e) {

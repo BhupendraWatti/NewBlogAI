@@ -6,6 +6,7 @@ namespace App\Modules\ContentPipeline\Services;
 
 use App\Modules\AIProviderManager\Models\AIProvider;
 use App\Modules\AIProviderManager\Services\AIProviderService;
+use App\Modules\AIProviderManager\Support\ProviderErrorClassifier;
 use App\Modules\ContentPipeline\Models\NewsCandidate;
 use App\Modules\ContentPipeline\Models\PipelineRun;
 use App\Modules\SubscriptionManager\Services\EntitlementService;
@@ -154,7 +155,10 @@ class NewsDiscoveryService
                         'trend_score'     => $this->clampScore($candidate['trend_score'] ?? 0),
                         'freshness_score' => $this->clampScore($candidate['freshness_score'] ?? 0),
                         'uniqueness_hash' => NewsCandidate::hashTitle((string) $candidate['title']),
-                        'metadata'        => ['event_date' => $candidate['event_date'] ?? null],
+                        'metadata'        => [
+                            'event_date' => $candidate['event_date'] ?? null,
+                            'published_at_relative' => $candidate['published_at_relative'] ?? null,
+                        ],
                         'status'          => NewsCandidate::STATUS_CANDIDATE,
                     ]);
                 }
@@ -292,12 +296,27 @@ class NewsDiscoveryService
                     $errorMsg = $e->getMessage();
                     $allErrors[$providerKey][] = "attempt {$attempt}: {$errorMsg}";
 
+                    $provider->handleFailure($e);
+
                     Log::warning('NewsDiscoveryService: Provider attempt failed.', [
                         'run_id'   => $run->id,
                         'provider' => $providerKey,
                         'attempt'  => $attempt,
                         'error'    => $errorMsg,
                     ]);
+
+                    // Permanent failures (bad key, connection refused, bad
+                    // request) can never succeed on retry and only waste
+                    // back-off time and tokens — fail over to the next
+                    // provider immediately instead of retrying this one.
+                    if (! ProviderErrorClassifier::isRetryable($e)) {
+                        Log::info('NewsDiscoveryService: Non-retryable error, skipping remaining attempts for provider.', [
+                            'run_id'   => $run->id,
+                            'provider' => $providerKey,
+                            'reason'   => ProviderErrorClassifier::reason($e),
+                        ]);
+                        break;
+                    }
 
                     // Exponential back-off between retries (not after the last attempt)
                     if ($attempt < self::FAILOVER_MAX_ATTEMPTS) {
@@ -321,7 +340,9 @@ class NewsDiscoveryService
             ->implode(' | ');
 
         throw new RuntimeException(
-            'Discovery failed on all available providers. Errors — '.$summary
+            'Discovery failed on all available providers. '
+            .'Fix the API keys flagged as "auth failed" or wait for rate-limited providers to reset. '
+            .'Errors — '.$summary
         );
     }
 
@@ -373,6 +394,16 @@ class NewsDiscoveryService
                 ]
             );
 
+            // Update rate limits in database
+            if (!empty($result['rate_limits'])) {
+                $limits = $result['rate_limits'];
+                $provider->updateRateLimits(
+                    isset($limits['limit']) ? intval($limits['limit']) : null,
+                    isset($limits['remaining']) ? intval($limits['remaining']) : null,
+                    $limits['reset'] ?? null
+                );
+            }
+
             $totalTokens['prompt']     += (int) ($result['prompt_tokens'] ?? 0);
             $totalTokens['completion'] += (int) ($result['completion_tokens'] ?? 0);
             $totalTokens['total']      += (int) ($result['total_tokens'] ?? 0);
@@ -410,14 +441,10 @@ class NewsDiscoveryService
         ];
     }
 
-    /**
-     * Build the discovery prompt: distinct current events, strict JSON output.
-     *
-     * @param array<int, string> $excludedTitles
-     */
     protected function buildDiscoveryPrompt(string $category, string $language, int $count, array $excludedTitles, ?string $country = null): string
     {
         $today = now()->format('F j, Y');
+        $currentTime = now()->format('H:i:s');
         $exclusions = '';
 
         if (! empty($excludedTitles)) {
@@ -428,9 +455,9 @@ class NewsDiscoveryService
         $regionContext = $country ? " focusing specifically on national news events relevant to or occurring in {$country}" : '';
 
         return <<<PROMPT
-You are a JSON-only news data API. Today is {$today}.
+You are a JSON-only news data API. Today is {$today}, current time is {$currentTime}.
 
-TASK: Return exactly {$count} current real-world news events from the "{$category}" category from the last 48 hours{$regionContext}.
+TASK: Return exactly {$count} current, extremely fresh real-world news events from the "{$category}" category from today or the last few hours/minutes/day{$regionContext}. Do NOT return stale news from 2-5 days ago. Prioritize breaking news and trending events that happened within the last 30 minutes, 1 hour, 4 hours, or up to 24 hours.
 
 STRICT OUTPUT RULES — VIOLATIONS WILL BREAK THE PARSER:
 - Your ENTIRE response must be a single valid JSON array starting with [ and ending with ]
@@ -448,8 +475,9 @@ Return exactly this JSON structure (no extra fields, no missing fields):
     "source_references": [{"name": "Outlet Name", "url": "https://real-url.com"}],
     "keywords": ["keyword1", "keyword2", "keyword3"],
     "trend_score": 85,
-    "freshness_score": 90,
-    "event_date": "2024-01-15"
+    "freshness_score": 95,
+    "event_date": "2026-07-10",
+    "published_at_relative": "relative time of news event, e.g. '30 mins ago', '1 hour ago', '4 hours ago', or '12 hours ago' relative to {$currentTime}"
   }
 ]
 {$exclusions}

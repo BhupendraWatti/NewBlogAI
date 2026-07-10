@@ -18,6 +18,10 @@ class AIProviderResource extends JsonResource
             'default_model' => $this->default_model,
             'is_default' => (bool) $this->is_default,
             'is_enabled' => (bool) $this->is_enabled,
+            'credits_total' => $this->credits_total,
+            'credits_remaining' => $this->credits_remaining,
+            'reset_at' => $this->reset_at?->toIso8601String(),
+            'last_error' => $this->last_error,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

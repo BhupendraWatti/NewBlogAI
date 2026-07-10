@@ -4,6 +4,7 @@ namespace App\Modules\ContentGeneration\Services;
 
 use App\Modules\AIProviderManager\Models\AIProvider;
 use App\Modules\AIProviderManager\Services\AIProviderService;
+use App\Modules\AIProviderManager\Support\ProviderErrorClassifier;
 use App\Modules\ContentGeneration\Models\AIRequestLog;
 use App\Modules\ContentGeneration\Models\ContentRevision;
 use App\Modules\ContentGeneration\Models\GeneratedContent;
@@ -306,12 +307,27 @@ class ContentGenerationService
                     $errorMsg = $e->getMessage();
                     $allErrors[$providerKey][] = "attempt {$attempt}: {$errorMsg}";
 
+                    $provider->handleFailure($e);
+
                     Log::warning('ContentGenerationService: Provider attempt failed.', [
                         'run_id'   => $context->run->id,
                         'provider' => $providerKey,
                         'attempt'  => $attempt,
                         'error'    => $errorMsg,
                     ]);
+
+                    // Permanent failures (bad key, connection refused, bad
+                    // request) can never succeed on retry. Retrying them re-runs
+                    // the full pipeline stage chain and burns real tokens/quota,
+                    // so fail over to the next provider immediately instead.
+                    if (! ProviderErrorClassifier::isRetryable($e)) {
+                        Log::info('ContentGenerationService: Non-retryable error, skipping remaining attempts for provider.', [
+                            'run_id'   => $context->run->id,
+                            'provider' => $providerKey,
+                            'reason'   => ProviderErrorClassifier::reason($e),
+                        ]);
+                        break;
+                    }
 
                     // Exponential back-off between retries (not after the last attempt)
                     if ($attempt < self::FAILOVER_MAX_ATTEMPTS) {
@@ -335,7 +351,9 @@ class ContentGenerationService
             ->implode(' | ');
 
         throw new \RuntimeException(
-            'Content generation failed on all available providers. Errors — '.$summary
+            'Content generation failed on all available providers. '
+            .'Fix the API keys flagged as "auth failed" or wait for rate-limited providers to reset. '
+            .'Errors — '.$summary
         );
     }
 

@@ -151,6 +151,16 @@ class ContentGeneratorService implements ContentGeneratorInterface
             $context->metadata['raw_response']       = $result['raw_response'] ?? [];
             $context->metadata['execution_time_ms']  = $executionTimeMs;
 
+            // Update rate limits in database
+            if ($provider instanceof AIProvider && !empty($result['rate_limits'])) {
+                $limits = $result['rate_limits'];
+                $provider->updateRateLimits(
+                    isset($limits['limit']) ? intval($limits['limit']) : null,
+                    isset($limits['remaining']) ? intval($limits['remaining']) : null,
+                    $limits['reset'] ?? null
+                );
+            }
+
             Log::info('ContentGeneratorService: News content generated successfully.', [
                 'title'            => $title,
                 'category'         => $category,
@@ -160,6 +170,9 @@ class ContentGeneratorService implements ContentGeneratorInterface
             ]);
 
         } catch (\Exception $e) {
+            if (isset($provider) && $provider instanceof AIProvider) {
+                $provider->handleFailure($e);
+            }
             Log::error('ContentGeneratorService failed: '.$e->getMessage(), [
                 'exception' => $e,
             ]);
