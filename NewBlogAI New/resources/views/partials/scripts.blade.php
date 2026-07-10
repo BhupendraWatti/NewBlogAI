@@ -3432,7 +3432,7 @@
                                         totalEl.textContent = Number(p.credits_total).toLocaleString() + ' tokens';
                                         totalEl.classList.remove('text-muted');
                                     } else {
-                                        totalEl.textContent = 'Not tracked yet';
+                                        totalEl.textContent = key === 'gemini' ? 'Free / Untracked' : 'Not tracked yet';
                                         totalEl.classList.add('text-muted');
                                     }
                                 }
@@ -3444,7 +3444,7 @@
                                         remainingEl.textContent = Number(p.credits_remaining).toLocaleString() + ' tokens' + (pct !== null ? ` (${pct}%)` : '');
                                         remainingEl.className = 'credits-remaining font-bold ' + (pct !== null && pct < 20 ? 'text-danger' : pct !== null && pct < 50 ? 'text-warning' : 'text-text');
                                     } else {
-                                        remainingEl.textContent = 'Not tracked yet';
+                                        remainingEl.textContent = key === 'gemini' ? 'Free / Untracked' : 'Not tracked yet';
                                         remainingEl.className = 'credits-remaining font-bold text-muted';
                                     }
                                 }
@@ -3631,21 +3631,14 @@
                 return;
             }
 
-            const originalText = btn.textContent;
-            btn.disabled = true;
-            btn.textContent = 'Refreshing...';
-
             await apiRequest(`/api/v1/providers/${dbId}/refresh-credits`, { method: 'POST' }, {
                 loadingMessage: "Refreshing credits from API...",
                 successTitle: "Credits Refreshed",
                 successMessage: `Successfully updated credit metrics for ${providerKey.toUpperCase()}.`,
                 defaultErrorMessage: "Failed to refresh credits. Please check your API key and network connection.",
+                submitBtn: btn,
                 onSuccess: async () => {
                     await fetchAIProviders();
-                },
-                onComplete: () => {
-                    btn.disabled = false;
-                    btn.textContent = originalText;
                 }
             });
         };
