@@ -61,6 +61,23 @@ class AIProvider extends Model
     }
 
     /**
+     * Accessor: auto-clear last_error when the reset window has already passed.
+     * This prevents stale rate-limit errors from showing after the provider has recovered.
+     */
+    public function getLastErrorAttribute(?string $value): ?string
+    {
+        if ($value && $this->attributes['reset_at'] ?? null) {
+            $resetAt = \Carbon\Carbon::parse($this->attributes['reset_at']);
+            if ($resetAt->isPast()) {
+                // Quietly wipe the stale error from the DB so it doesn't keep coming back
+                $this->withoutEvents(fn () => $this->updateQuietly(['last_error' => null]));
+                return null;
+            }
+        }
+        return $value;
+    }
+
+    /**
      * Update credit/rate limit metrics from successful response details.
      */
     public function updateRateLimits(?int $limit, ?int $remaining, ?string $reset): void
@@ -77,14 +94,18 @@ class AIProvider extends Model
             if (preg_match('/(\d+)\s*h/i', $reset, $m)) {
                 $seconds += intval($m[1]) * 3600;
             }
-            if (preg_match('/(\d+)\s*m/i', $reset, $m)) {
+            // Use negative lookahead to prevent matching 'ms' as minutes
+            if (preg_match('/(\d+)\s*m(?!s)/i', $reset, $m)) {
                 $seconds += intval($m[1]) * 60;
             }
-            if (preg_match('/(\d+\.?\d*)\s*s/i', $reset, $m)) {
-                $seconds += intval(round(floatval($m[1])));
+            // Match milliseconds explicitly, or standard seconds
+            if (preg_match('/(\d+\.?\d*)\s*ms/i', $reset, $m)) {
+                $seconds += floatval($m[1]) / 1000.0;
+            } elseif (preg_match('/(\d+\.?\d*)\s*s/i', $reset, $m)) {
+                $seconds += floatval($m[1]);
             }
 
-            $update['reset_at'] = $seconds > 0 ? now()->addSeconds($seconds) : null;
+            $update['reset_at'] = $seconds > 0 ? now()->addSeconds(intval(ceil($seconds))) : null;
         }
 
         if (!empty($update)) {
@@ -105,10 +126,11 @@ class AIProvider extends Model
             $this->last_error = 'Rate limit exceeded';
 
             // Parse reset time from error message.
-            // Groq format: "Please try again in 1h34m7.968s"
-            // Generic:     "reset in 2m30s"
+            // Groq format:   "Please try again in 1h34m7.968s"
+            // Gemini format: "Please retry in 28.093431161s"
+            // Generic:       "reset in 2m30s"
             $seconds = 0;
-            if (preg_match('/(?:try again in|reset in)\s*([\dh m s\.]+)/i', $message, $matches)) {
+            if (preg_match('/(?:try again in|retry in|reset in)\s*([\dh m s\.]+)/i', $message, $matches)) {
                 $resetStr = $matches[1];
                 if (preg_match('/(\d+)\s*h/i', $resetStr, $m)) {
                     $seconds += (int) $m[1] * 3600;

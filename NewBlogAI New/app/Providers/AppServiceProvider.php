@@ -46,6 +46,14 @@ class AppServiceProvider extends ServiceProvider
             \App\Modules\ContentPipeline\Services\FactExtractionService::class
         );
 
+        // Chronological Context Parser — inserted between FactExtraction and ContentGenerator.
+        // Decouples HTML publish time from root event time and injects a temporal
+        // framing guardrail into the AI writer prompt for follow-up stories.
+        $this->app->bind(
+            \App\Modules\ContentPipeline\Contracts\ChronologicalContextParserInterface::class,
+            \App\Modules\ContentPipeline\Services\ChronologicalContextParser::class
+        );
+
         $this->app->bind(
             \App\Modules\ContentPipeline\Contracts\ContentGeneratorInterface::class,
             \App\Modules\ContentPipeline\Services\ContentGeneratorService::class

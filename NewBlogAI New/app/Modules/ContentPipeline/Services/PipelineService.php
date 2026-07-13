@@ -103,6 +103,14 @@ class PipelineService
             throw new InvalidArgumentException('Cannot execute an inactive content pipeline.');
         }
 
+        // Prevent concurrent or duplicate generation runs for the same pipeline
+        $activeRunExists = PipelineRun::where('pipeline_id', $pipeline->id)
+            ->whereIn('status', ['queued', 'processing'])
+            ->exists();
+        if ($activeRunExists) {
+            throw new InvalidArgumentException('A generation run is already in progress for this pipeline.');
+        }
+
         $pipeline->loadMissing(['site', 'provider']);
         $this->entitlements->assertCanGenerate($pipeline->site);
 

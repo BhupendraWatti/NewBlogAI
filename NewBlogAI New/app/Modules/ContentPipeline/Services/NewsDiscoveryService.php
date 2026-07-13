@@ -98,6 +98,20 @@ class NewsDiscoveryService
             ? AIProvider::find($discoveryProviderId)
             : $pipeline->provider;
 
+        // Auto-override: News discovery needs real-time search grounding to prevent hallucinations.
+        // If preferred provider is not Gemini, but Gemini is enabled with an API key, we use Gemini for discovery.
+        if ($preferredProvider && strtolower($preferredProvider->provider_key) !== 'gemini') {
+            $geminiProvider = \App\Modules\AIProviderManager\Models\AIProvider::where('provider_key', 'gemini')
+                ->where('is_enabled', true)
+                ->whereNotNull('api_key')
+                ->get()
+                ->first(fn($p) => !empty($p->api_key));
+            if ($geminiProvider) {
+                Log::info("NewsDiscoveryService: Overriding preferred provider '{$preferredProvider->provider_key}' with 'gemini' to utilize search grounding.");
+                $preferredProvider = $geminiProvider;
+            }
+        }
+
         Log::info('NewsDiscoveryService: Using discovery provider ID '
             .($preferredProvider?->id ?? 'none')
             ." ({$preferredProvider?->provider_key})");
@@ -227,12 +241,20 @@ class NewsDiscoveryService
         // Sort by priority order defined in PROVIDER_PRIORITY
         $priorityMap = array_flip(self::PROVIDER_PRIORITY);
 
-        $sorted = $allEnabled->sortBy(
-            fn (AIProvider $p) => $priorityMap[$p->provider_key] ?? PHP_INT_MAX
-        )->values();
+        // Providers still inside their rate-limit reset window are pushed to the
+        // back of the list (kept as last-resort fallbacks, not dropped), so a
+        // known-throttled provider is never attempted first.
+        $sorted = $allEnabled->sortBy(function (AIProvider $p) use ($priorityMap) {
+            $throttled = $p->reset_at && $p->reset_at->isFuture() ? 1_000_000 : 0;
 
-        // Bubble the explicitly preferred provider to the front
-        if ($preferred && ! empty($preferred->api_key) && $preferred->is_enabled) {
+            return $throttled + ($priorityMap[$p->provider_key] ?? PHP_INT_MAX);
+        })->values();
+
+        // Bubble the explicitly preferred provider to the front — unless it is
+        // currently throttled, in which case respect the reset window and let a
+        // healthy provider go first.
+        if ($preferred && ! empty($preferred->api_key) && $preferred->is_enabled
+            && ! ($preferred->reset_at && $preferred->reset_at->isFuture())) {
             $sorted = $sorted
                 ->reject(fn (AIProvider $p) => $p->id === $preferred->id)
                 ->prepend($preferred);
@@ -309,8 +331,11 @@ class NewsDiscoveryService
                     // request) can never succeed on retry and only waste
                     // back-off time and tokens — fail over to the next
                     // provider immediately instead of retrying this one.
-                    if (! ProviderErrorClassifier::isRetryable($e)) {
-                        Log::info('NewsDiscoveryService: Non-retryable error, skipping remaining attempts for provider.', [
+                    // Rate limits are also skipped here: the driver already
+                    // applied its own back-off, and the provider won't reset
+                    // within our budget, so move straight to the next one.
+                    if (! ProviderErrorClassifier::shouldRetrySameProvider($e)) {
+                        Log::info('NewsDiscoveryService: Not retrying this provider, moving to next.', [
                             'run_id'   => $run->id,
                             'provider' => $providerKey,
                             'reason'   => ProviderErrorClassifier::reason($e),
@@ -391,6 +416,7 @@ class NewsDiscoveryService
                     'max_tokens'  => self::DISCOVERY_MAX_TOKENS,
                     'temperature' => 0.2,
                     'timeout'     => 150,
+                    'tools'       => strtolower($provider->provider_key) === 'gemini' ? [['google_search' => (object) []]] : null,
                 ]
             );
 
@@ -459,6 +485,13 @@ You are a JSON-only news data API. Today is {$today}, current time is {$currentT
 
 TASK: Return exactly {$count} current, extremely fresh real-world news events from the "{$category}" category from today or the last few hours/minutes/day{$regionContext}. Do NOT return stale news from 2-5 days ago. Prioritize breaking news and trending events that happened within the last 30 minutes, 1 hour, 4 hours, or up to 24 hours.
 
+CRITICAL TEMPORAL RULES (must be strictly followed):
+- Do NOT include events that are scheduled to happen in the future (e.g. upcoming festivals, planned events, future elections, preview articles). These are anticipated searches, NOT live news.
+- The "event_date" MUST be today ({$today}) or earlier. Never set it to a future date.
+- If a topic is trending because people are searching for an UPCOMING event (e.g. a festival weeks away), do NOT include it — it has no live news value yet.
+- Only include events where something has ALREADY HAPPENED and been reported by a news outlet.
+- For truly live/breaking events set freshness_score 80–99. For events from yesterday use 50–79. For events 2–3 days old use 20–49.
+
 STRICT OUTPUT RULES — VIOLATIONS WILL BREAK THE PARSER:
 - Your ENTIRE response must be a single valid JSON array starting with [ and ending with ]
 - Do NOT write any text, explanation, or commentary before or after the JSON array
@@ -476,7 +509,7 @@ Return exactly this JSON structure (no extra fields, no missing fields):
     "keywords": ["keyword1", "keyword2", "keyword3"],
     "trend_score": 85,
     "freshness_score": 95,
-    "event_date": "2026-07-10",
+    "event_date": "{$today}",
     "published_at_relative": "relative time of news event, e.g. '30 mins ago', '1 hour ago', '4 hours ago', or '12 hours ago' relative to {$currentTime}"
   }
 ]
@@ -564,12 +597,20 @@ PROMPT;
                 'trend_score'       => $item['trend_score'] ?? 0,
                 'freshness_score'   => $item['freshness_score'] ?? 0,
                 'event_date'        => $item['event_date'] ?? null,
+                'published_at_relative' => $item['published_at_relative'] ?? null,
             ];
         }
 
         if (empty($candidates)) {
             throw new RuntimeException('Discovery response contained no usable candidates.');
         }
+
+        // ── BUG 1 FIX: Temporal freshness validation ─────────────────────────
+        // Penalize freshness scores for future events (anticipation spikes) and
+        // for news that is older than 7 days. This prevents the pipeline from
+        // marking "Sawan festival next month" as 98% fresh just because
+        // search volume is spiking today.
+        $candidates = $this->validateAndCorrectFreshness($candidates);
 
         Log::info('NewsDiscoveryService: parseCandidates succeeded.', [
             'count' => count($candidates),
@@ -581,5 +622,75 @@ PROMPT;
     protected function clampScore(mixed $value): int
     {
         return max(0, min(100, (int) $value));
+    }
+
+    /**
+     * BUG 1 FIX: Validate and correct freshness scores based on the event_date.
+     *
+     * The AI may return high freshness scores for topics trending because of
+     * anticipation (e.g. an upcoming festival) rather than live news. This
+     * method cross-references the event_date against today and penalizes
+     * scores accordingly:
+     *
+     *   - event_date > today (FUTURE event)  → freshness capped at 35
+     *   - event_date is 2–7 days old         → freshness capped at 55
+     *   - event_date is 8–30 days old        → freshness capped at 30
+     *   - event_date is missing              → no correction (AI-score kept)
+     *
+     * @param  array<int, array>  $candidates
+     * @return array<int, array>
+     */
+    private function validateAndCorrectFreshness(array $candidates): array
+    {
+        $today = now()->startOfDay();
+
+        foreach ($candidates as &$candidate) {
+            $eventDateStr = $candidate['event_date'] ?? null;
+            if (empty($eventDateStr)) {
+                continue;
+            }
+
+            try {
+                $eventDate = \Carbon\Carbon::parse((string) $eventDateStr)->startOfDay();
+            } catch (\Throwable) {
+                // Unparsable date — leave score untouched
+                continue;
+            }
+
+            $diffDays = $today->diffInDays($eventDate, false); // negative = past
+
+            if ($diffDays > 0) {
+                // Future event — this is an anticipation spike, NOT live news.
+                $corrected = min((int) $candidate['freshness_score'], 35);
+                Log::warning('NewsDiscoveryService: Future event detected — penalizing freshness.', [
+                    'title'      => mb_substr($candidate['title'], 0, 80),
+                    'event_date' => $eventDateStr,
+                    'original'   => $candidate['freshness_score'],
+                    'corrected'  => $corrected,
+                ]);
+                $candidate['freshness_score'] = $corrected;
+                $candidate['freshness_penalty_reason'] = 'future_event';
+            } elseif ($diffDays < -7 && $diffDays >= -30) {
+                // 2–30 days old
+                $corrected = min((int) $candidate['freshness_score'], 55);
+                if ($corrected < (int) $candidate['freshness_score']) {
+                    Log::info('NewsDiscoveryService: Stale event (>7 days) — capping freshness.', [
+                        'title'      => mb_substr($candidate['title'], 0, 80),
+                        'event_date' => $eventDateStr,
+                        'original'   => $candidate['freshness_score'],
+                        'corrected'  => $corrected,
+                    ]);
+                    $candidate['freshness_score'] = $corrected;
+                    $candidate['freshness_penalty_reason'] = 'stale_event';
+                }
+            } elseif ($diffDays < -30) {
+                // Very old — cap hard at 25
+                $candidate['freshness_score'] = min((int) $candidate['freshness_score'], 25);
+                $candidate['freshness_penalty_reason'] = 'very_old_event';
+            }
+        }
+        unset($candidate);
+
+        return $candidates;
     }
 }

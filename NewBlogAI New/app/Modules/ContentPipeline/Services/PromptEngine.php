@@ -25,7 +25,9 @@ class PromptEngine
         
         if (!empty($context->sources)) {
             $researchContext .= "Normalized Sources:\n";
-            foreach ($context->sources as $source) {
+            // Limit to top 3 sources to keep prompt tokens within the target budget
+            $sources = array_slice($context->sources, 0, 3);
+            foreach ($sources as $source) {
                 $title = $source['title'] ?? 'No Title';
                 $url = $source['url'] ?? 'No URL';
                 $snippet = $source['snippet'] ?? '';
@@ -82,7 +84,9 @@ class PromptEngine
             if (!empty($facts[$type])) {
                 // Determine label: e.g. organizations -> Organizations, keywords -> Key Terms
                 $label = $type === 'keywords' ? 'Key Terms' : ucfirst($type);
-                $injection .= "- {$label}: " . implode(', ', $facts[$type]) . "\n";
+                // Limit to top 10 items to prevent token bloat
+                $limitedFacts = array_slice($facts[$type], 0, 10);
+                $injection .= "- {$label}: " . implode(', ', $limitedFacts) . "\n";
             }
         }
         
@@ -103,6 +107,10 @@ class PromptEngine
 
     /**
      * Generates dynamic guidelines based on context (e.g. locale target, language translations, style guides, tone instructions).
+     *
+     * Enhanced to surface temporal framing context set by ChronologicalContextParser:
+     * - story_type: 'breaking' | 'followup' | 'background'
+     * - dynamic_instructions: may contain a TEMPORAL FRAMING GUARDRAIL for follow-up stories
      */
     public function compileDynamicInstructions(PipelineContext $context): string
     {
@@ -132,8 +140,32 @@ class PromptEngine
             $instructions[] = "Tone: Write with a {$tone} tone.";
         }
 
-        // Additional guidelines
-        $additional = $context->metadata['dynamic_instructions'] ?? $context->metadata['instructions'] ?? null;
+        // ── Temporal Framing Guardrail ────────────────────────────────────────
+        // Populated by ChronologicalContextParser. For follow-up/background
+        // stories this contains mandatory framing rules that prevent the AI
+        // writer from treating historical events as breaking news.
+        $storyType  = $context->metadata['story_type'] ?? 'breaking';
+        $guardrailText = trim($context->metadata['dynamic_instructions'] ?? '');
+
+        if ($storyType === 'breaking') {
+            // Confirm this is a live story so the AI approaches it with urgency
+            $instructions[] = "Story Classification: BREAKING / CURRENT EVENT — write with immediacy. This story covers events that are happening now or very recently.";
+        } elseif (!empty($guardrailText)) {
+            // The full TEMPORAL FRAMING GUARDRAIL from ChronologicalContextParser
+            // is injected verbatim so the AI writer receives the exact framing rules.
+            $instructions[] = $guardrailText;
+        } else {
+            // story_type is followup/background but parser found no guardrail text
+            // (edge case: parser ran but wrote nothing). Emit a safe generic rule.
+            if ($storyType === 'followup') {
+                $instructions[] = "Story Classification: FOLLOW-UP / DEVELOPMENTAL — this is a follow-up story on a past event. Lead with today's latest development and reference the original incident as historical context. Do NOT write as if the original event happened today.";
+            }
+        }
+
+        // Additional guidelines (from other pipeline stages, not overwritten)
+        // Note: dynamic_instructions is intentionally NOT read again here — its
+        // content was already consumed by the guardrail block above.
+        $additional = $context->metadata['instructions'] ?? null;
         if ($additional) {
             $instructions[] = "Additional Guidelines: {$additional}";
         }

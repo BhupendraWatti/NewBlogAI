@@ -59,13 +59,22 @@ class TranslationService implements TranslationInterface
 
                         // Translate title
                         $titlePrompt = "Translate the following article title to language code '{$targetLanguage}'. Output ONLY the translated title:\n\n{$originalTitle}";
-                        $titleResult = $client->generate($apiKey, $titlePrompt, $provider->default_model);
+                        $titleResult = $client->generate($apiKey, $titlePrompt, $provider->default_model, [
+                            'task' => 'translation_title',
+                        ]);
                         $translatedTitle = trim($titleResult['text'] ?? '');
 
-                        // Translate content
-                        $contentPrompt = "Translate the following article content to language code '{$targetLanguage}'. Preserve all markdown formatting, headings, and structure. Output ONLY the translated content:\n\n{$originalContent}";
-                        $contentResult = $client->generate($apiKey, $contentPrompt, $provider->default_model);
-                        $translatedContent = $contentResult['text'] ?? '';
+                        // Translate content only if it is not already in the target language
+                        $isContentAlreadyInTargetLanguage = ($context->metadata['content_language'] ?? 'en') === $targetLanguage;
+                        if (!$isContentAlreadyInTargetLanguage) {
+                            $contentPrompt = "Translate the following article content to language code '{$targetLanguage}'. Preserve all markdown formatting, headings, and structure. Output ONLY the translated content:\n\n{$originalContent}";
+                            $contentResult = $client->generate($apiKey, $contentPrompt, $provider->default_model, [
+                                'task' => 'translation_content',
+                            ]);
+                            $translatedContent = $contentResult['text'] ?? '';
+                        } else {
+                            $translatedContent = $originalContent;
+                        }
 
                         $context->title = $translatedTitle ?: $originalTitle;
                         $context->generatedContent = $translatedContent ?: $originalContent;
@@ -77,9 +86,10 @@ class TranslationService implements TranslationInterface
                         $context->generatedContent = $this->simulateTranslation($originalContent ?? '', $targetLanguage);
                     }
                 } else {
-                    // Simulate translation dynamically
+                    // Simulate translation dynamically only for the parts not already translated/in target language
+                    $isContentAlreadyInTargetLanguage = ($context->metadata['content_language'] ?? 'en') === $targetLanguage;
                     $context->title = $this->simulateTranslation($originalTitle ?? '', $targetLanguage);
-                    $context->generatedContent = $this->simulateTranslation($originalContent ?? '', $targetLanguage);
+                    $context->generatedContent = $isContentAlreadyInTargetLanguage ? ($originalContent ?? '') : $this->simulateTranslation($originalContent ?? '', $targetLanguage);
                 }
 
                 Log::info('TranslationService: Content translated successfully.');

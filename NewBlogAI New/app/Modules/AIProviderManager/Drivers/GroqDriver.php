@@ -40,58 +40,123 @@ class GroqDriver implements AIProviderClientInterface
     public function generate(string $apiKey, string $prompt, ?string $model = null, array $options = []): array
     {
         $model = $model ?: 'llama-3.3-70b-versatile';
-
-        // Groq is fast but large JSON outputs still need reasonable timeout
         $timeout = $options['timeout'] ?? 120;
 
-        try {
-            $response = Http::withToken($apiKey)
+        return $this->executeWithRetryAndLog($apiKey, $prompt, $model, $options, function ($key, $p, $m, $opts) use ($timeout) {
+            return Http::withToken($key)
                 ->timeout($timeout)
                 ->post('https://api.groq.com/openai/v1/chat/completions', [
-                    'model' => $model,
+                    'model' => $m,
                     'messages' => [
-                        ['role' => 'user', 'content' => $prompt],
+                        ['role' => 'user', 'content' => $p],
                     ],
-                    'temperature' => $options['temperature'] ?? 0.7,
-                    'max_tokens' => $options['max_tokens'] ?? 2000,
+                    'temperature' => $opts['temperature'] ?? 0.7,
+                    'max_tokens' => $opts['max_tokens'] ?? 2000,
+                ]);
+        });
+    }
+
+    protected function executeWithRetryAndLog(
+        string $apiKey,
+        string $prompt,
+        string $model,
+        array $options,
+        callable $apiCall
+    ): array {
+        $maxRetries = 3;
+        $lastException = null;
+
+        for ($retry = 0; $retry <= $maxRetries; $retry++) {
+            $startTime = microtime(true);
+            try {
+                if ($retry > 0) {
+                    $delay = pow(2, $retry); // 2s, 4s, 8s
+                    Log::info("Groq retry backoff: waiting {$delay}s before attempt #{$retry}");
+                    sleep($delay);
+                }
+
+                $response = $apiCall($apiKey, $prompt, $model, $options);
+                $latency = (int) ((microtime(true) - $startTime) * 1000);
+
+                if ($response->status() === 429 && $retry < $maxRetries) {
+                    Log::warning("Groq rate limit (429) hit, retrying...", [
+                        'attempt' => $retry + 1,
+                        'latency_ms' => $latency
+                    ]);
+                    continue;
+                }
+
+                if (!$response->successful()) {
+                    throw new \RuntimeException("Groq API error: Status {$response->status()} - " . $response->body());
+                }
+
+                $data = $response->json();
+                $text = $data['choices'][0]['message']['content'] ?? '';
+                $usage = $data['usage'] ?? [];
+                $promptTokens = $usage['prompt_tokens'] ?? 0;
+                $completionTokens = $usage['completion_tokens'] ?? 0;
+                $totalTokens = $usage['total_tokens'] ?? 0;
+
+                $cost = (($promptTokens * 0.00059) + ($completionTokens * 0.00079)) / 1000;
+
+                $limit     = $response->header('x-ratelimit-limit-tokens') ?: ($response->header('x-ratelimit-limit-requests') ?: null);
+                $remaining = $response->header('x-ratelimit-remaining-tokens') ?: ($response->header('x-ratelimit-remaining-requests') ?: null);
+                $reset     = $response->header('x-ratelimit-reset-tokens') ?: ($response->header('x-ratelimit-reset-requests') ?: null);
+
+                // Structured logging for task, model, input tokens, output tokens, latency, and retry count
+                Log::info('AI API Call Log', [
+                    'task' => $options['task'] ?? 'generation',
+                    'provider' => 'groq',
+                    'model' => $model,
+                    'input_tokens' => $promptTokens,
+                    'output_tokens' => $completionTokens,
+                    'latency_ms' => $latency,
+                    'retry_count' => $retry,
                 ]);
 
-            if (! $response->successful()) {
-                throw new \RuntimeException("Groq API error: Status {$response->status()} - ".$response->body());
+                return [
+                    'text' => $text,
+                    'prompt_tokens' => $promptTokens,
+                    'completion_tokens' => $completionTokens,
+                    'total_tokens' => $totalTokens,
+                    'estimated_cost' => $cost,
+                    'raw_response' => $data,
+                    'rate_limits' => [
+                        'limit' => $limit,
+                        'remaining' => $remaining,
+                        'reset' => $reset,
+                    ],
+                ];
+
+            } catch (\Exception $e) {
+                $lastException = $e;
+                $latency = (int) ((microtime(true) - $startTime) * 1000);
+
+                if ($retry < $maxRetries && (str_contains($e->getMessage(), '429') || str_contains(strtolower($e->getMessage()), 'rate limit'))) {
+                    Log::warning("Groq rate limit hit (exception), retrying...", [
+                        'attempt' => $retry + 1,
+                        'error' => $e->getMessage()
+                    ]);
+                    continue;
+                }
+
+                Log::error('AI API Call Failed', [
+                    'task' => $options['task'] ?? 'generation',
+                    'provider' => 'groq',
+                    'model' => $model,
+                    'latency_ms' => $latency,
+                    'retry_count' => $retry,
+                    'error' => $e->getMessage()
+                ]);
+
+                throw $e;
             }
-
-            $data = $response->json();
-            $text = $data['choices'][0]['message']['content'] ?? '';
-            $usage = $data['usage'] ?? [];
-            $promptTokens = $usage['prompt_tokens'] ?? 0;
-            $completionTokens = $usage['completion_tokens'] ?? 0;
-            $totalTokens = $usage['total_tokens'] ?? 0;
-
-            // Groq Pricing estimation (llama-3.3-70b rates)
-            $cost = (($promptTokens * 0.00059) + ($completionTokens * 0.00079)) / 1000;
-
-            $limit     = $response->header('x-ratelimit-limit-tokens') ?: ($response->header('x-ratelimit-limit-requests') ?: null);
-            $remaining = $response->header('x-ratelimit-remaining-tokens') ?: ($response->header('x-ratelimit-remaining-requests') ?: null);
-            $reset     = $response->header('x-ratelimit-reset-tokens') ?: ($response->header('x-ratelimit-reset-requests') ?: null);
-
-            return [
-                'text' => $text,
-                'prompt_tokens' => $promptTokens,
-                'completion_tokens' => $completionTokens,
-                'total_tokens' => $totalTokens,
-                'estimated_cost' => $cost,
-                'raw_response' => $data,
-                'rate_limits' => [
-                    'limit' => $limit,
-                    'remaining' => $remaining,
-                    'reset' => $reset,
-                ],
-            ];
-
-        } catch (\Exception $e) {
-            Log::error('Groq generation failed: '.$e->getMessage());
-            throw $e;
         }
+
+        if ($lastException) {
+            throw $lastException;
+        }
+        throw new \RuntimeException("Groq generation failed after max retries.");
     }
 
     public function getConfig(): array

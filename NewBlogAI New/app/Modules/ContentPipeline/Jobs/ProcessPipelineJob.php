@@ -43,6 +43,13 @@ class ProcessPipelineJob implements ShouldQueue
             return;
         }
 
+        // Prevent concurrent queue workers processing the same pipeline run simultaneously
+        $lock = \Illuminate\Support\Facades\Cache::lock("pipeline_run_processing_{$this->runId}", 300);
+        if (! $lock->get()) {
+            Log::warning("ProcessPipelineJob ID {$this->runId} is already being processed. Skipping execution.");
+            return;
+        }
+
         try {
             // Update status to processing
             $run->update([
@@ -74,6 +81,8 @@ class ProcessPipelineJob implements ShouldQueue
             $pipeline->update(['status' => 'failed']);
 
             throw $e;
+        } finally {
+            $lock->release();
         }
     }
 }

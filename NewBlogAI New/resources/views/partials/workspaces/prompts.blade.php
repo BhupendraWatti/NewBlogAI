@@ -130,6 +130,7 @@
                                             <span class="text-muted">Cost: calculated at runtime</span>
                                         </div>
                                         <div class="flex gap-2">
+                                            <button id="delete-prompt-btn" onclick="deleteActivePrompt()" class="bg-danger hover:bg-danger/80 text-white font-medium text-xs px-4 py-1.5 rounded-xl transition hidden">Delete Template</button>
                                             <button onclick="saveActivePrompt()" class="bg-accent hover:bg-accent/80 text-background font-medium text-xs px-4 py-1.5 rounded-xl transition">Save Template Settings</button>
                                         </div>
                                     </div>

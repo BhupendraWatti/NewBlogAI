@@ -64,6 +64,41 @@ class ProviderErrorClassifierTest extends TestCase
         ));
     }
 
+    public function test_rate_limit_is_detected(): void
+    {
+        $this->assertTrue(ProviderErrorClassifier::isRateLimit(
+            new RuntimeException('Groq API error: Status 429 - rate limit reached')
+        ));
+        $this->assertTrue(ProviderErrorClassifier::isRateLimit(
+            new RuntimeException('Provider hit its rate limit for today')
+        ));
+        $this->assertFalse(ProviderErrorClassifier::isRateLimit(
+            new RuntimeException('OpenAI API error: Status 500 - internal error')
+        ));
+    }
+
+    public function test_rate_limits_are_not_retried_on_same_provider(): void
+    {
+        // The driver already applied its own back-off and the provider won't
+        // reset within our budget — fail over instead of retrying in place.
+        $this->assertFalse(ProviderErrorClassifier::shouldRetrySameProvider(
+            new RuntimeException('Groq API error: Status 429 - rate limit reached')
+        ));
+
+        // Genuinely transient errors are still retried on the same provider.
+        $this->assertTrue(ProviderErrorClassifier::shouldRetrySameProvider(
+            new RuntimeException('Gemini API error: Status 503 - overloaded')
+        ));
+        $this->assertTrue(ProviderErrorClassifier::shouldRetrySameProvider(
+            new RuntimeException('cURL error 28: Operation timed out')
+        ));
+
+        // Permanent failures are never retried on the same provider.
+        $this->assertFalse(ProviderErrorClassifier::shouldRetrySameProvider(
+            new RuntimeException('OpenAI API error: Status 401 - invalid key')
+        ));
+    }
+
     private function retryable(string $message): bool
     {
         return ProviderErrorClassifier::isRetryable(new RuntimeException($message));

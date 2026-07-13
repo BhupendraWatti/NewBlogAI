@@ -144,6 +144,12 @@ class AIProviderController extends Controller
                 $limits['reset'] ?? null
             );
 
+            // Successful call — clear any stale error message and re-enable provider
+            $provider->update([
+                'last_error'  => null,
+                'is_enabled'  => true,
+            ]);
+
             $provider->refresh();
 
             return response()->json([

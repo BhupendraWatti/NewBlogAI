@@ -45,9 +45,6 @@ class FactExtractionService implements FactExtractorInterface
                 }
             }
 
-            // Fallback mock entities based on common topics to make it highly realistic
-            $this->injectRealisticEntities($topic, $facts);
-
             // Process each source to extract facts
             foreach ($sources as $source) {
                 // Extract author as People if available
@@ -115,40 +112,4 @@ class FactExtractionService implements FactExtractorInterface
         return $context;
     }
 
-    /**
-     * Inject realistic entities based on topic domain to simulate real NLP extraction.
-     */
-    protected function injectRealisticEntities(string $topic, array &$facts): void
-    {
-        $topicLower = strtolower($topic);
-
-        if (str_contains($topicLower, 'ai') || str_contains($topicLower, 'intelligence') || str_contains($topicLower, 'learning')) {
-            $facts['people'][] = 'Sam Altman';
-            $facts['people'][] = 'Demis Hassabis';
-            $facts['organizations'][] = 'OpenAI';
-            $facts['organizations'][] = 'Google DeepMind';
-            $facts['locations'][] = 'Silicon Valley';
-            $facts['locations'][] = 'San Francisco';
-            $facts['dates'][] = '2026';
-            $facts['events'][] = 'Google I/O 2026';
-            $facts['events'][] = 'OpenAI DevDay';
-            $facts['keywords'][] = 'neural networks';
-            $facts['keywords'][] = 'transformers';
-        } elseif (str_contains($topicLower, 'crypto') || str_contains($topicLower, 'bitcoin') || str_contains($topicLower, 'blockchain')) {
-            $facts['people'][] = 'Satoshi Nakamoto';
-            $facts['people'][] = 'Vitalik Buterin';
-            $facts['organizations'][] = 'Ethereum Foundation';
-            $facts['locations'][] = 'Zug (Crypto Valley)';
-            $facts['dates'][] = '2009';
-            $facts['events'][] = 'Bitcoin Halving';
-            $facts['keywords'][] = 'cryptocurrency';
-            $facts['keywords'][] = 'smart contracts';
-        } else {
-            // General fallback entities
-            $facts['organizations'][] = 'Global Research Institute';
-            $facts['locations'][] = 'New York';
-            $facts['dates'][] = date('Y');
-            $facts['events'][] = 'Annual Tech Summit';
-        }
-    }
 }

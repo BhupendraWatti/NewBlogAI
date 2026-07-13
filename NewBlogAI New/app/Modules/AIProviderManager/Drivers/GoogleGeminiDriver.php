@@ -44,68 +44,137 @@ class GoogleGeminiDriver implements AIProviderClientInterface
     public function generate(string $apiKey, string $prompt, ?string $model = null, array $options = []): array
     {
         $model = $model ?: 'gemini-2.5-flash';
-        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
-
-        // Gemini 2.5 "thinking" models need longer timeouts for large token outputs
         $timeout = $options['timeout'] ?? 180;
 
-        try {
-            $response = Http::timeout($timeout)->post($url, [
+        return $this->executeWithRetryAndLog($apiKey, $prompt, $model, $options, function ($key, $p, $m, $opts) use ($timeout) {
+            $url = "https://generativelanguage.googleapis.com/v1beta/models/{$m}:generateContent?key={$key}";
+            $payload = [
                 'contents' => [
                     [
                         'parts' => [
-                            ['text' => $prompt],
+                            ['text' => $p],
                         ],
                     ],
                 ],
                 'generationConfig' => [
-                    'temperature' => $options['temperature'] ?? 0.7,
-                    'maxOutputTokens' => $options['max_tokens'] ?? 2048,
-                ],
-            ]);
-
-            if (! $response->successful()) {
-                throw new \RuntimeException("Gemini API error: Status {$response->status()} - ".$response->body());
-            }
-
-            $data = $response->json();
-            $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
-
-            // Gemini beta has usageMetadata
-            $usage = $data['usageMetadata'] ?? [];
-            $promptTokens = $usage['promptTokenCount'] ?? 0;
-            $completionTokens = $usage['candidatesTokenCount'] ?? 0;
-            $totalTokens = $usage['totalTokenCount'] ?? 0;
-
-            // Gemini Pricing estimation
-            $isPro = str_contains($model, 'pro');
-            $promptRate = $isPro ? 0.00125 : 0.000125;
-            $completionRate = $isPro ? 0.00375 : 0.000375;
-            $cost = (($promptTokens * $promptRate) + ($completionTokens * $completionRate)) / 1000;
-
-            // Gemini uses x-ratelimit-* headers on the v1beta endpoint
-            $limit     = $response->header('x-ratelimit-limit-requests') ?: $response->header('x-ratelimit-limit-tokens');
-            $remaining = $response->header('x-ratelimit-remaining-requests') ?: $response->header('x-ratelimit-remaining-tokens');
-            $reset     = $response->header('x-ratelimit-reset-requests') ?: $response->header('x-ratelimit-reset-tokens');
-
-            return [
-                'text' => $text,
-                'prompt_tokens' => $promptTokens,
-                'completion_tokens' => $completionTokens,
-                'total_tokens' => $totalTokens,
-                'estimated_cost' => $cost,
-                'raw_response' => $data,
-                'rate_limits' => [
-                    'limit'     => $limit ?: null,
-                    'remaining' => $remaining ?: null,
-                    'reset'     => $reset ?: null,
+                    'temperature' => $opts['temperature'] ?? 0.7,
+                    'maxOutputTokens' => $opts['max_tokens'] ?? 2048,
                 ],
             ];
 
-        } catch (\Exception $e) {
-            Log::error('Gemini generation failed: '.$e->getMessage());
-            throw $e;
+            if (!empty($opts['tools'])) {
+                $payload['tools'] = $opts['tools'];
+            }
+
+            return Http::timeout($timeout)->post($url, $payload);
+        });
+    }
+
+    protected function executeWithRetryAndLog(
+        string $apiKey,
+        string $prompt,
+        string $model,
+        array $options,
+        callable $apiCall
+    ): array {
+        $maxRetries = 3;
+        $lastException = null;
+
+        for ($retry = 0; $retry <= $maxRetries; $retry++) {
+            $startTime = microtime(true);
+            try {
+                if ($retry > 0) {
+                    $delay = pow(2, $retry); // 2s, 4s, 8s
+                    Log::info("Gemini retry backoff: waiting {$delay}s before attempt #{$retry}");
+                    sleep($delay);
+                }
+
+                $response = $apiCall($apiKey, $prompt, $model, $options);
+                $latency = (int) ((microtime(true) - $startTime) * 1000);
+
+                if ($response->status() === 429 && $retry < $maxRetries) {
+                    Log::warning("Gemini rate limit (429) hit, retrying...", [
+                        'attempt' => $retry + 1,
+                        'latency_ms' => $latency
+                    ]);
+                    continue;
+                }
+
+                if (!$response->successful()) {
+                    throw new \RuntimeException("Gemini API error: Status {$response->status()} - " . $response->body());
+                }
+
+                $data = $response->json();
+                $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+
+                $usage = $data['usageMetadata'] ?? [];
+                $promptTokens = $usage['promptTokenCount'] ?? 0;
+                $completionTokens = $usage['candidatesTokenCount'] ?? 0;
+                $totalTokens = $usage['totalTokenCount'] ?? 0;
+
+                $isPro = str_contains($model, 'pro');
+                $promptRate = $isPro ? 0.00125 : 0.000125;
+                $completionRate = $isPro ? 0.00375 : 0.000375;
+                $cost = (($promptTokens * $promptRate) + ($completionTokens * $completionRate)) / 1000;
+
+                $limit     = $response->header('x-ratelimit-limit-requests') ?: $response->header('x-ratelimit-limit-tokens');
+                $remaining = $response->header('x-ratelimit-remaining-requests') ?: $response->header('x-ratelimit-remaining-tokens');
+                $reset     = $response->header('x-ratelimit-reset-requests') ?: $response->header('x-ratelimit-reset-tokens');
+
+                // Structured logging for task, model, input tokens, output tokens, latency, and retry count
+                Log::info('AI API Call Log', [
+                    'task' => $options['task'] ?? 'generation',
+                    'provider' => 'gemini',
+                    'model' => $model,
+                    'input_tokens' => $promptTokens,
+                    'output_tokens' => $completionTokens,
+                    'latency_ms' => $latency,
+                    'retry_count' => $retry,
+                ]);
+
+                return [
+                    'text' => $text,
+                    'prompt_tokens' => $promptTokens,
+                    'completion_tokens' => $completionTokens,
+                    'total_tokens' => $totalTokens,
+                    'estimated_cost' => $cost,
+                    'raw_response' => $data,
+                    'rate_limits' => [
+                        'limit' => $limit ?: null,
+                        'remaining' => $remaining ?: null,
+                        'reset' => $reset ?: null,
+                    ],
+                ];
+
+            } catch (\Exception $e) {
+                $lastException = $e;
+                $latency = (int) ((microtime(true) - $startTime) * 1000);
+
+                if ($retry < $maxRetries && (str_contains($e->getMessage(), '429') || str_contains(strtolower($e->getMessage()), 'rate limit'))) {
+                    Log::warning("Gemini rate limit hit (exception), retrying...", [
+                        'attempt' => $retry + 1,
+                        'error' => $e->getMessage()
+                    ]);
+                    continue;
+                }
+
+                Log::error('AI API Call Failed', [
+                    'task' => $options['task'] ?? 'generation',
+                    'provider' => 'gemini',
+                    'model' => $model,
+                    'latency_ms' => $latency,
+                    'retry_count' => $retry,
+                    'error' => $e->getMessage()
+                ]);
+
+                throw $e;
+            }
         }
+
+        if ($lastException) {
+            throw $lastException;
+        }
+        throw new \RuntimeException("Gemini generation failed after max retries.");
     }
 
     public function getConfig(): array

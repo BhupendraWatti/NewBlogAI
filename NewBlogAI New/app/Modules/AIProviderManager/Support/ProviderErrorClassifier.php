@@ -66,6 +66,34 @@ final class ProviderErrorClassifier
     }
 
     /**
+     * True when the error is a rate limit / quota exhaustion (429 or a
+     * "rate limit" message).
+     */
+    public static function isRateLimit(\Throwable $e): bool
+    {
+        if (self::extractStatus($e->getMessage()) === 429) {
+            return true;
+        }
+
+        return str_contains(strtolower($e->getMessage()), 'rate limit');
+    }
+
+    /**
+     * Whether the failover loop should retry the SAME provider.
+     *
+     * Rate limits are deliberately excluded: the drivers already apply their
+     * own internal exponential back-off on 429, and a rate-limited provider
+     * usually resets minutes-to-hours later — far beyond any request budget.
+     * Re-running it at the failover level only wastes wall-clock and tokens,
+     * so we fail over to the next provider immediately instead. Only genuinely
+     * transient errors (5xx, timeouts) are worth retrying on the same provider.
+     */
+    public static function shouldRetrySameProvider(\Throwable $e): bool
+    {
+        return self::isRetryable($e) && ! self::isRateLimit($e);
+    }
+
+    /**
      * Short human-readable reason used in the consolidated failover error so
      * admins can tell misconfiguration (fix the key) from throttling (wait).
      */

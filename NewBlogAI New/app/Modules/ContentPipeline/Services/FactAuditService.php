@@ -168,21 +168,21 @@ class FactAuditService implements FactAuditorInterface
      */
     protected function calculateMatchScore(string $claim, SourceDTO $source): float
     {
-        $claimLower = strtolower($claim);
-        $sourceText = strtolower(($source->title ?? '') . ' ' . ($source->snippet ?? ''));
+        $claimLower = mb_strtolower($claim, 'UTF-8');
+        $sourceText = mb_strtolower(($source->title ?? '') . ' ' . ($source->snippet ?? ''), 'UTF-8');
 
         // Direct containment check (highly supportive)
         if (str_contains($sourceText, $claimLower)) {
             return 1.0;
         }
 
-        // Keyword overlap calculation
-        $claimWords = str_word_count($claimLower, 1);
+        // Keyword overlap calculation: Use Unicode-safe word matching
+        $claimWords = array_filter(preg_split('/[^\p{L}\p{N}]+/u', $claimLower) ?: []);
         
         // Filter out short words and common stop words
         $stopWords = ['the', 'and', 'a', 'of', 'to', 'in', 'is', 'that', 'it', 'for', 'on', 'with', 'as', 'this', 'was', 'are', 'by', 'an', 'be', 'at'];
         $keywords = array_filter($claimWords, function ($word) use ($stopWords) {
-            return strlen($word) > 3 && !in_array($word, $stopWords, true);
+            return mb_strlen($word) >= 3 && !in_array($word, $stopWords, true);
         });
 
         if (empty($keywords)) {

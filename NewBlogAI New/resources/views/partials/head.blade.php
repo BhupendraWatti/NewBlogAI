@@ -125,7 +125,7 @@
            Fixes: background, text colour, border, placeholder, focus state,
            select option background, scrollbar thumb.
         ──────────────────────────────────────────────────────────────────── */
-        :root:not(.dark) input,
+        :root:not(.dark) input:not([type="checkbox"]):not([type="radio"]),
         :root:not(.dark) select,
         :root:not(.dark) textarea {
             background-color: #FFFFFF;
@@ -135,7 +135,7 @@
 
         /* Inputs that use Tailwind's bg-background will inherit #F8FAFC —
            override to white for better contrast against the page surface. */
-        :root:not(.dark) input[class*="bg-background"],
+        :root:not(.dark) input:not([type="checkbox"]):not([type="radio"])[class*="bg-background"],
         :root:not(.dark) select[class*="bg-background"],
         :root:not(.dark) textarea[class*="bg-background"] {
             background-color: #FFFFFF !important;
@@ -180,11 +180,23 @@
             color: #0F172A !important;
         }
 
-        /* border-border in light mode: make it clearly visible */
-        :root:not(.dark) input.border-border,
+        /* border-border in light mode: make it clearly visible.
+           Checkboxes and radios are excluded — their border is managed by Tailwind's
+           focus/checked states and must NOT be overridden here. */
+        :root:not(.dark) input.border-border:not([type="checkbox"]):not([type="radio"]),
         :root:not(.dark) select.border-border,
         :root:not(.dark) textarea.border-border {
             border-color: rgba(0, 0, 0, 0.2) !important;
+        }
+
+        /* Checkbox / radio tint in light mode — Tailwind's text-accent maps to
+           accent-color, ensuring the checked fill colour is the brand accent green. */
+        :root:not(.dark) input[type="checkbox"],
+        :root:not(.dark) input[type="radio"] {
+            accent-color: var(--color-accent, #059669);
+            border-color: rgba(0, 0, 0, 0.3);
+            width: 1rem;
+            height: 1rem;
         }
 
         /* Scrollbar thumb: use dark tint in light mode instead of white tint */

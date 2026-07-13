@@ -542,6 +542,40 @@
             if (window.fetchSystemAlerts) {
                 window.fetchSystemAlerts();
             }
+
+            // Start a live countdown timer for provider rate-limit resets
+            if (window._providerResetInterval) {
+                clearInterval(window._providerResetInterval);
+            }
+            window._providerResetInterval = setInterval(() => {
+                document.querySelectorAll('.credits-reset[data-reset-at]').forEach(resetEl => {
+                    const resetAtStr = resetEl.getAttribute('data-reset-at');
+                    if (!resetAtStr) return;
+
+                    const resetDate = new Date(resetAtStr);
+                    const diffMs = resetDate - new Date();
+                    if (diffMs > 0) {
+                        const diffSec = Math.ceil(diffMs / 1000);
+                        const h = Math.floor(diffSec / 3600);
+                        const m = Math.floor((diffSec % 3600) / 60);
+                        const s = diffSec % 60;
+                        resetEl.textContent = `${h > 0 ? h + 'h ' : ''}${m > 0 ? m + 'm ' : ''}${s}s`;
+                        resetEl.classList.add('text-warning');
+                        resetEl.classList.remove('text-text', 'text-muted', 'text-success');
+                    } else {
+                        resetEl.textContent = 'Limit reset — ready';
+                        resetEl.classList.add('text-success');
+                        resetEl.classList.remove('text-text', 'text-warning', 'text-muted');
+                        resetEl.removeAttribute('data-reset-at');
+                        // Hide stale error banner now that the reset window has passed
+                        const card = resetEl.closest('.provider-card');
+                        if (card) {
+                            const errBanner = card.querySelector('.provider-error-msg');
+                            if (errBanner) errBanner.classList.add('hidden');
+                        }
+                    }
+                });
+            }, 1000);
         });
 
         // Workspace Node Router
@@ -1915,6 +1949,17 @@
         function selectPromptTemplate(id, name, category, version, status, promt = '') {
             activePromptId = id;
             
+            // Toggle delete button visibility based on whether the prompt is saved (numeric ID)
+            const isNew = id === 'new' || isNaN(id);
+            const deleteBtn = document.getElementById('delete-prompt-btn');
+            if (deleteBtn) {
+                if (isNew) {
+                    deleteBtn.classList.add('hidden');
+                } else {
+                    deleteBtn.classList.remove('hidden');
+                }
+            }
+
             // Highlight selected item in list
             document.querySelectorAll('.prompt-list-item').forEach(item => {
                 item.classList.remove('bg-white/5', 'border-accent');
@@ -1951,6 +1996,11 @@
         window.openNewPromptTemplate = function() {
             activePromptId = 'new';
             
+            const deleteBtn = document.getElementById('delete-prompt-btn');
+            if (deleteBtn) {
+                deleteBtn.classList.add('hidden');
+            }
+
             document.querySelectorAll('.prompt-list-item').forEach(item => {
                 item.classList.remove('bg-white/5', 'border-accent');
                 item.classList.add('bg-transparent', 'border-border');
@@ -2092,6 +2142,45 @@
                 await window.fetchPromptTemplates();
             }
         }
+
+        window.deleteActivePrompt = async function() {
+            if (!activePromptId || activePromptId === 'new' || isNaN(activePromptId)) {
+                return;
+            }
+
+            const result = await Swal.fire({
+                title: 'Delete Prompt Template?',
+                text: "Are you sure you want to delete this prompt template from the library? This action cannot be undone.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#EF4444',
+                cancelButtonColor: '#64748B',
+                confirmButtonText: 'Yes, delete it',
+                cancelButtonText: 'Cancel',
+                background: document.documentElement.classList.contains('dark') ? '#0f172a' : '#ffffff',
+                color: document.documentElement.classList.contains('dark') ? '#f8fafc' : '#0f172a'
+            });
+
+            if (!result.isConfirmed) {
+                return;
+            }
+
+            const success = await apiRequest(`/api/v1/prompts/${activePromptId}`, {
+                method: 'DELETE'
+            }, {
+                successTitle: "Prompt Deleted",
+                successMessage: "The prompt template was successfully deleted.",
+                defaultErrorMessage: "Could not delete prompt template."
+            });
+
+            if (success) {
+                activePromptId = 'new';
+                if (window.fetchPromptTemplates) {
+                    await window.fetchPromptTemplates();
+                }
+                openNewPromptTemplate();
+            }
+        };
 
 
         // Execute live prompt testing dry-run
@@ -3037,7 +3126,10 @@
                 submitBtn: btn,
                 successTitle: "Settings Saved",
                 successMessage: "Global system configurations saved successfully!",
-                defaultErrorMessage: "Failed to save system settings."
+                defaultErrorMessage: "Failed to save system settings.",
+                onSuccess: async () => {
+                    await window.fetchSystemSettings();
+                }
             });
         };
 
@@ -3067,21 +3159,49 @@
         };
 
         window.toggleImageDriverKeyField = function() {
-            const driver = document.getElementById('setting-img-driver')?.value;
+            const enableImgGen = document.getElementById('setting-enable-img-gen')?.checked;
+            const driverSelect = document.getElementById('setting-img-driver');
             const keyContainer = document.getElementById('img-driver-key-container');
             const keyLabel = document.getElementById('img-driver-key-label');
             const keyInput = document.getElementById('setting-img-key');
 
-            if (driver === 'unsplash') {
-                if (keyContainer) keyContainer.classList.remove('hidden');
-                if (keyLabel) keyLabel.innerText = "Unsplash Access Key";
-                if (keyInput) keyInput.placeholder = "Paste Unsplash Access Key...";
-            } else if (driver === 'dalle') {
-                if (keyContainer) keyContainer.classList.remove('hidden');
-                if (keyLabel) keyLabel.innerText = "OpenAI DALL-E Key (optional)";
-                if (keyInput) keyInput.placeholder = "Uses OpenAI provider key if left blank...";
+            if (!enableImgGen) {
+                if (driverSelect) {
+                    driverSelect.disabled = true;
+                    driverSelect.classList.add('opacity-50', 'cursor-not-allowed');
+                }
+                if (keyInput) {
+                    keyInput.disabled = true;
+                    keyInput.classList.add('opacity-50', 'cursor-not-allowed');
+                }
+                if (keyContainer) {
+                    keyContainer.classList.add('opacity-50');
+                }
             } else {
-                if (keyContainer) keyContainer.classList.add('hidden');
+                if (driverSelect) {
+                    driverSelect.disabled = false;
+                    driverSelect.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+                if (keyInput) {
+                    keyInput.disabled = false;
+                    keyInput.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+                if (keyContainer) {
+                    keyContainer.classList.remove('opacity-50');
+                }
+
+                const driver = driverSelect?.value;
+                if (driver === 'unsplash') {
+                    if (keyContainer) keyContainer.classList.remove('hidden');
+                    if (keyLabel) keyLabel.innerText = "Unsplash Access Key";
+                    if (keyInput) keyInput.placeholder = "Paste Unsplash Access Key...";
+                } else if (driver === 'dalle') {
+                    if (keyContainer) keyContainer.classList.remove('hidden');
+                    if (keyLabel) keyLabel.innerText = "OpenAI DALL-E Key (optional)";
+                    if (keyInput) keyInput.placeholder = "Uses OpenAI provider key if left blank...";
+                } else {
+                    if (keyContainer) keyContainer.classList.add('hidden');
+                }
             }
         };
 
@@ -3437,7 +3557,7 @@
                                 const totalEl = creditsPanel.querySelector('.credits-total');
                                 if (totalEl) {
                                     if (p.credits_total !== null && p.credits_total !== undefined) {
-                                        totalEl.textContent = Number(p.credits_total).toLocaleString() + ' tokens';
+                                        totalEl.textContent = Number(p.credits_total).toLocaleString() + ' tokens (cap)';
                                         totalEl.classList.remove('text-muted');
                                     } else {
                                         totalEl.textContent = key === 'gemini' ? 'Free / Untracked' : 'Not tracked yet';
@@ -3449,7 +3569,9 @@
                                 if (remainingEl) {
                                     if (p.credits_remaining !== null && p.credits_remaining !== undefined) {
                                         const pct = p.credits_total ? Math.round((p.credits_remaining / p.credits_total) * 100) : null;
-                                        remainingEl.textContent = Number(p.credits_remaining).toLocaleString() + ' tokens' + (pct !== null ? ` (${pct}%)` : '');
+                                        const used = p.credits_total ? (p.credits_total - p.credits_remaining) : null;
+                                        const usedStr = used !== null ? ` — ${Number(used).toLocaleString()} used` : '';
+                                        remainingEl.textContent = Number(p.credits_remaining).toLocaleString() + ' tokens' + (pct !== null ? ` (${pct}%${usedStr})` : '');
                                         remainingEl.className = 'credits-remaining font-bold ' + (pct !== null && pct < 20 ? 'text-danger' : pct !== null && pct < 50 ? 'text-warning' : 'text-text');
                                     } else {
                                         remainingEl.textContent = key === 'gemini' ? 'Free / Untracked' : 'Not tracked yet';
@@ -3460,6 +3582,7 @@
                                 const resetEl = creditsPanel.querySelector('.credits-reset');
                                 if (resetEl) {
                                     if (p.reset_at) {
+                                        resetEl.setAttribute('data-reset-at', p.reset_at);
                                         const resetDate = new Date(p.reset_at);
                                         const diffMs = resetDate - new Date();
                                         if (diffMs > 0) {
@@ -3469,13 +3592,14 @@
                                             const s = diffSec % 60;
                                             resetEl.textContent = `${h > 0 ? h + 'h ' : ''}${m > 0 ? m + 'm ' : ''}${s}s`;
                                             resetEl.classList.add('text-warning');
-                                            resetEl.classList.remove('text-text', 'text-muted');
+                                            resetEl.classList.remove('text-text', 'text-muted', 'text-success');
                                         } else {
                                             resetEl.textContent = 'Limit reset — ready';
                                             resetEl.classList.add('text-success');
                                             resetEl.classList.remove('text-text', 'text-warning', 'text-muted');
                                         }
                                     } else {
+                                        resetEl.removeAttribute('data-reset-at');
                                         resetEl.textContent = 'No limit active';
                                         resetEl.classList.add('text-muted');
                                         resetEl.classList.remove('text-text', 'text-warning', 'text-success');
@@ -3484,7 +3608,11 @@
 
                                 const errorEl = creditsPanel.querySelector('.provider-error-msg');
                                 if (errorEl) {
-                                    if (p.last_error) {
+                                    // Only show the error if reset_at hasn't passed yet.
+                                    // Once the reset window is over the rate limit has cleared,
+                                    // so a stale last_error is no longer meaningful to show.
+                                    const resetAlreadyPassed = p.reset_at && new Date(p.reset_at) <= new Date();
+                                    if (p.last_error && !resetAlreadyPassed) {
                                         errorEl.textContent = '⚠ ' + p.last_error;
                                         errorEl.classList.remove('hidden');
                                     } else {
@@ -3945,17 +4073,59 @@
 
                 const trendColor = trend >= 70 ? 'text-green-400' : trend >= 40 ? 'text-yellow-400' : 'text-muted';
 
+                // Calculate genuine relative age text
+                let ageText = '';
                 const relativeAge = c.metadata?.published_at_relative || '';
-                const ageText = relativeAge ? relativeAge : `${fresh}% fresh`;
+                const eventDateStr = c.metadata?.event_date || '';
+                const createdAtStr = c.created_at || '';
+
+                if (relativeAge) {
+                    ageText = relativeAge;
+                } else if (eventDateStr) {
+                    const eventDate = new Date(eventDateStr);
+                    const createdDate = createdAtStr ? new Date(createdAtStr) : new Date();
+                    
+                    eventDate.setHours(0, 0, 0, 0);
+                    createdDate.setHours(0, 0, 0, 0);
+                    
+                    const diffTime = createdDate.getTime() - eventDate.getTime();
+                    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    if (diffDays <= 0) {
+                        ageText = "Today";
+                    } else if (diffDays === 1) {
+                        ageText = "Yesterday";
+                    } else if (diffDays > 1 && diffDays < 7) {
+                        ageText = `${diffDays} days ago`;
+                    } else if (diffDays >= 7 && diffDays < 14) {
+                        ageText = "1 week ago";
+                    } else if (diffDays >= 14 && diffDays < 30) {
+                        const weeks = Math.floor(diffDays / 7);
+                        ageText = `${weeks} weeks ago`;
+                    } else {
+                        const months = Math.floor(diffDays / 30);
+                        ageText = `${months} ${months === 1 ? 'month' : 'months'} ago`;
+                    }
+                } else {
+                    // Fallback to estimation from freshness_score
+                    if (fresh >= 95) ageText = "Just now";
+                    else if (fresh >= 90) ageText = "Today";
+                    else if (fresh >= 80) ageText = "Yesterday";
+                    else if (fresh >= 70) ageText = "2 days ago";
+                    else if (fresh >= 60) ageText = "3 days ago";
+                    else if (fresh >= 50) ageText = "5 days ago";
+                    else ageText = "1 week ago";
+                }
 
                 const card = document.createElement('div');
                 card.className = 'glass-surface rounded-2xl p-4 space-y-3 border border-border hover:border-accent/50 transition-all cursor-pointer group';
                 card.innerHTML = `
                     <div class="flex items-start justify-between gap-2">
                         <span class="text-[10px] font-mono text-muted bg-surface border border-border px-2 py-0.5 rounded-full">#${idx + 1}</span>
-                        <div class="flex gap-1.5">
+                        <div class="flex flex-wrap gap-1.5 justify-end max-w-[80%]">
                             <span class="text-[9px] font-mono ${trendColor} border border-current/30 px-1.5 py-0.5 rounded-full">⚡ ${trend}% trend</span>
-                            <span class="text-[9px] font-mono text-blue-400 border border-blue-400/30 px-1.5 py-0.5 rounded-full">🕐 ${ageText}</span>
+                            <span class="text-[9px] font-mono text-blue-400 border border-blue-400/30 px-1.5 py-0.5 rounded-full">💧 ${fresh}% fresh</span>
+                            <span class="text-[9px] font-mono text-purple-400 border border-purple-400/30 px-1.5 py-0.5 rounded-full">🕐 ${ageText}</span>
                         </div>
                     </div>
                     <h4 class="text-xs font-semibold text-text leading-snug group-hover:text-accent transition-colors">${(c.title || 'Untitled').replace(/</g, '&lt;')}</h4>

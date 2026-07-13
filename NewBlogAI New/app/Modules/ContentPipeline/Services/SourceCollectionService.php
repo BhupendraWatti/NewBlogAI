@@ -56,8 +56,13 @@ class SourceCollectionService implements SourceCollectorInterface
             $apiKey      = $provider?->api_key ?? '';
             $model       = $provider?->default_model ?? null;
 
-            foreach ($queries as $query) {
-                if (!empty($apiKey)) {
+            // Skip additional searches if newsroom candidate is already selected to save tokens
+            $hasSelectedNews = is_array($context->metadata['selected_news'] ?? null);
+
+            if (! $hasSelectedNews && !empty($apiKey)) {
+                // Limit search to the top 1 query to prevent rate limits and token usage
+                $limitedQueries = array_slice($queries, 0, 1);
+                foreach ($limitedQueries as $query) {
                     $realSources = $this->searchWithProvider($query, $topic ?? '', $providerKey, $apiKey, $model);
                     foreach ($realSources as $source) {
                         $rawSources[] = $source;
@@ -97,10 +102,18 @@ class SourceCollectionService implements SourceCollectorInterface
     /**
      * Process, normalize, deduplicate, and rank raw source arrays.
      * Returns an array of sorted SourceDTOs.
+     *
+     * BUG 2 FIX: Enforces strict temporal filtering.
+     * Sources with no parseable publish date AND whose URL does not contain
+     * the current year are treated as potentially stale and dropped to prevent
+     * high-SEO legacy articles (e.g. a News18 article from 3 years ago) from
+     * being pulled in as live news.
      */
     protected function processSources(array $rawSources, array $queries, string $topic): array
     {
         $uniqueSources = [];
+        $currentYear   = (int) now()->format('Y');
+        $cutoffDate    = now()->subDays(7)->startOfDay(); // accept up to 7 days old
 
         foreach ($rawSources as $raw) {
             $url = $raw['url'] ?? '';
@@ -116,11 +129,28 @@ class SourceCollectionService implements SourceCollectorInterface
                 continue;
             }
 
+            // BUG 3 FIX: Lock origin_url at extraction time so publisher is never
+            // detached from its source URL during concurrent processing.
+            $originUrl = $normalizedUrl;
+
             // Extract fields
             $metadata = $raw['metadata'] ?? [];
             $title = $raw['title'] ?? null;
             $snippet = $raw['snippet'] ?? null;
-            $publisher = $raw['publisher'] ?? $metadata['publisher'] ?? null;
+
+            // BUG 3 FIX: Derive publisher strictly from the origin URL domain,
+            // not from metadata that may have been assembled from a different source.
+            // Only fall back to metadata publisher if the origin_url host matches
+            // the declared publisher domain (loose heuristic).
+            $declaredPublisher = $raw['publisher'] ?? $metadata['publisher'] ?? null;
+            $originHost        = strtolower(parse_url($originUrl, PHP_URL_HOST) ?? '');
+            if ($declaredPublisher && str_contains($originHost, strtolower(explode('.', (string) $declaredPublisher)[0] ?? ''))) {
+                $publisher = trim(strip_tags((string) $declaredPublisher));
+            } else {
+                // Derive cleanly from host, stripping www. prefix
+                $publisher = preg_replace('/^www\./', '', $originHost) ?: null;
+            }
+
             $author = $raw['author'] ?? $metadata['author'] ?? null;
             $publishedDate = $raw['published_date'] ?? $metadata['published_date'] ?? $raw['publishedDate'] ?? $metadata['publishedDate'] ?? null;
             $keywords = $raw['keywords'] ?? $metadata['keywords'] ?? [];
@@ -128,19 +158,47 @@ class SourceCollectionService implements SourceCollectorInterface
             // Normalize text fields
             $title = $title ? trim(strip_tags($title)) : null;
             $snippet = $snippet ? trim(strip_tags($snippet)) : null;
-            $publisher = $publisher ? trim(strip_tags($publisher)) : null;
             $author = $author ? trim(strip_tags($author)) : null;
 
-            // Normalize date to Y-m-d
+            // BUG 2 FIX: Strict temporal filtering.
+            // Normalize date to Y-m-d; if date is missing, check if the URL
+            // path contains the current year as a proxy for freshness.
             if ($publishedDate) {
                 $timestamp = strtotime((string) $publishedDate);
                 if ($timestamp !== false) {
                     $publishedDate = date('Y-m-d', $timestamp);
+
+                    // Reject sources older than the cutoff (7 days)
+                    $publishedAt = \Carbon\Carbon::parse($publishedDate)->startOfDay();
+                    if ($publishedAt->lt($cutoffDate)) {
+                        Log::info('SourceCollectionService: Dropping stale source (older than 7 days).', [
+                            'url'            => $normalizedUrl,
+                            'published_date' => $publishedDate,
+                        ]);
+                        continue;
+                    }
                 } else {
-                    $publishedDate = date('Y-m-d');
+                    // Date string was present but unparseable; treat as unknown
+                    $publishedDate = null;
                 }
-            } else {
-                $publishedDate = date('Y-m-d');
+            }
+
+            if ($publishedDate === null) {
+                // No date at all: check if the URL path contains the current year.
+                // If it explicitly contains an older year (e.g. /2022/) reject it.
+                if (preg_match('/\/(20\d{2})\//', $normalizedUrl, $yearMatch)) {
+                    $urlYear = (int) $yearMatch[1];
+                    if ($urlYear < $currentYear) {
+                        Log::info('SourceCollectionService: Dropping legacy-year URL (no date, old year in path).', [
+                            'url'      => $normalizedUrl,
+                            'url_year' => $urlYear,
+                        ]);
+                        continue;
+                    }
+                }
+                // No date and no year in URL — use today as a conservative default
+                // (the source came directly from our grounding query so it is likely fresh)
+                $publishedDate = now()->format('Y-m-d');
             }
 
             // Infer region & locale
@@ -166,8 +224,9 @@ class SourceCollectionService implements SourceCollectorInterface
                 publishedDate: $publishedDate,
                 keywords: $keywords,
                 metadata: [
-                    'region' => $regionData['region'],
-                    'locale' => $regionData['locale'],
+                    'region'     => $regionData['region'],
+                    'locale'     => $regionData['locale'],
+                    'origin_url' => $originUrl,  // BUG 3 FIX: immutably bound
                 ]
             );
 
@@ -438,6 +497,14 @@ class SourceCollectionService implements SourceCollectorInterface
 
     /**
      * Use Gemini's native Google Search grounding to find current news sources.
+     *
+     * BUG 2 FIX: The grounding prompt now includes an explicit "after:YYYY-MM-DD"
+     * date constraint to bias Gemini Search toward today's results.
+     *
+     * BUG 3 FIX: Each grounding chunk's snippet is now derived from its own
+     * title/URI — NOT by distributing sentences from the generated prose across
+     * chunks positionally. The old approach caused Source A's snippet to carry
+     * Source B's text body, scrambling attribution.
      */
     protected function searchViaGeminiGrounding(
         string $query,
@@ -447,12 +514,14 @@ class SourceCollectionService implements SourceCollectorInterface
     ): array {
         $model = $model ?: 'gemini-2.5-flash';
         $url   = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+        $today = now()->format('Y-m-d');
 
+        // BUG 2 FIX: Add explicit date constraint so Gemini prioritises today's results
         $payload = [
             'contents' => [
                 [
                     'parts' => [
-                        ['text' => "Search for the latest news about: {$query}. List the top 3 most relevant, real, current news sources with their URLs, titles, and brief summaries. Focus on news from the last 48 hours."],
+                        ['text' => "Search for the latest news about: {$query} after:{$today}. List the top 3 most relevant, real, current news sources published today or within the last 48 hours. For each source include its URL, headline title, and a 1-sentence summary. Focus strictly on news from {$today} or the last 48 hours."],
                     ],
                 ],
             ],
@@ -461,7 +530,7 @@ class SourceCollectionService implements SourceCollectorInterface
             ],
             'generationConfig' => [
                 'maxOutputTokens' => 1024,
-                'temperature' => 0.1,
+                'temperature'     => 0.1,
             ],
         ];
 
@@ -484,31 +553,27 @@ class SourceCollectionService implements SourceCollectorInterface
                 continue;
             }
 
+            // BUG 3 FIX: Each source's publisher and snippet are derived
+            // exclusively from this chunk's own URI and title — never from
+            // Gemini's generated prose which may describe a different source.
+            $sourceUri       = $web['uri'];
+            $sourceTitle     = $web['title'] ?? $topic . ' News';
+            $sourcePublisher = preg_replace('/^www\./', '', strtolower(parse_url($sourceUri, PHP_URL_HOST) ?? 'Unknown'));
+            $sourceSnippet   = $sourceTitle; // Safe: same-source title as snippet seed
+
             $sources[] = [
-                'url'     => $web['uri'],
-                'title'   => $web['title'] ?? $topic . ' News',
-                'snippet' => '',
+                'url'      => $sourceUri,
+                'title'    => $sourceTitle,
+                'snippet'  => $sourceSnippet,
                 'metadata' => [
                     'query'          => $query,
-                    'publisher'      => parse_url($web['uri'], PHP_URL_HOST) ?? 'Unknown',
-                    'published_date' => now()->format('Y-m-d'),
+                    'publisher'      => $sourcePublisher,
+                    'published_date' => $today,
                     'keywords'       => array_filter(explode(' ', strtolower($topic))),
                     'origin'         => 'gemini_grounding',
+                    'origin_url'     => $sourceUri,  // BUG 3 FIX: immutably bound
                 ],
             ];
-        }
-
-        // Also extract inline text content as a fallback snippet source
-        $generatedText = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
-        if (!empty($generatedText) && !empty($sources)) {
-            // Distribute snippets across found sources
-            $sentences = array_filter(explode('.', $generatedText));
-            foreach ($sources as $idx => &$src) {
-                if (isset($sentences[$idx])) {
-                    $src['snippet'] = trim($sentences[$idx]) . '.';
-                }
-            }
-            unset($src);
         }
 
         return $sources;
@@ -532,7 +597,11 @@ class SourceCollectionService implements SourceCollectorInterface
             . "Focus only on REAL, CURRENT events from the last 48-72 hours. Use real, working URLs from major news outlets.";
 
         $driver = $this->providerService->getDriver($providerKey);
-        $result = $driver->generate($apiKey, $prompt, $model, ['max_tokens' => 512, 'temperature' => 0.1]);
+        $result = $driver->generate($apiKey, $prompt, $model, [
+            'max_tokens' => 512,
+            'temperature' => 0.1,
+            'task' => 'search_source',
+        ]);
         $text   = trim($result['text'] ?? '');
 
         // Strip markdown fences

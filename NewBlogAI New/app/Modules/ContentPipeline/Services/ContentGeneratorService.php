@@ -134,7 +134,9 @@ class ContentGeneratorService implements ContentGeneratorInterface
 
             // 4. Measure execution time and call provider
             $startTime      = microtime(true);
-            $result         = $client->generate($apiKey, $compiledPrompt, $provider->default_model);
+            $result         = $client->generate($apiKey, $compiledPrompt, $provider->default_model, [
+                'task' => 'article_generation',
+            ]);
             $executionTimeMs = (int) ((microtime(true) - $startTime) * 1000);
 
             // 5. Structure results into context
@@ -143,6 +145,9 @@ class ContentGeneratorService implements ContentGeneratorInterface
             // Title: Category News — Date  (news-appropriate format)
             $title          = "{$categoryLabel} News: " . now()->format('F j, Y');
             $context->title = $title;
+
+            // Set content language to prevent redundant translation of the article body
+            $context->metadata['content_language'] = $language;
 
             // Merge token/cost metadata
             $context->metadata['prompt_tokens']      = $result['prompt_tokens'] ?? 0;

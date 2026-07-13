@@ -59,12 +59,12 @@ class ContentPostProcessor
             }
         };
 
-        // Standalone block comments: <p>&lt;!-- image-placeholder: ... --&gt;</p>
-        $patternBlock = '/<p>\s*&lt;!--\s*image-placeholder:\s*(.*?)\s*--&gt;\s*<\/p>/i';
+        // Standalone block comments: <p>&lt;!-- image-placeholder: ... --&gt;</p> or <p><!-- image-placeholder: ... --></p>
+        $patternBlock = '/<p>\s*(?:&lt;|<)!--\s*image-placeholder:\s*(.*?)\s*--(?:\s*&gt;|>)\s*<\/p>/i';
         $htmlContent = preg_replace_callback($patternBlock, $callback, $htmlContent);
 
-        // Inline comments: &lt;!-- image-placeholder: ... --&gt;
-        $patternInline = '/&lt;!--\s*image-placeholder:\s*(.*?)\s*--&gt;/i';
+        // Inline comments: &lt;!-- image-placeholder: ... --&gt; or <!-- image-placeholder: ... -->
+        $patternInline = '/(?:&lt;|<)!--\s*image-placeholder:\s*(.*?)\s*--(?:\s*&gt;|>)/i';
         $htmlContent = preg_replace_callback($patternInline, $callback, $htmlContent);
 
         // 3. Generate a featured image

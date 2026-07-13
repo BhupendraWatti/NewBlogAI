@@ -50,10 +50,10 @@ class MediaPreparationService implements MediaPreparatorInterface
             $blockSpecs = [];
             $inlineSpecs = [];
             
-            // Standalone block comments: <p>&lt;!-- image-placeholder: ... --&gt;</p>
-            $patternBlock = '/<p>\s*&lt;!--\s*image-placeholder:\s*(.*?)\s*--&gt;\s*<\/p>/i';
-            // Inline comments: &lt;!-- image-placeholder: ... --&gt;
-            $patternInline = '/&lt;!--\s*image-placeholder:\s*(.*?)\s*--&gt;/i';
+            // Standalone block comments: <p>&lt;!-- image-placeholder: ... --&gt;</p> or <p><!-- image-placeholder: ... --></p>
+            $patternBlock = '/<p>\s*(?:&lt;|<)!--\s*image-placeholder:\s*(.*?)\s*--(?:\s*&gt;|>)\s*<\/p>/i';
+            // Inline comments: &lt;!-- image-placeholder: ... --&gt; or <!-- image-placeholder: ... -->
+            $patternInline = '/(?:&lt;|<)!--\s*image-placeholder:\s*(.*?)\s*--(?:\s*&gt;|>)/i';
 
             // Find block matches first
             preg_match_all($patternBlock, $tempHtml, $blockMatches, PREG_SET_ORDER);

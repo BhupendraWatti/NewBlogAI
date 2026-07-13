@@ -231,12 +231,20 @@ class ContentGenerationService
 
         $priorityMap = array_flip(self::PROVIDER_PRIORITY);
 
-        $sorted = $allEnabled->sortBy(
-            fn (AIProvider $p) => $priorityMap[$p->provider_key] ?? PHP_INT_MAX
-        )->values();
+        // Providers still inside their rate-limit reset window are pushed to the
+        // back of the list (kept as last-resort fallbacks, not dropped), so a
+        // known-throttled provider is never attempted first.
+        $sorted = $allEnabled->sortBy(function (AIProvider $p) use ($priorityMap) {
+            $throttled = $p->reset_at && $p->reset_at->isFuture() ? 1_000_000 : 0;
 
-        // Always try the pipeline's own provider first
-        if ($preferred && ! empty($preferred->api_key) && $preferred->is_enabled) {
+            return $throttled + ($priorityMap[$p->provider_key] ?? PHP_INT_MAX);
+        })->values();
+
+        // Always try the pipeline's own provider first — unless it is currently
+        // throttled, in which case respect the reset window and let a healthy
+        // provider go first.
+        if ($preferred && ! empty($preferred->api_key) && $preferred->is_enabled
+            && ! ($preferred->reset_at && $preferred->reset_at->isFuture())) {
             $sorted = $sorted
                 ->reject(fn (AIProvider $p) => $p->id === $preferred->id)
                 ->prepend($preferred);
@@ -320,8 +328,11 @@ class ContentGenerationService
                     // request) can never succeed on retry. Retrying them re-runs
                     // the full pipeline stage chain and burns real tokens/quota,
                     // so fail over to the next provider immediately instead.
-                    if (! ProviderErrorClassifier::isRetryable($e)) {
-                        Log::info('ContentGenerationService: Non-retryable error, skipping remaining attempts for provider.', [
+                    // Rate limits are also skipped here: the driver already
+                    // applied its own back-off, and the provider won't reset
+                    // within our budget, so move straight to the next one.
+                    if (! ProviderErrorClassifier::shouldRetrySameProvider($e)) {
+                        Log::info('ContentGenerationService: Not retrying this provider, moving to next.', [
                             'run_id'   => $context->run->id,
                             'provider' => $providerKey,
                             'reason'   => ProviderErrorClassifier::reason($e),
@@ -387,6 +398,16 @@ class ContentGenerationService
                 function (PipelineContext $context, \Closure $next) {
                     if ($context->hasErrors()) { return $next($context); }
                     $context = app(\App\Modules\ContentPipeline\Contracts\FactExtractorInterface::class)->handle($context);
+                    return $next($context);
+                },
+                // ── Temporal Context Analysis ────────────────────────────────
+                // Decouples HTML publication timestamp from root event time.
+                // Tags story_type ('breaking' | 'followup' | 'background') and
+                // injects a temporal framing guardrail into dynamic_instructions
+                // so the AI writer does not mis-frame follow-up stories as breaking news.
+                // Non-blocking: any failure here is logged and the pipeline continues.
+                function (PipelineContext $context, \Closure $next) {
+                    $context = app(\App\Modules\ContentPipeline\Contracts\ChronologicalContextParserInterface::class)->handle($context);
                     return $next($context);
                 },
                 function (PipelineContext $context, \Closure $next) {
