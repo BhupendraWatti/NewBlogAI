@@ -45,9 +45,10 @@ sequenceDiagram
     L->>L: 2. Research Service Stage (Generates provider-independent queries)
     L->>L: 3. Source Collection Stage (Deduplicates & normalizes sources)
     L->>L: 4. Fact Extraction Stage (Extracts People, Orgs, Dates, Keywords)
-    L->>AI: 5. Content Generation Stage (Compiles modular prompts & calls AI)
-    L->>L: 6. Media Preparation Stage (Generates featured image & processes inline image placeholders)
-    L->>DB_L: 7. Publishing Queue Stage (Saves GeneratedContent as draft, logs revisions/usage)
+    L->>L: 5. Chronological Context Parser Stage (Decouples event and publication times, sets story type)
+    L->>AI: 6. Content Generation Stage (Compiles modular prompts & calls AI)
+    L->>L: 7. Media Preparation Stage (Generates featured image & processes inline image placeholders)
+    L->>DB_L: 8. Publishing Queue Stage (Saves GeneratedContent as draft, logs revisions/usage)
     end
 
     %% Post Publishing
@@ -90,6 +91,7 @@ sequenceDiagram
    - **Research Service**: Prepares search-oriented queries based on the topic. Keep the interface provider-independent.
    - **Source Collection**: Collects and normalizes sources, performing deduplication and metadata extraction.
    - **Fact Extraction**: Extracts People, Organizations, Locations, Dates, Events, and Keywords.
+   - **Temporal Context Analysis**: Decouples HTML publication timestamp from root event time, flags story_type (`breaking` | `followup` | `background`), and injects a temporal framing guardrail.
    - **Content Generation**: Compiles modular prompt blocks (System Prompt, Research Context, User Prompt, Variables, and Output Instructions) and calls the AI completion driver.
    - **Media Preparation**: Converts markdown to HTML, scans inline image placeholders, generates featured/inline images, and updates metadata.
    - **Publishing Queue**: Creates the `GeneratedContent` model with status `'draft'`, records revisions, and logs usage in `ai_request_logs` inside a DB transaction.
@@ -175,6 +177,26 @@ Laravel Modules (app/Modules/)
   - `POST /api/v1/license/deactivate`
 * **Database Interactions**: `plugin_licenses`.
 * **Current Status / Discrepancy**: While the Laravel backend implements this license check module, **the WordPress plugin currently lacks any license check logic** and does not consume these endpoints during onboarding.
+
+### VII. CustomerManager (Workspaces & Teams)
+* **Purpose**: Manages tenant (customer) SaaS accounts, multiple tenant-isolated workspaces, and employee/team members.
+* **Dependencies**: `SubscriptionManager`, `AuthManager`.
+* **APIs Exposed**:
+  - `POST /api/v1/workspaces` (create workspace)
+  - `PUT /api/v1/workspaces/{workspace}` (update workspace)
+  - `POST /api/v1/employees` (add employee/team member)
+  - `PUT /api/v1/employees/{employee}` (update employee/team member)
+  - `DELETE /api/v1/employees/{employee}` (remove employee/team member)
+* **Database Interactions**: reads/writes `workspaces`, `employees`, `users`.
+
+### VIII. Operations (Notifications & Webhooks)
+* **Purpose**: Handles analytics, health metrics, database log feeds, in-app notifications feeds, and outbound webhooks to external services (Slack, Discord, and generic endpoints).
+* **Dependencies**: `SystemSettings`, `CustomerManager`.
+* **APIs Exposed**:
+  - `GET /api/v1/notifications` (fetch paginated in-app feed and unread count)
+  - `POST /api/v1/notifications/{id}/read` (mark notification read)
+  - `POST /api/v1/notifications/read-all` (mark all read)
+* **Database Interactions**: `notifications`, `failed_jobs`.
 
 ---
 
@@ -262,6 +284,26 @@ Phase 3 introduces advanced, provider-independent services integrated sequential
 * **Class**: `WPClientService` (Laravel) & `REST_Controller` (WordPress Plugin)
 * **API Route**: `POST /wp-json/newsblogify/v1/publish`
 * **Responsibilities**: Accepts full category lists, tags, slugs, Yoast/RankMath SEO meta values, and a featured image URL. Sideloads featured images from the URL directly into WordPress media attachments and binds them as post thumbnails. Enforces idempotency via `publishing_log_id` checks.
+
+### G. Temporal Context Analysis (Chronological Parsing)
+* **Class**: [ChronologicalContextParser.php](file:///d:/Company%20Work/Company%20projects/NewBlogAI/NewBlogAI%20New/app/Modules/ContentPipeline/Services/ChronologicalContextParser.php) (implements [ChronologicalContextParserInterface.php](file:///d:/Company%20Work/Company%20projects/NewBlogAI/NewBlogAI%20New/app/Modules/ContentPipeline/Contracts/ChronologicalContextParserInterface.php))
+* **Responsibilities**: Decouples publication timestamp from the actual root event occurrence time by parsing Hindi/English date phrases and anchors in scraped corpus text. Classifies story type (`breaking` | `followup` | `background`) based on a 48-hour event lag threshold. Injects dynamic temporal framing instructions into prompt variables, guiding the AI to lead with the news hook and reference older events as historical context.
+
+### H. Provider Failover & Error Classification
+* **Classes**: [ContentGenerationService.php](file:///d:/Company%20Work/Company%20projects/NewBlogAI/NewBlogAI%20New/app/Modules/ContentGeneration/Services/ContentGenerationService.php) & [ProviderErrorClassifier.php](file:///d:/Company%20Work/Company%20projects/NewBlogAI/NewBlogAI%20New/app/Modules/AIProviderManager/Support/ProviderErrorClassifier.php)
+* **Responsibilities**: Orchestrates sequential provider failover (Groq → Gemini → OpenAI → Claude → OpenRouter → Ollama) during generation runs. Each provider gets up to 3 attempts with exponential back-off (2 s → 4 s → 8 s) for retryable errors (HTTP 429 rate limits, network timeouts). Immediately skips to the next provider for permanent errors (invalid credentials). Tracks token consumption and updates rate limit parameters in the database.
+
+### I. Line-by-Line Markdown-to-HTML Post-Processor
+* **Classes**: [ContentPostProcessor.php](file:///d:/Company%20Work/Company%20projects/NewBlogAI/NewBlogAI%20New/app/Modules/MediaManager/Services/ContentPostProcessor.php) & [MediaPreparationService.php](file:///d:/Company%20Work/Company%20projects/NewBlogAI/NewBlogAI%20New/app/Modules/MediaManager/Services/MediaPreparationService.php)
+* **Responsibilities**: Converts Markdown content to standard HTML structure while resolving inline image comment placeholders. Employs a line-by-line streaming parser to prevent the discarding of text blocks that sometimes occurs in block-based regex/HTML replacement methods.
+
+### J. In-App Notification Feed & Outbound Webhooks
+* **Classes**: [NotificationsController.php](file:///d:/Company%20Work/Company%20projects/NewBlogAI/NewBlogAI%20New/app/Modules/Operations/Controllers/NotificationsController.php) & [RoutesToConfiguredChannels.php](file:///d:/Company%20Work/Company%20projects/NewBlogAI/NewBlogAI%20New/app/Modules/Operations/Notifications/Concerns/RoutesToConfiguredChannels.php)
+* **Responsibilities**: Provides paginated in-app feeds, unread feed counting, individual read marking, and read-all actions. Dispatches notifications to outbound webhook channels (Slack, Discord, generic HTTP endpoints) based on System Settings Service configuration, gracefully handling channel-specific failures.
+
+### K. Tenant-Isolated Workspaces & Team API
+* **Classes**: [WorkspaceController.php](file:///d:/Company%20Work/Company%20projects/NewBlogAI/NewBlogAI%20New/app/Modules/CustomerManager/Controllers/WorkspaceController.php) & Models/Resources under `app/Modules/CustomerManager/`
+* **Responsibilities**: Exposes workspace CRUD and team member setup endpoints with strict tenant (Customer) isolation. Ensures owners cannot delete themselves, verifies workspace update permission rules, and handles workspace limits.
 
 ---
 

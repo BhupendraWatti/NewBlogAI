@@ -150,6 +150,9 @@ class PromptEngine
         if ($storyType === 'breaking') {
             // Confirm this is a live story so the AI approaches it with urgency
             $instructions[] = "Story Classification: BREAKING / CURRENT EVENT — write with immediacy. This story covers events that are happening now or very recently.";
+            if (!empty($guardrailText)) {
+                $instructions[] = "Additional Guidelines: " . $guardrailText;
+            }
         } elseif (!empty($guardrailText)) {
             // The full TEMPORAL FRAMING GUARDRAIL from ChronologicalContextParser
             // is injected verbatim so the AI writer receives the exact framing rules.
@@ -162,7 +165,6 @@ class PromptEngine
             }
         }
 
-        // Additional guidelines (from other pipeline stages, not overwritten)
         // Note: dynamic_instructions is intentionally NOT read again here — its
         // content was already consumed by the guardrail block above.
         $additional = $context->metadata['instructions'] ?? null;

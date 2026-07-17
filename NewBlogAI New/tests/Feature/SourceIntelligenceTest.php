@@ -92,7 +92,7 @@ class SourceIntelligenceTest extends TestCase
             'metadata' => [
                 'author' => 'Author A',
                 'publisher' => 'Publisher A',
-                'published_date' => '2026-07-01'
+                'published_date' => now()->format('Y-m-d')
             ]
         ]);
 
@@ -103,7 +103,7 @@ class SourceIntelligenceTest extends TestCase
             'metadata' => [
                 'author' => 'Author B',
                 'publisher' => 'Publisher B',
-                'published_date' => '2026-07-02'
+                'published_date' => now()->format('Y-m-d')
             ]
         ]);
 
@@ -144,7 +144,7 @@ class SourceIntelligenceTest extends TestCase
             'metadata' => [
                 'author' => 'John Smith',
                 'publisher' => 'Laravel Devs',
-                'published_date' => '2026-05-15'
+                'published_date' => now()->subDays(2)->format('Y-m-d')
             ]
         ]);
 
@@ -156,7 +156,7 @@ class SourceIntelligenceTest extends TestCase
             'metadata' => [
                 'author' => 'Jane Doe',
                 'publisher' => 'AI Tech Journal',
-                'published_date' => '2026-07-06',
+                'published_date' => now()->format('Y-m-d'),
                 'keywords' => ['laravel', 'artificial', 'intelligence', 'integration']
             ]
         ]);

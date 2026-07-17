@@ -14,6 +14,9 @@ When you create a Prompt Template in the system, you can use curly brace variabl
 | `{{category}}` | The category group of the topic | `Technology` |
 | `{{language}}` | The target writing language | `en` |
 | `{{website}}` | The destination blog domain url | `https://example-blog.com` |
+| `{{headline}}` | The headline of the selected news candidate (newsroom workflow) | `NHRC issues notice on sewer collapse` |
+| `{{summary}}` | The summary/abstract of the selected news candidate (newsroom workflow) | `The National Human Rights Commission has sent a notice...` |
+| `{{sources}}` | The comma-separated list of source reference URLs for the news candidate | `https://timesofindia.com/123, https://ndtv.com/456` |
 
 > [!NOTE]
 > To escape the variable mapping and print literal curly braces (for example, in code blocks), prefix it with `@` like: `@{{topic}}`.
@@ -82,4 +85,31 @@ Category: {{category}}
 
 ## Conclusion
 [Concluding summary...]
+```
+
+---
+
+## 5. Newsroom Coverage Demo Prompt Template
+
+Use this template when setting up pipelines configured for the newsroom coverage workflow (where a news candidate is selected first):
+
+```markdown
+You are a professional news journalist writing for the online publication {{website}}.
+Write a comprehensive, objective news article in the {{language}} language.
+
+Headline: {{headline}}
+Summary: {{summary}}
+Category: {{category}}
+Sources: {{sources}}
+
+### Editorial Instructions:
+1. Write an engaging title based on the Headline: {{headline}}.
+2. The lead paragraph must answer Who, What, When, Where, and Why, introducing today's latest development.
+3. Use the details from the Summary: {{summary}} to build the core body paragraphs.
+4. Integrate the source references: {{sources}} as external references in the body (attribute claims clearly).
+5. Throughout the post, place exactly two inline image placeholders on standalone lines.
+   Format:
+   <!-- image-placeholder: prompt="[detailed prompt representing this section]" alt="[short alt description]" caption="[readable caption]" -->
+6. Structure the article with clear H2 and H3 subheadings.
+7. Conclude with a 'Key Takeaways' bullet list summarizing the facts.
 ```

@@ -64,6 +64,9 @@ class NewsDiscoveryService
         protected AIProviderService $providerService,
         protected DuplicateDetectionService $duplicates,
         protected EntitlementService $entitlements,
+        protected ContentQualityFilterService $qualityFilter,
+        protected GeographicDiversityEnforcer $geoEnforcer,
+        protected LLMCandidateRefinementService $llmRefiner,
     ) {}
 
     /**
@@ -160,20 +163,24 @@ class NewsDiscoveryService
             DB::transaction(function () use ($run, $unique) {
                 foreach ($unique as $index => $candidate) {
                     NewsCandidate::create([
-                        'pipeline_run_id' => $run->id,
-                        'position'        => $index + 1,
-                        'title'           => mb_substr(trim((string) $candidate['title']), 0, 500),
-                        'summary'         => $candidate['summary'] ?? null,
+                        'pipeline_run_id'   => $run->id,
+                        'position'          => $index + 1,
+                        'title'             => mb_substr(trim((string) $candidate['title']), 0, 500),
+                        'summary'           => $candidate['summary'] ?? null,
                         'source_references' => $candidate['source_references'] ?? [],
-                        'keywords'        => $candidate['keywords'] ?? [],
-                        'trend_score'     => $this->clampScore($candidate['trend_score'] ?? 0),
-                        'freshness_score' => $this->clampScore($candidate['freshness_score'] ?? 0),
-                        'uniqueness_hash' => NewsCandidate::hashTitle((string) $candidate['title']),
-                        'metadata'        => [
-                            'event_date' => $candidate['event_date'] ?? null,
+                        'keywords'          => $candidate['keywords'] ?? [],
+                        'trend_score'       => $this->clampScore($candidate['trend_score'] ?? 0),
+                        'freshness_score'   => $this->clampScore($candidate['freshness_score'] ?? 0),
+                        'uniqueness_hash'   => NewsCandidate::hashTitle((string) $candidate['title']),
+                        'metadata'          => [
+                            'event_date'            => $candidate['event_date'] ?? null,
                             'published_at_relative' => $candidate['published_at_relative'] ?? null,
                         ],
-                        'status'          => NewsCandidate::STATUS_CANDIDATE,
+                        // Issue #1 Sub-problem 2 & 3: persist quality + geo data
+                        'geo_city'          => $candidate['geo_city'] ?? null,
+                        'geo_state'         => $candidate['geo_state'] ?? null,
+                        'quality_score'     => isset($candidate['quality_score']) ? $this->clampScore($candidate['quality_score']) : null,
+                        'status'            => NewsCandidate::STATUS_CANDIDATE,
                     ]);
                 }
 
@@ -436,17 +443,46 @@ class NewsDiscoveryService
             $totalCost                 += (float) ($result['estimated_cost'] ?? 0.0);
 
             $parsed   = $this->parseCandidates((string) ($result['text'] ?? ''));
+
+            // ── Issue #2: LLM editorial refinement gate ──────────────────────
+            // Intercepts the raw parsed batch BEFORE deduplication and DB
+            // persistence. A cheap, fast LLM (gemini-flash / gpt-4o-mini)
+            // deduplicates same-event stories, drops gossip/trash, enforces
+            // geographic balance, and fills in missing geo fields in one pass.
+            // Fail-open: on any LLM error, $parsed is returned unchanged.
+            $refinementResult = $this->llmRefiner->refine($parsed, $provider, $category, $country);
+            $parsed           = $refinementResult['candidates'];
+
+            // Accumulate LLM refinement token costs into the run totals
+            $totalTokens['prompt']     += (int) ($refinementResult['prompt_tokens'] ?? 0);
+            $totalTokens['completion'] += (int) ($refinementResult['completion_tokens'] ?? 0);
+            $totalTokens['total']      += (int) ($refinementResult['total_tokens'] ?? 0);
+            $totalCost                 += (float) ($refinementResult['estimated_cost'] ?? 0.0);
+
             $filtered = $this->duplicates->filterUnique(array_merge($unique, $parsed), $site->id);
 
-            $unique         = array_slice($filtered['unique'], 0, self::CANDIDATE_TARGET + 3);
+            // ── Issue #1 Sub-problem 2: Quality filter ───────────────────
+            $qualityResult  = $this->qualityFilter->filter($filtered['unique']);
+            $qualityPassed  = $qualityResult['passed'];
+            $qualityDropped = count($qualityResult['rejected']);
+
+            // ── Issue #1 Sub-problem 3: Geographic diversity enforcer ────
+            $geoResult  = $this->geoEnforcer->filter($qualityPassed);
+            $geoAllowed = $geoResult['passed'];
+            $geoBlocked = count($geoResult['blocked']);
+
+            $unique         = array_slice($geoAllowed, 0, self::CANDIDATE_TARGET + 3);
             $excludedTitles = array_merge($excludedTitles, array_column($filtered['duplicates'], 'title'));
 
             Log::info('NewsDiscoveryService: attempt completed.', [
-                'run_id'             => $run->id,
-                'provider'           => $provider->provider_key,
-                'attempt'            => $attempt,
-                'unique_count'       => count($unique),
-                'duplicates_dropped' => count($filtered['duplicates']),
+                'run_id'              => $run->id,
+                'provider'            => $provider->provider_key,
+                'attempt'             => $attempt,
+                'unique_count'        => count($unique),
+                'duplicates_dropped'  => count($filtered['duplicates']),
+                'llm_refined_dropped' => $refinementResult['dropped_count'] ?? 0,
+                'quality_dropped'     => $qualityDropped,
+                'geo_blocked'         => $geoBlocked,
             ]);
         }
 
@@ -480,10 +516,28 @@ class NewsDiscoveryService
 
         $regionContext = $country ? " focusing specifically on national news events relevant to or occurring in {$country}" : '';
 
+        // Build geographic diversity instruction for the prompt
+        $geoInstruction = $country
+            ? "- If the region is {$country}: spread stories across different states/regions — do NOT cluster multiple stories in the same city."
+            : '- Spread stories across different cities and regions globally.';
+
         return <<<PROMPT
 You are a JSON-only news data API. Today is {$today}, current time is {$currentTime}.
 
 TASK: Return exactly {$count} current, extremely fresh real-world news events from the "{$category}" category from today or the last few hours/minutes/day{$regionContext}. Do NOT return stale news from 2-5 days ago. Prioritize breaking news and trending events that happened within the last 30 minutes, 1 hour, 4 hours, or up to 24 hours.
+
+GEOGRAPHIC DIVERSITY RULES (strictly enforced):
+- Each story MUST come from a DIFFERENT city wherever possible. Do NOT return multiple stories from the same city.
+- Spread coverage across different states/regions. Maximum 2 stories per state/region.
+{$geoInstruction}
+- "geo_city": the primary city where the event occurred (e.g. "Mumbai"). Use null if the story is national/international with no single city focus.
+- "geo_state": the state or region of the event (e.g. "Maharashtra"). Use null if national/international.
+
+QUALITY RULES (strictly enforced):
+- Do NOT include viral social media gossip, TikTok/Reel rumours, or sensational gossip about local officials.
+- Do NOT include minor domestic crimes, petty theft, or local brawls with no wider significance.
+- Do NOT include unverified rumours or anonymous "sources say" gossip without a named publisher.
+- Only include events that have been reported by a named, credible news outlet.
 
 CRITICAL TEMPORAL RULES (must be strictly followed):
 - Do NOT include events that are scheduled to happen in the future (e.g. upcoming festivals, planned events, future elections, preview articles). These are anticipated searches, NOT live news.
@@ -510,7 +564,9 @@ Return exactly this JSON structure (no extra fields, no missing fields):
     "trend_score": 85,
     "freshness_score": 95,
     "event_date": "{$today}",
-    "published_at_relative": "relative time of news event, e.g. '30 mins ago', '1 hour ago', '4 hours ago', or '12 hours ago' relative to {$currentTime}"
+    "published_at_relative": "relative time of news event, e.g. '30 mins ago', '1 hour ago', '4 hours ago', or '12 hours ago' relative to {$currentTime}",
+    "geo_city": "City name or null",
+    "geo_state": "State/region name or null"
   }
 ]
 {$exclusions}
@@ -598,6 +654,9 @@ PROMPT;
                 'freshness_score'   => $item['freshness_score'] ?? 0,
                 'event_date'        => $item['event_date'] ?? null,
                 'published_at_relative' => $item['published_at_relative'] ?? null,
+                // Geographic fields (Issue #1 Sub-problem 3)
+                'geo_city'          => isset($item['geo_city']) && is_string($item['geo_city']) ? mb_substr(trim($item['geo_city']), 0, 100) : null,
+                'geo_state'         => isset($item['geo_state']) && is_string($item['geo_state']) ? mb_substr(trim($item['geo_state']), 0, 100) : null,
             ];
         }
 

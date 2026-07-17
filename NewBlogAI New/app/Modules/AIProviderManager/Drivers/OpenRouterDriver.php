@@ -46,20 +46,41 @@ class OpenRouterDriver implements AIProviderClientInterface
         $model = $model ?: 'google/gemini-pro';
 
         try {
+            // -- Structured Output: response_format --------------------------------
+            // OpenRouter forwards response_format to the underlying model.
+            // json_schema mode requires a model that supports Structured Outputs.
+            // json_object guarantees valid JSON with no schema enforcement.
+            $responseFormat = null;
+            if (! empty($options['json_schema'])) {
+                $responseFormat = [
+                    'type'        => 'json_schema',
+                    'json_schema' => $options['json_schema'],
+                ];
+            } elseif (! empty($options['json_mode'])) {
+                $responseFormat = ['type' => 'json_object'];
+            }
+            // -- End Structured Output -------------------------------------------
+
+            $payload = [
+                'model'       => $model,
+                'messages'    => [
+                    ['role' => 'user', 'content' => $prompt],
+                ],
+                'temperature' => $options['temperature'] ?? 0.7,
+                'max_tokens'  => $options['max_tokens'] ?? 2000,
+            ];
+
+            if ($responseFormat !== null) {
+                $payload['response_format'] = $responseFormat;
+            }
+
             $response = Http::withToken($apiKey)
                 ->withHeaders([
                     'HTTP-Referer' => config('app.url', 'http://localhost'),
                     'X-Title' => 'NewsBlogify AI OS',
                 ])
                 ->timeout($options['timeout'] ?? 90)
-                ->post('https://openrouter.ai/api/v1/chat/completions', [
-                    'model' => $model,
-                    'messages' => [
-                        ['role' => 'user', 'content' => $prompt],
-                    ],
-                    'temperature' => $options['temperature'] ?? 0.7,
-                    'max_tokens' => $options['max_tokens'] ?? 2000,
-                ]);
+                ->post('https://openrouter.ai/api/v1/chat/completions', $payload);
 
             if (! $response->successful()) {
                 throw new \RuntimeException("OpenRouter API error: Status {$response->status()} - ".$response->body());

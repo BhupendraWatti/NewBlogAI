@@ -57,12 +57,27 @@ class GoogleGeminiDriver implements AIProviderClientInterface
                     ],
                 ],
                 'generationConfig' => [
-                    'temperature' => $opts['temperature'] ?? 0.7,
+                    'temperature'     => $opts['temperature'] ?? 0.7,
                     'maxOutputTokens' => $opts['max_tokens'] ?? 2048,
                 ],
             ];
 
-            if (!empty($opts['tools'])) {
+            // ── Structured Output: JSON Mode ──────────────────────────────────
+            // When either json_mode or json_schema is requested, set the MIME
+            // type so Gemini guarantees a well-formed JSON response every time.
+            if (! empty($opts['json_mode']) || ! empty($opts['json_schema'])) {
+                $payload['generationConfig']['responseMimeType'] = 'application/json';
+            }
+
+            // When a full JSON Schema is provided, pass it as responseSchema so
+            // Gemini constrains its output to exactly the declared shape.
+            // Gemini accepts a JSON Schema object (OpenAPI 3.0 subset).
+            if (! empty($opts['json_schema']['schema'])) {
+                $payload['generationConfig']['responseSchema'] = $opts['json_schema']['schema'];
+            }
+            // ── End Structured Output ─────────────────────────────────────────
+
+            if (! empty($opts['tools'])) {
                 $payload['tools'] = $opts['tools'];
             }
 

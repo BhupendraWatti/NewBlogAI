@@ -57,16 +57,36 @@ class OpenAIDriver implements AIProviderClientInterface
         $model = $model ?: 'gpt-3.5-turbo';
 
         try {
+            // ── Structured Output: build response_format ──────────────────────
+            // json_schema (Structured Outputs) — schema-enforced JSON; requires
+            // gpt-4o / gpt-4o-mini. json_object — valid JSON, no schema enforcement.
+            $responseFormat = null;
+            if (! empty($options['json_schema'])) {
+                $responseFormat = [
+                    'type'        => 'json_schema',
+                    'json_schema' => $options['json_schema'], // {name, strict, schema}
+                ];
+            } elseif (! empty($options['json_mode'])) {
+                $responseFormat = ['type' => 'json_object'];
+            }
+            // ── End Structured Output ─────────────────────────────────────────
+
+            $payload = [
+                'model'       => $model,
+                'messages'    => [
+                    ['role' => 'user', 'content' => $prompt],
+                ],
+                'temperature' => $options['temperature'] ?? 0.7,
+                'max_tokens'  => $options['max_tokens'] ?? 2000,
+            ];
+
+            if ($responseFormat !== null) {
+                $payload['response_format'] = $responseFormat;
+            }
+
             $response = Http::withToken($apiKey)
                 ->timeout($options['timeout'] ?? 90)
-                ->post('https://api.openai.com/v1/chat/completions', [
-                    'model' => $model,
-                    'messages' => [
-                        ['role' => 'user', 'content' => $prompt],
-                    ],
-                    'temperature' => $options['temperature'] ?? 0.7,
-                    'max_tokens' => $options['max_tokens'] ?? 2000,
-                ]);
+                ->post('https://api.openai.com/v1/chat/completions', $payload);
 
             if (! $response->successful()) {
                 throw new \RuntimeException("OpenAI API error: Status {$response->status()} - ".$response->body());

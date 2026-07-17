@@ -43,16 +43,27 @@ class GroqDriver implements AIProviderClientInterface
         $timeout = $options['timeout'] ?? 120;
 
         return $this->executeWithRetryAndLog($apiKey, $prompt, $model, $options, function ($key, $p, $m, $opts) use ($timeout) {
+            // -- Structured Output: json_object mode -----------------------------
+            // Groq supports response_format: json_object (OpenAI-compatible).
+            // Full json_schema (Structured Outputs) is NOT supported by Groq;
+            // we fall back to json_object for either key so JSON is guaranteed.
+            $payload = [
+                'model'       => $m,
+                'messages'    => [
+                    ['role' => 'user', 'content' => $p],
+                ],
+                'temperature' => $opts['temperature'] ?? 0.7,
+                'max_tokens'  => $opts['max_tokens'] ?? 2000,
+            ];
+
+            if (! empty($opts['json_mode']) || ! empty($opts['json_schema'])) {
+                $payload['response_format'] = ['type' => 'json_object'];
+            }
+            // -- End Structured Output -------------------------------------------
+
             return Http::withToken($key)
                 ->timeout($timeout)
-                ->post('https://api.groq.com/openai/v1/chat/completions', [
-                    'model' => $m,
-                    'messages' => [
-                        ['role' => 'user', 'content' => $p],
-                    ],
-                    'temperature' => $opts['temperature'] ?? 0.7,
-                    'max_tokens' => $opts['max_tokens'] ?? 2000,
-                ]);
+                ->post('https://api.groq.com/openai/v1/chat/completions', $payload);
         });
     }
 

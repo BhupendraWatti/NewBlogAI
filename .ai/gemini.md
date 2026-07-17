@@ -8,6 +8,7 @@
 > 3. [.ai/BUSINESS_RULES.md](file:///D:/Company%20Work/Company%20projects/NewBlogAI/.ai/BUSINESS_RULES.md) - Mandatory product constraints, tenancy logic, and database preservation rules.
 > 4. [.ai/CODING_STANDARDS.md](file:///D:/Company%20Work/Company%20projects/NewBlogAI/.ai/CODING_STANDARDS.md) - Code style, module layouts, and testing expectations.
 > 5. [.ai/guide.md](file:///D:/Company%20Work/Company%20projects/NewBlogAI/.ai/guide.md) - Detailed guide on prompt variables and image generator placeholders.
+> 6. [.ai/refactoring_report.md](file:///D:/Company%20Work/Company%20projects/NewBlogAI/.ai/refactoring_report.md) - Refactoring, API token optimizations, and error classifier details.
 
 ## 1. Preserve Original Test Data
 * **DO NOT** run `migrate:fresh` or clear database tables unless explicitly requested by the user.
@@ -20,4 +21,14 @@
 
 ## 3. Do Not Modify Working Code
 * The current files and core features are fully working and verified. Do not make modifications or refactorings to existing functional code structures unless specifically implementing new feature specifications or addressing newly identified bugs.
+
+## 4. Keep Documentation Synchronized
+* **MANDATORY RULES FOR SESSIONS:**
+  * Whenever you implement a new feature, fix a bug, or refactor code, you MUST update the corresponding documentation files in the `.ai/` folder.
+  * Update [.ai/TASK_STATE.md](file:///D:/Company%20Work/Company%20projects/NewBlogAI/.ai/TASK_STATE.md) to record the task completion and progress details.
+  * Update [.ai/ARCHITECTURE.md](file:///D:/Company%20Work/Company%20projects/NewBlogAI/.ai/ARCHITECTURE.md) if the change introduces new stages, modules, endpoints, flows, or structural components.
+  * Update [.ai/BUSINESS_RULES.md](file:///D:/Company%20Work/Company%20projects/NewBlogAI/.ai/BUSINESS_RULES.md) if the change introduces new business constraints or policy decisions.
+  * Update [.ai/MODULE_OWNERSHIP.md](file:///D:/Company%20Work/Company%20projects/NewBlogAI/.ai/MODULE_OWNERSHIP.md) if capabilities or interactions between modules change.
+  * Update [.ai/guide.md](file:///D:/Company%20Work/Company%20projects/NewBlogAI/.ai/guide.md) if template variables, placeholders, or prompt formats are added/modified.
+  * Any new AI session relies entirely on these `.md` files to understand the system state without scanning the whole codebase. Make sure all documentation is 100% accurate, up-to-date, and contains explicit file paths/links.
 

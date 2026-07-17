@@ -21,6 +21,12 @@ class NewsCandidate extends Model
     /** Flagged as overlapping previously published or sibling news. */
     public const STATUS_DUPLICATE = 'duplicate';
 
+    /** Dropped by the geographic diversity enforcer (city/state quota exceeded). */
+    public const STATUS_GEO_FILTERED = 'geo_filtered';
+
+    /** Dropped by the content quality filter (gossip / low-quality score). */
+    public const STATUS_QUALITY_FILTERED = 'quality_filtered';
+
     protected $table = 'news_candidates';
 
     protected $fillable = [
@@ -35,6 +41,9 @@ class NewsCandidate extends Model
         'freshness_score',
         'uniqueness_hash',
         'metadata',
+        'geo_city',
+        'geo_state',
+        'quality_score',
         'status',
         'selected_by',
         'selected_at',
@@ -46,6 +55,7 @@ class NewsCandidate extends Model
         'metadata' => 'array',
         'trend_score' => 'integer',
         'freshness_score' => 'integer',
+        'quality_score' => 'integer',
         'position' => 'integer',
         'selected_at' => 'datetime',
     ];

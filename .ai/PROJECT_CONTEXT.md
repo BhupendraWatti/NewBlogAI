@@ -36,3 +36,8 @@ WordPress is only responsible for execution.
 * **Drivers:** Pollinations AI (free testing), Unsplash API, and OpenAI DALL-E.
 * **Flow:** The pipeline converts Markdown to HTML first, then replaces any comment placeholders (e.g. `<!-- image-placeholder: ... -->`) with standard block `<figure><img></figure>` elements, downloading and storing assets locally under `storage/app/public/media` to prevent hotlinking and CORS blocks.
 * **Safeguards:** Features strict scheme validation (preventing javascript: XSS), finfo binary signature mime checking (preventing malicious extension spoofing), size checking, and idempotency tracking.
+
+## Newsroom Discovery & Temporal Guardrails
+* **Newsroom Discovery Mode:** When a pipeline runs in `discovery` mode, it researches the target category and generates exactly 9 unique news candidates (using Groq for speed and cost efficiency). These are persisted to the database. An employee then selects exactly one candidate.
+* **Full Generation Run:** Selecting a candidate triggers the standard full generation pipeline, passing the candidate context and anchoring generation to its title and source references.
+* **Temporal Framing Guardrail:** To prevent historical events in source articles from being framed as breaking news, the chronological context parser extracts dates from scraped snippets. If the event lag exceeds 48 hours, the story is classified as `followup`, and the AI writer is instructed to frame the article around what is new today, referencing the historical incident as background context.

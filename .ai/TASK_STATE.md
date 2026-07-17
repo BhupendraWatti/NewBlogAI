@@ -1,3 +1,33 @@
+# Sprint Progress: Phase 6: Refactoring, Temporal Context & Pipeline Optimization
+
+## Current Sprint Objectives (Phase 6)
+- [x] **Task 1: Chronological Context Parser** (Implemented `ChronologicalContextParser` stage to decouple publication timestamp from event time. Parses relative/explicit Hindi and English dates and anchors, classifies story type based on a 48-hour event lag, and injects temporal framing instructions into prompt variables to prevent historical framing errors).
+- [x] **Task 2: Concurrency Protection on Pipelines** (Added concurrency gates in `PipelineService` and Cache-driven atomic locks in `ProcessPipelineJob` to prevent concurrent duplicate runs).
+- [x] **Task 3: Sequential AI Provider Failover** (Refactored `ContentGenerationService` to fail over sequentially from Groq → Gemini → OpenAI → Claude → OpenRouter → Ollama. Implemented exponential backoff for retryable errors (HTTP 429 rate limits, network timeouts), and immediate failover for permanent authorization issues via `ProviderErrorClassifier`).
+- [x] **Task 4: Dynamic Credits Tracking & Refresh** (Added credit freshness tracking to AI providers, masked credentials in serializations, and exposed a manual/automatic credit refresh endpoint in `AIProviderController`).
+- [x] **Task 5: Line-by-Line Markdown Parser Fix** (Implemented line-by-line streaming parser in `ContentPostProcessor` to prevent text block discarding).
+- [x] **Task 6: Tests Coverage** (Added new test suites: `PipelineOptimizationTest`, `ImageGenerationToggleTest`, `ProviderErrorClassifierTest` verifying all optimizations, temporal parser, locks, and failover).
+
+---
+
+# Sprint Progress: Phase 5: Increment 2: Webhook Channels & In-App Notification Feed
+
+## Current Sprint Objectives (Phase 5 Increment 2)
+- [x] **Task 1: Outbound Webhook Channels** (Built native Slack, Discord, and Generic HTTP webhook channels without external packages, gracefully routing notification payloads and handling delivery exceptions).
+- [x] **Task 2: In-App Notification Feed** (Exposed paginated feeds, unread feed counting, individual read marking, and read-all actions in `NotificationsController`).
+- [x] **Task 3: Tests** (Created `NotificationChannelsTest` suite verifying default and configured channel routing, mocking webhook payloads, and asserting feed isolation).
+
+---
+
+# Sprint Progress: Phase 5: Increment 1: Enterprise Workspace & Team API
+
+## Current Sprint Objectives (Phase 5 Increment 1)
+- [x] **Task 1: HTTP API layer for Workspaces & Teams** (Implemented tenant-isolated workspaces CRUD, employee setup requests/resources, and workspace ownership constraints).
+- [x] **Task 2: Workspace Ownership Protection** (Protected last-Owner deletion and restricted workspace setup and updates to authorized users under tenant boundaries).
+- [x] **Task 3: Tests** (Added `WorkspaceApiTest` suite verifying isolation, Owner auto-assignment, and customer limits).
+
+---
+
 # Sprint Progress: Phase 5: Newsroom Coverage Workflow (Coverage → 9 Candidates → Select One → Full Generation)
 
 ## Current Sprint Objectives (Phase 5)
