@@ -35,7 +35,10 @@ class OperationsController extends Controller
      */
     public function aiStats(): JsonResponse
     {
-        $customerId = Auth::user()?->customer_id;
+        $user = Auth::user();
+        $isSuperAdmin = ($user?->role === 1);
+        $customerId = $isSuperAdmin ? null : $user?->customer_id;
+
         if ($customerId) {
             $this->entitlements->assertFeatureEnabled(Customer::findOrFail($customerId), 'analytics');
         }
@@ -48,7 +51,10 @@ class OperationsController extends Controller
      */
     public function contentStats(): JsonResponse
     {
-        $customerId = Auth::user()?->customer_id;
+        $user = Auth::user();
+        $isSuperAdmin = ($user?->role === 1);
+        $customerId = $isSuperAdmin ? null : $user?->customer_id;
+
         if ($customerId) {
             $this->entitlements->assertFeatureEnabled(Customer::findOrFail($customerId), 'analytics');
         }

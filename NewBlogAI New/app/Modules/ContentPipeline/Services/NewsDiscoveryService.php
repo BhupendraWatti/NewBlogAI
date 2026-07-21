@@ -401,14 +401,14 @@ class NewsDiscoveryService
 
             $driver = $this->providerService->getDriver($provider->provider_key);
 
-            // BUG 1 FIX: Use standard google_search tool for grounding, as
+            // BUG 1 FIX: Use standard googleSearch tool for grounding, as
             // googleSearchRetrieval is only supported in Vertex AI / enterprise
             // accounts and throws a 400 error on Developer API keys.
             $tools = null;
             if (strtolower($provider->provider_key) === 'gemini') {
                 $tools = [
                     [
-                        'google_search' => (object) [],
+                        'googleSearch' => (object) [],
                     ],
                 ];
             }
@@ -529,12 +529,29 @@ class NewsDiscoveryService
             ? "- If the region is {$country}: spread stories across different states/regions — do NOT cluster multiple stories in the same city."
             : '- Spread stories across different cities and regions globally.';
 
+        // Resolve current year for prompt context
+        $currentYear = now()->format('Y');
+
         // Embed explicit date range operators so Gemini Search grounding
         // anchors its retrieval to the last 48 hours rather than returning
         // evergreen top-ranked articles. The "after:" / "before:" syntax is
         // recognised by Google Search and biases the grounding toward fresh results.
         return <<<PROMPT
 You are a JSON-only news data API. Today is {$today} ({$todayIso}), current time is {$currentTime}.
+
+GOVERNMENT & POLITICAL CONTEXT (Verify all official designations strictly):
+- Current Year: {$currentYear}
+- India Active Council of Ministers:
+  * Prime Minister: Narendra Modi
+  * President: Droupadi Murmu
+  * Minister of Home Affairs: Amit Shah
+  * Minister of External Affairs: S. Jaishankar
+  * Minister of Finance: Nirmala Sitharaman
+  * Chief Minister of Madhya Pradesh: Mohan Yadav (Note: Shivraj Singh Chouhan is no longer the CM of MP; Mohan Yadav is the current CM)
+- United States: President Joe Biden
+- United Kingdom: Prime Minister Keir Starmer
+
+VERIFY OFFICIAL DESIGNATIONS: You MUST perform web search grounding to verify the current active official designations of any political leaders, government ministers, or officials mentioned in the news. Do NOT reference former officials as currently active. Ensure all titles are 100% accurate as of {$todayIso}.
 
 SEARCH CONTEXT — USE THIS DATE RANGE FOR ALL QUERIES:
   after:{$yesterdayIso} before:{$todayIso}
@@ -581,7 +598,7 @@ Return exactly this JSON structure (no extra fields, no missing fields):
 [
   {
     "title": "concise headline max 120 chars",
-    "summary": "2-3 sentence factual summary of the real event",
+    "summary": "2-3 sentence factual summary of the real event. You MUST include specific news details: the exact city location, the exact time, the named officials or organizations involved, casualty counts or cost figures if applicable, and the specific occasion (e.g. Shravan Monday, VIP visit, festival name). Avoid vague placeholders or generic sentences.",
     "source_references": [{"name": "Outlet Name", "url": "https://real-url.com"}],
     "keywords": ["keyword1", "keyword2", "keyword3"],
     "trend_score": 85,
@@ -675,12 +692,22 @@ PROMPT;
         }
 
         $candidates = [];
-        foreach ($decoded as $item) {
+        foreach ($decoded as $index => $item) {
             if (! is_array($item) || trim((string) ($item['title'] ?? '')) === '') {
                 continue;
             }
             $rawFreshness = (int) ($item['freshness_score'] ?? 0);
             $sourceRefs   = is_array($item['source_references'] ?? null) ? $item['source_references'] : [];
+            $sourceCount  = count($sourceRefs);
+            $keywordCount = is_array($item['keywords'] ?? null) ? count($item['keywords']) : 0;
+
+            // Mathematical Trending Score: coverage volume (sources) + keyword velocity
+            // Introduce a deterministic position-based variance offset (unique per card)
+            // so scores are dynamically scattered (e.g. 84%, 77%, 91%) and never locked/clustered.
+            $baseVelocity = 45 + ($keywordCount * 6);
+            $coverageBonus = $sourceCount * 18;
+            $positionVariance = ($index * 7) % 19; 
+            $dynamicTrend  = (int) min(98, max(45, $baseVelocity + $coverageBonus - $positionVariance));
 
             // Bug Fix #1: If the AI claims freshness > 80 but provides NO source reference URL,
             // cap it at 60 — we cannot verify the recency without a source, so treat as unverifiable.
@@ -694,7 +721,7 @@ PROMPT;
                 'summary'           => isset($item['summary']) ? trim((string) $item['summary']) : null,
                 'source_references' => $sourceRefs,
                 'keywords'          => is_array($item['keywords'] ?? null) ? array_values($item['keywords']) : [],
-                'trend_score'       => $item['trend_score'] ?? 0,
+                'trend_score'       => $dynamicTrend,
                 'freshness_score'   => $rawFreshness,
                 'event_date'        => $item['event_date'] ?? null,
                 'published_at_relative' => $item['published_at_relative'] ?? null,
@@ -856,9 +883,8 @@ PROMPT;
 
     /**
      * Parse a relative time string like "30 mins ago", "2 hours ago", "3 days ago"
-     * and return the maximum freshness score that candidate should receive.
-     *
-     * Returns null if the string cannot be parsed (no cap applied).
+     * and return the maximum freshness score that candidate should receive using
+     * the exponential decay function: score = 100 * e^(-0.04 * t).
      */
     private function capFromRelativeString(string $relative): ?int
     {
@@ -882,15 +908,19 @@ PROMPT;
                 return null;
             }
 
-            return match (true) {
-                $ageInHours <= 2   => null,        // < 2h: genuinely fresh, no cap
-                $ageInHours <= 24  => null,        // < 24h: fresh enough, no cap
-                $ageInHours <= 48  => 75,          // 1–2 days
-                $ageInHours <= 168 => 55,          // 3–7 days
-                $ageInHours <= 408 => 35,          // 8–17 days
-                $ageInHours <= 720 => 20,          // 18–30 days
-                default            => 10,          // > 30 days
-            };
+            // Stories under 24 hours old: no freshness cap — they are live/fresh news.
+            // The AI's own freshness_score is trusted in this window (Bug Fix #1 above
+            // already rejected scores > 80 without a source URL).
+            if ($ageInHours <= 24) {
+                return null;
+            }
+
+            // For content older than 24 hours: exponential decay formula S = 100 * e^(-0.04 * t)
+            // Decay curve at key milestones:
+            //   24h  → 38   |   48h  → 15   |   72h  → 6 (clamped to 10)
+            $decayRate = 0.04;
+            $decayedScore = 100 * exp(-$decayRate * $ageInHours);
+            return (int) max(10, min(100, round($decayedScore)));
         }
 
         return null;

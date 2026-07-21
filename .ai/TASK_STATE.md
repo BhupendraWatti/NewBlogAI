@@ -14,6 +14,7 @@
 - [x] **Task 11: Route Mapping Fix & Accessible Border Contrast** (Registered plans path inside web.php routing array to prevent 404 errors on hard refresh. Standardized light theme borders to rgba(0,0,0,0.12) and configured solid grey checklist backgrounds).
 - [x] **Task 12: Dynamic Modal Input Aesthetics & Accessible Badges Contrast** (Replaced all remaining static bg-[#071018] instances in changePlan/assignSubscription modal inputs, log detail panels, and pricing plan listing row feature badges with dynamic theme bg-background classes to guarantee accessibility. Verified all test suites).
 - [x] **Task 13: Full System QA Audit, Dead Code Removal & Dynamic Select Data-Binding** (Conducted full browser & code QA audit across all workspaces. Fixed hardcoded bg-[#071018] and dead border-outline-variant classes across topics, scheduler, rules, settings, customers, roles, creation-wizard, and prompts modal views. Added full frontend Topic CRUD JS integration and dynamic AI provider primary model routing. All 176 PHP unit tests pass successfully).
+- [x] **Task 14: Analytics Super Admin Bypass & Live KPI Correction** (Bypassed the tenant-level customer_id check for Super Admin roles (role = 1) in `OperationsController` to prevent ModelNotFoundExceptions on dummy customer IDs. Enabled Super Admins to view platform-wide request logs and draft metrics on the analytics dashboard instead of empty states. All unit tests pass successfully).
 
 ---
 

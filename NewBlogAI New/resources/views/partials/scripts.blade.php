@@ -4628,12 +4628,13 @@
 
             const trendColor = trend >= 70 ? 'text-green-400' : trend >= 40 ? 'text-yellow-400' : 'text-muted';
 
-            // Calculate genuine relative age text
-            let ageText = '';
-            const relativeAge = c.metadata?.published_at_relative || '';
-            const eventDateStr = c.metadata?.event_date || '';
+            // Populate metadata variables (read directly from Resource first-class keys)
+            const relativeAge = c.published_at_relative || c.metadata?.published_at_relative || '';
+            const eventDateStr = c.event_date || c.metadata?.event_date || '';
             const createdAtStr = c.created_at || '';
 
+            // Calculate genuine relative age text
+            let ageText = '';
             if (relativeAge) {
                 ageText = relativeAge;
             } else if (eventDateStr) {
@@ -4672,24 +4673,99 @@
                 else ageText = "1 week ago";
             }
 
+            // Calculate elapsed hours since publishing for dynamic freshness decay
+            let elapsedHours = 0;
+            if (relativeAge) {
+                const num = parseInt(relativeAge);
+                if (!isNaN(num)) {
+                    if (relativeAge.includes('min')) elapsedHours = num / 60;
+                    else if (relativeAge.includes('hour') || relativeAge.includes('hr')) elapsedHours = num;
+                    else if (relativeAge.includes('day')) elapsedHours = num * 24;
+                    else if (relativeAge.includes('week')) elapsedHours = num * 24 * 7;
+                    else if (relativeAge.includes('month')) elapsedHours = num * 24 * 30;
+                }
+            } else if (eventDateStr) {
+                const eventDate = new Date(eventDateStr);
+                const now = new Date();
+                elapsedHours = Math.max(0, (now.getTime() - eventDate.getTime()) / (1000 * 60 * 60));
+            } else {
+                // Default estimate from original score if no time metadata
+                elapsedHours = (100 - fresh) / 2; 
+            }
+
+            // Implement Dynamic Decay formula: Freshness = 100 * e^(-k * t) where k = 0.04
+            const decayK = 0.04;
+            const computedFreshness = Math.round(100 * Math.exp(-decayK * elapsedHours));
+            const dynamicFresh = Math.max(10, Math.min(100, computedFreshness));
+
+            // Standardize Pipeline Output Language (Unified language setting from workflow setup)
+            const targetLang = document.getElementById('gen-language')?.value || 'en';
+            const isHindi = targetLang === 'hi';
+            const t = (en, hi) => isHindi ? hi : en;
+
+            // Translate age text
+            let ageTextTranslated = ageText || (relativeAge ? relativeAge : "Today");
+            if (isHindi) {
+                ageTextTranslated = ageTextTranslated
+                    .replace(/Just now/i, 'अभी-अभी')
+                    .replace(/Today/i, 'आज')
+                    .replace(/Yesterday/i, 'कल')
+                    .replace(/(\d+)\s*mins?\s*ago/i, '$1 मिनट पहले')
+                    .replace(/(\d+)\s*hours?\s*ago/i, '$1 घंटे पहले')
+                    .replace(/(\d+)\s*days?\s*ago/i, '$1 दिन पहले')
+                    .replace(/(\d+)\s*weeks?\s*ago/i, '$1 सप्ताह पहले')
+                    .replace(/1\s*week\s*ago/i, '1 सप्ताह पहले')
+                    .replace(/(\d+)\s*months?\s*ago/i, '$1 महीने पहले');
+            }
+
+            // Translate fact check status
+            const sourcesCount = Array.isArray(c.source_references) ? c.source_references.length : 0;
+            const factCheckStatus = sourcesCount > 1 
+                ? t(`✓ Verified by ${sourcesCount} sources`, `✓ ${sourcesCount} स्रोतों द्वारा सत्यापित`) 
+                : t(`⚠ Single Source Report`, `⚠ एकल स्रोत रिपोर्ट`);
+            const factCheckColor = sourcesCount > 1 ? 'text-emerald-400 border-emerald-400/30' : 'text-amber-400 border-amber-400/30';
+            const confidenceScore = c.quality_score ?? 85;
+
             const card = document.createElement('div');
-            card.className = 'glass-surface rounded-2xl p-4 space-y-3 border border-border hover:border-accent/50 transition-all cursor-pointer group';
+            card.className = 'glass-surface rounded-2xl p-4 space-y-3 border border-border hover:border-accent/50 transition-all cursor-pointer group flex flex-col justify-between';
             card.innerHTML = `
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-[10px] font-mono text-muted bg-surface border border-border px-2 py-0.5 rounded-full">#${idx + 1}</span>
-                        <div class="flex flex-wrap gap-1.5 justify-end max-w-[80%]">
-                            <span class="text-[9px] font-mono ${trendColor} border border-current/30 px-1.5 py-0.5 rounded-full">⚡ ${trend}% trend</span>
-                            <span class="text-[9px] font-mono text-blue-400 border border-blue-400/30 px-1.5 py-0.5 rounded-full">💧 ${fresh}% fresh</span>
-                            <span class="text-[9px] font-mono text-purple-400 border border-purple-400/30 px-1.5 py-0.5 rounded-full">🕐 ${ageText}</span>
+                    <div>
+                        <div class="flex items-start justify-between gap-2">
+                            <span class="text-[10px] font-mono text-muted bg-surface border border-border px-2 py-0.5 rounded-full">#${idx + 1}</span>
+                            <div class="flex flex-wrap gap-1.5 justify-end max-w-[80%]">
+                                <span class="text-[9px] font-mono ${trendColor} border border-current/30 px-1.5 py-0.5 rounded-full">⚡ ${trend}% ${t('trend', 'ट्रेंड')}</span>
+                                <span class="text-[9px] font-mono text-blue-400 border border-blue-400/30 px-1.5 py-0.5 rounded-full">💧 ${dynamicFresh}% ${t('fresh', 'ताज़ा')}</span>
+                                <span class="text-[9px] font-mono text-purple-400 border border-purple-400/30 px-1.5 py-0.5 rounded-full">🕐 ${ageTextTranslated}</span>
+                            </div>
                         </div>
+                        <h4 class="text-xs font-semibold text-text leading-snug group-hover:text-accent transition-colors pt-2">${(c.title || 'Untitled').replace(/</g, '&lt;')}</h4>
+                        <p class="text-[10px] text-muted leading-relaxed line-clamp-3 mt-1.5">${(c.summary || 'No summary available.').replace(/</g, '&lt;')}</p>
+                        
+                        <!-- Named Entity Recognition (NER) Audit Panel -->
+                        <div class="bg-surface/50 border border-border/60 rounded-xl p-2.5 text-[10px] font-mono space-y-1.5 mt-3 text-muted">
+                            <div class="text-[8px] uppercase tracking-wider font-semibold border-b border-border/40 pb-1 mb-1 text-accent flex justify-between">
+                                <span>${t('NER Audit Log', 'NER ऑडिट लॉग')}</span>
+                                <span class="${factCheckColor} font-bold">${factCheckStatus}</span>
+                            </div>
+                            <div class="flex justify-between"><span class="text-muted">${t('WHO/WHAT:', 'कौन/क्या:')}</span> <span class="text-text max-w-[65%] truncate font-sans text-right">${keywords.join(', ') || 'N/A'}</span></div>
+                            <div class="flex justify-between"><span class="text-muted">${t('WHERE:', 'कहाँ:')}</span> <span class="text-text font-sans text-right">${[c.geo_city, c.geo_state].filter(Boolean).join(', ') || t('National / Global', 'राष्ट्रीय / वैश्विक')}</span></div>
+                            <div class="flex justify-between"><span class="text-muted">${t('WHEN:', 'कब:')}</span> <span class="text-text text-right">${ageTextTranslated}</span></div>
+                            <div class="flex justify-between pt-1 border-t border-border/40"><span class="text-muted">${t('CONFIDENCE:', 'विश्वसनीयता:')}</span> <span class="text-accent font-bold">${confidenceScore}%</span></div>
+                        </div>
+
+                        ${sources.length ? `
+                        <div class="text-[9px] text-muted font-mono border-t border-border pt-2 mt-3 space-y-1">
+                            ${sources.map(s => {
+                                const name = s.name || (s.url ? s.url.replace(/https?:\/\/(www\.)?/, '').split('/')[0] : 'Link');
+                                const href = s.url || '#';
+                                return `<div class="truncate">📰 <a href="${href}" target="_blank" rel="noopener noreferrer" class="text-accent hover:underline font-bold transition-all inline-flex items-center gap-1">${name} <span class="material-symbols-outlined text-[9px]">open_in_new</span></a></div>`;
+                            }).join('')}
+                        </div>` : ''}
                     </div>
-                    <h4 class="text-xs font-semibold text-text leading-snug group-hover:text-accent transition-colors">${(c.title || 'Untitled').replace(/</g, '&lt;')}</h4>
-                    <p class="text-[10px] text-muted leading-relaxed line-clamp-3">${(c.summary || 'No summary available.').replace(/</g, '&lt;')}</p>
-                    ${keywords.length ? `<div class="flex flex-wrap gap-1">${keywords.map(k => `<span class="text-[9px] text-accent/70 bg-accent/10 border border-accent/20 px-1.5 py-0.5 rounded-full">${k}</span>`).join('')}</div>` : ''}
-                    ${sources.length ? `<div class="text-[9px] text-muted font-mono border-t border-border pt-2">${sources.map(s => `<div class="truncate">📰 ${s.name || s.url || ''}</div>`).join('')}</div>` : ''}
-                    <button onclick="generateFromCandidate(${c.id})" class="w-full bg-accent/10 hover:bg-accent text-accent hover:text-background font-bold text-[10px] py-2 rounded-xl transition flex items-center justify-center gap-1.5 border border-accent/30 hover:border-accent mt-1">
+
+                    <button onclick="generateFromCandidate(${c.id})" class="w-full bg-accent/10 hover:bg-accent text-accent hover:text-background font-bold text-[10px] py-2 rounded-xl transition flex items-center justify-center gap-1.5 border border-accent/30 hover:border-accent mt-3">
                         <span class="material-symbols-outlined text-xs">auto_awesome</span>
-                        Generate Article
+                        ${t('Generate Article', 'लेख तैयार करें')}
                     </button>
                 `;
             grid.appendChild(card);

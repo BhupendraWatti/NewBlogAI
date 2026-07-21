@@ -173,9 +173,9 @@ class DuplicateDetectionService
             ->join('pipeline_runs', 'news_candidates.pipeline_run_id', '=', 'pipeline_runs.id')
             ->join('content_pipelines', 'pipeline_runs.pipeline_id', '=', 'content_pipelines.id')
             ->where('content_pipelines.site_id', $siteId)
-            ->where(function ($q) use ($since) {
+            ->where(function ($q) {
                 $q->where('news_candidates.status', NewsCandidate::STATUS_SELECTED)
-                  ->orWhere(function ($q2) use ($since) {
+                  ->orWhere(function ($q2) {
                       // STATUS_CANDIDATE from previous runs only (created > 1 hour ago)
                       $q2->where('news_candidates.status', NewsCandidate::STATUS_CANDIDATE)
                          ->where('news_candidates.created_at', '<=', now()->subHour());

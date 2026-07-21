@@ -527,7 +527,7 @@ class SourceCollectionService implements SourceCollectorInterface
                 ],
             ],
             'tools' => [
-                ['google_search' => (object) []],
+                ['googleSearch' => (object) []],
             ],
             'generationConfig' => [
                 'maxOutputTokens' => 1024,
