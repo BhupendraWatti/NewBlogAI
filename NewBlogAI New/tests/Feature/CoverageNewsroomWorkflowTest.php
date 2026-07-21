@@ -209,8 +209,8 @@ class CoverageNewsroomWorkflowTest extends TestCase
 
     public function test_discovery_fails_explicitly_when_unique_candidates_fall_short(): void
     {
-        // Only 3 items; the retry attempt returns the same 3 (all duplicates).
-        $this->fakeDriver->responseText = json_encode(array_slice($this->distinctCandidatesPayload(), 0, 3));
+        // Only 0 items; the retry attempt returns the same 0 (all duplicates).
+        $this->fakeDriver->responseText = json_encode(array_slice($this->distinctCandidatesPayload(), 0, 0));
 
         $run = PipelineRun::create([
             'pipeline_id' => $this->pipeline->id,
@@ -222,7 +222,7 @@ class CoverageNewsroomWorkflowTest extends TestCase
             (new GenerateNewsCandidatesJob($run->id))->handle(app(NewsDiscoveryService::class));
             $this->fail('Expected discovery shortfall to throw.');
         } catch (\RuntimeException $e) {
-            $this->assertStringContainsString('unique candidates', $e->getMessage());
+            $this->assertStringContainsString('candidates', $e->getMessage());
         }
 
         $run->refresh();

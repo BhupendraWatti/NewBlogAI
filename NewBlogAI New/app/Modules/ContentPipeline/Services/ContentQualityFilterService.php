@@ -37,8 +37,19 @@ class ContentQualityFilterService
     /** Penalty applied when a gossip signal is found only in the summary. */
     private const GOSSIP_SUMMARY_PENALTY = 10;
 
-    /** Penalty applied when no named source publisher is present. */
-    private const NO_NAMED_SOURCE_PENALTY = 20;
+    /**
+     * Bug Fix #5a: Reduced from 20 → 10. Gemini grounded search results
+     * legitimately strip publisher names from source_references, so a 20-point
+     * penalty was causing real, credible news to be incorrectly rejected.
+     */
+    private const NO_NAMED_SOURCE_PENALTY = 10;
+
+    /**
+     * Bug Fix #5b: Penalty for source_references that only contain Google
+     * redirect/grounding URLs (google.com/grounding-api-redirect/...) without
+     * a real publisher URL. These are proxy redirects, not verifiable sources.
+     */
+    private const REDIRECT_URL_ONLY_PENALTY = 15;
 
     /**
      * Penalty applied when the candidate summary is too thin (fewer than
@@ -132,9 +143,24 @@ class ContentQualityFilterService
             return ! empty($src['name']) && trim((string) $src['name']) !== '';
         });
 
+        // Bug Fix #5a: Use the reduced penalty so Gemini-grounded candidates
+        // are not incorrectly rejected for missing publisher name labels.
         if (! $hasNamedSource) {
             $score -= self::NO_NAMED_SOURCE_PENALTY;
             $reasons[] = 'no_named_source';
+        }
+
+        // Bug Fix #5b: Penalize candidates whose ONLY source URLs are Google
+        // grounding redirect proxies — these cannot be directly verified.
+        $hasRealUrl = collect($sources)->contains(function ($src) {
+            $url = (string) ($src['url'] ?? '');
+            return str_starts_with($url, 'http')
+                && ! str_contains($url, 'google.com/grounding-api-redirect')
+                && ! str_contains($url, 'google.com/search?');
+        });
+        if (! empty($sources) && ! $hasRealUrl) {
+            $score -= self::REDIRECT_URL_ONLY_PENALTY;
+            $reasons[] = 'redirect_url_only';
         }
 
         // -- Thin summary (gossip tends to be shallow) ----------------------

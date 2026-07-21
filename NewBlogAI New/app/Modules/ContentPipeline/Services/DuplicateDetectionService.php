@@ -147,7 +147,8 @@ class DuplicateDetectionService
 
     /**
      * Recent comparison corpus for a site: generated/published article titles
-     * plus previously selected news candidates.
+     * plus previously selected news candidates AND all candidates from the
+     * current discovery run (status=candidate) to prevent retry-loop duplicates.
      *
      * @return array<int, array{title: string, keywords: array, hash: string}>
      */
@@ -162,11 +163,24 @@ class DuplicateDetectionService
             ->limit(self::HISTORY_LIMIT)
             ->pluck('title');
 
+        // Bug Fix #2: include ALL candidates (selected + current-run candidates)
+        // so the retry loop on attempt 2 cannot re-insert the same stories.
+        // Use a 1-hour age threshold so that newly-persisted current-run candidates
+        // are NOT included during the same-run article selection flow (avoids false
+        // "self-duplicate" detection when an employee selects a candidate from the
+        // same discovery run).
         $selectedCandidates = NewsCandidate::query()
             ->join('pipeline_runs', 'news_candidates.pipeline_run_id', '=', 'pipeline_runs.id')
             ->join('content_pipelines', 'pipeline_runs.pipeline_id', '=', 'content_pipelines.id')
             ->where('content_pipelines.site_id', $siteId)
-            ->where('news_candidates.status', NewsCandidate::STATUS_SELECTED)
+            ->where(function ($q) use ($since) {
+                $q->where('news_candidates.status', NewsCandidate::STATUS_SELECTED)
+                  ->orWhere(function ($q2) use ($since) {
+                      // STATUS_CANDIDATE from previous runs only (created > 1 hour ago)
+                      $q2->where('news_candidates.status', NewsCandidate::STATUS_CANDIDATE)
+                         ->where('news_candidates.created_at', '<=', now()->subHour());
+                  });
+            })
             ->where('news_candidates.created_at', '>=', $since)
             ->orderByDesc('news_candidates.created_at')
             ->limit(self::HISTORY_LIMIT)
@@ -176,17 +190,17 @@ class DuplicateDetectionService
 
         foreach ($articleTitles as $title) {
             $items[] = [
-                'title' => (string) $title,
+                'title'    => (string) $title,
                 'keywords' => [],
-                'hash' => NewsCandidate::hashTitle((string) $title),
+                'hash'     => NewsCandidate::hashTitle((string) $title),
             ];
         }
 
         foreach ($selectedCandidates as $candidate) {
             $items[] = [
-                'title' => (string) $candidate->title,
+                'title'    => (string) $candidate->title,
                 'keywords' => is_array($candidate->keywords) ? $candidate->keywords : (array) json_decode((string) $candidate->keywords, true),
-                'hash' => NewsCandidate::hashTitle((string) $candidate->title),
+                'hash'     => NewsCandidate::hashTitle((string) $candidate->title),
             ];
         }
 

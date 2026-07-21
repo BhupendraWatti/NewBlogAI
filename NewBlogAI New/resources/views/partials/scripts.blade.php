@@ -3972,22 +3972,38 @@
         custom: { label: 'Custom', icon: 'extension', colour: 'text-highlight', bg: 'bg-highlight/10' },
     };
 
-    function openAddProviderForm() {
-        const modal = document.getElementById('add-provider-modal');
-        if (!modal) return;
-        // Reset fields
-        document.getElementById('modal-provider-select').value = '';
-        document.getElementById('modal-api-key').value = '';
-        document.getElementById('modal-model').value = '';
-        document.getElementById('modal-provider-error').classList.add('hidden');
-        modal.classList.remove('hidden');
-        document.getElementById('modal-provider-select').focus();
-    }
+    window.flipCreatorCard = function (flipped) {
+        const card = document.getElementById('creator-card');
+        if (!card) return;
+        
+        if (flipped) {
+            card.classList.add('flipped');
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Reset fields
+            document.getElementById('modal-provider-select').value = '';
+            document.getElementById('modal-api-key').value = '';
+            document.getElementById('modal-model').value = '';
+            document.getElementById('modal-tier').value = 'free';
+            document.getElementById('modal-priority').value = '0';
+            document.getElementById('modal-provider-error').classList.add('hidden');
+            
+            setTimeout(() => {
+                const select = document.getElementById('modal-provider-select');
+                if (select) select.focus();
+            }, 300);
+        } else {
+            card.classList.remove('flipped');
+        }
+    };
 
-    function closeAddProviderForm() {
-        const modal = document.getElementById('add-provider-modal');
-        if (modal) modal.classList.add('hidden');
-    }
+    window.openAddProviderForm = function () {
+        flipCreatorCard(true);
+    };
+
+    window.closeAddProviderForm = function () {
+        flipCreatorCard(false);
+    };
 
     // Dismiss on Escape key
     document.addEventListener('keydown', function (e) {
@@ -4004,265 +4020,259 @@
             const result = await response.json();
             const providers = result.data || result;
 
-            // Clear dynamic custom cards from grid first (keep only the 6 standard cards)
             const grid = document.getElementById('providers-grid');
-            if (grid) {
-                const standardKeys = ['gemini', 'openai', 'claude', 'groq', 'openrouter', 'ollama'];
-                const cards = grid.querySelectorAll('.glass-surface');
-                cards.forEach(card => {
-                    const id = card.getAttribute('id');
-                    if (id && !standardKeys.some(k => id === 'provider-card-' + k)) {
-                        card.remove();
-                    }
-                });
-            }
+            if (!grid) return;
 
-            // Reset standard cards UI states
-            document.querySelectorAll('#providers-grid .provider-status').forEach(badge => {
-                badge.textContent = 'not configured';
-                badge.className = 'provider-status px-2 py-0.5 rounded bg-muted/10 text-muted border border-border text-[9px] font-mono';
-            });
-            document.querySelectorAll('#providers-grid .provider-default-chk').forEach(chk => {
-                chk.checked = false;
-            });
-            document.querySelectorAll('#providers-grid button[onclick^="saveProviderKey"]').forEach(btn => {
-                btn.disabled = true;
-                btn.textContent = 'Save Settings';
-            });
-            document.querySelectorAll('#providers-grid input[type="password"]').forEach(input => {
-                input.value = '';
-            });
-            document.querySelectorAll('#providers-grid [data-db-id]').forEach(el => {
-                el.removeAttribute('data-db-id');
+            // Remove any cards from DOM that are no longer present in the database
+            const activeIds = new Set(providers.map(p => String(p.id)));
+            const cards = grid.querySelectorAll('[data-db-id]');
+            cards.forEach(card => {
+                const dbId = card.getAttribute('data-db-id');
+                if (dbId && !activeIds.has(dbId)) {
+                    card.remove();
+                }
             });
 
             configuredProviders = {};
 
-            // Update cards based on database data
             providers.forEach(p => {
+                const dbId = p.id;
+                configuredProviders[dbId] = p;
+
                 const key = p.provider_key;
-                configuredProviders[key] = p;
+                const meta = _providerMeta[key] || _providerMeta.custom;
+                const cardId = 'provider-card-' + dbId;
+                const maskedKey = p.has_api_key ? '••••••••••••••••••••' : '';
 
-                const card = document.getElementById('provider-card-' + key);
-                if (card) {
-                    card.setAttribute('data-db-id', p.id);
+                // Calculate success and error rates from live DB-aggregated log counts
+                const totalReqs    = p.total_requests    || 0;
+                const successReqs  = p.success_requests  || 0;
+                const errorReqs    = p.error_requests    || 0;
+                const successRate  = totalReqs > 0 ? Math.round((successReqs / totalReqs) * 100) : 0;
+                const errorRate    = totalReqs > 0 ? Math.round((errorReqs   / totalReqs) * 100) : 0;
 
-                    const statusBadge = card.querySelector('.provider-status');
-                    if (statusBadge) {
-                        if (!p.is_enabled) {
-                            statusBadge.textContent = 'disabled / error';
-                            statusBadge.className = 'provider-status px-2 py-0.5 rounded bg-danger/20 text-danger border border-danger/30 text-[9px] font-mono';
-                        } else {
-                            statusBadge.textContent = 'configured';
-                            statusBadge.className = 'provider-status px-2 py-0.5 rounded bg-success/20 text-success border border-success/30 text-[9px] font-mono';
-                        }
-                    }
-
-                    const keyInput = card.querySelector('input[type="password"], input[type="text"]');
-                    if (keyInput) {
-                        keyInput.value = p.api_key || '••••••••••••••••••••';
-                    }
-
-                    const modelEl = card.querySelector('[data-role="model"]');
-                    if (modelEl && p.default_model) {
-                        modelEl.value = p.default_model;
-                        // Warn devs if the value didn't stick (e.g. option not in list)
-                        if (modelEl.tagName === 'SELECT' && modelEl.value !== p.default_model) {
-                            console.warn(`[Providers] Model "${p.default_model}" not in dropdown options for ${p.provider_key} — option not found.`);
-                        }
-                    }
-
-                    const chkDefault = card.querySelector('.provider-default-chk');
-                    if (chkDefault) {
-                        chkDefault.checked = p.is_default;
-                    }
-
-                    // Populate Rate Limit & Credit information
-                    const creditsPanel = card.querySelector('.provider-credits-panel');
-                    if (creditsPanel) {
-                        if (p.has_api_key && key !== 'ollama') {
-                            creditsPanel.classList.remove('hidden');
-
-                            const totalEl = creditsPanel.querySelector('.credits-total');
-                            if (totalEl) {
-                                if (p.credits_total !== null && p.credits_total !== undefined) {
-                                    totalEl.textContent = Number(p.credits_total).toLocaleString() + ' tokens (cap)';
-                                    totalEl.classList.remove('text-muted');
-                                } else {
-                                    totalEl.textContent = key === 'gemini' ? 'Free / Untracked' : 'Not tracked yet';
-                                    totalEl.classList.add('text-muted');
-                                }
-                            }
-
-                            const remainingEl = creditsPanel.querySelector('.credits-remaining');
-                            if (remainingEl) {
-                                if (p.credits_remaining !== null && p.credits_remaining !== undefined) {
-                                    const pct = p.credits_total ? Math.round((p.credits_remaining / p.credits_total) * 100) : null;
-                                    const used = p.credits_total ? (p.credits_total - p.credits_remaining) : null;
-                                    const usedStr = used !== null ? ` — ${Number(used).toLocaleString()} used` : '';
-                                    remainingEl.textContent = Number(p.credits_remaining).toLocaleString() + ' tokens' + (pct !== null ? ` (${pct}%${usedStr})` : '');
-                                    remainingEl.className = 'credits-remaining font-bold ' + (pct !== null && pct < 20 ? 'text-danger' : pct !== null && pct < 50 ? 'text-warning' : 'text-text');
-                                } else {
-                                    remainingEl.textContent = key === 'gemini' ? 'Free / Untracked' : 'Not tracked yet';
-                                    remainingEl.className = 'credits-remaining font-bold text-muted';
-                                }
-                            }
-
-                            const tokensUsedEl = creditsPanel.querySelector('.tokens-used');
-                            if (tokensUsedEl) {
-                                const tokensTotal = p.tokens_used_total || 0;
-                                const promptTokens = p.prompt_tokens_total || 0;
-                                const completionTokens = p.completion_tokens_total || 0;
-                                if (tokensTotal > 0) {
-                                    tokensUsedEl.textContent = `${Number(tokensTotal).toLocaleString()} tokens (${Number(promptTokens).toLocaleString()} in / ${Number(completionTokens).toLocaleString()} out)`;
-                                    tokensUsedEl.classList.remove('text-muted');
-                                } else {
-                                    tokensUsedEl.textContent = '0 tokens';
-                                    tokensUsedEl.classList.add('text-muted');
-                                }
-                            }
-
-                            const costReqEl = creditsPanel.querySelector('.provider-cost-req');
-                            if (costReqEl) {
-                                const costUsd = p.estimated_cost_total || 0;
-                                const costInr = (costUsd * 83).toFixed(2);
-                                const reqCount = p.total_requests || 0;
-                                costReqEl.textContent = `₹${costInr} ($${costUsd.toFixed(4)}) • ${reqCount} calls`;
-                            }
-
-                            const resetEl = creditsPanel.querySelector('.credits-reset');
-                            if (resetEl) {
-                                if (p.reset_at) {
-                                    resetEl.setAttribute('data-reset-at', p.reset_at);
-                                    const resetDate = new Date(p.reset_at);
-                                    const diffMs = resetDate - new Date();
-                                    if (diffMs > 0) {
-                                        const diffSec = Math.ceil(diffMs / 1000);
-                                        const h = Math.floor(diffSec / 3600);
-                                        const m = Math.floor((diffSec % 3600) / 60);
-                                        const s = diffSec % 60;
-                                        resetEl.textContent = `${h > 0 ? h + 'h ' : ''}${m > 0 ? m + 'm ' : ''}${s}s`;
-                                        resetEl.classList.add('text-warning');
-                                        resetEl.classList.remove('text-text', 'text-muted', 'text-success');
-                                    } else {
-                                        resetEl.textContent = 'Limit reset — ready';
-                                        resetEl.classList.add('text-success');
-                                        resetEl.classList.remove('text-text', 'text-warning', 'text-muted');
-                                    }
-                                } else {
-                                    resetEl.removeAttribute('data-reset-at');
-                                    resetEl.textContent = 'No limit active';
-                                    resetEl.classList.add('text-muted');
-                                    resetEl.classList.remove('text-text', 'text-warning', 'text-success');
-                                }
-                            }
-
-                            const errorEl = creditsPanel.querySelector('.provider-error-msg');
-                            if (errorEl) {
-                                // Only show the error if reset_at hasn't passed yet.
-                                // Once the reset window is over the rate limit has cleared,
-                                // so a stale last_error is no longer meaningful to show.
-                                const resetAlreadyPassed = p.reset_at && new Date(p.reset_at) <= new Date();
-                                if (p.last_error && !resetAlreadyPassed) {
-                                    errorEl.textContent = '⚠ ' + p.last_error;
-                                    errorEl.classList.remove('hidden');
-                                } else {
-                                    errorEl.classList.add('hidden');
-                                }
-                            }
-                        } else if (key === 'ollama') {
-                            creditsPanel.classList.remove('hidden');
-                        } else {
-                            creditsPanel.classList.add('hidden');
-                        }
-                    }
-
-                    const saveBtn = card.querySelector('button[onclick^="saveProviderKey"]');
-                    if (saveBtn) {
-                        saveBtn.disabled = false;
-                    }
-
-                    const refreshBtn = card.querySelector('.provider-refresh-btn');
-                    if (refreshBtn) {
-                        if (p.has_api_key && key !== 'ollama') {
-                            refreshBtn.classList.remove('hidden');
-                        } else {
-                            refreshBtn.classList.add('hidden');
-                        }
-                    }
-                } else {
-                    // Render dynamic custom provider card
-                    const meta = _providerMeta.custom;
-                    const cardId = 'provider-card-custom-' + p.id;
-                    const maskedKey = p.api_key || '••••••••••••••••••••';
-
-                    const cardHTML = `
-                            <div class="glass-surface rounded-2xl p-5 space-y-4 border border-border hover:border-accent transition" id="${cardId}" data-db-id="${p.id}">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-3">
-                                        <span class="material-symbols-outlined text-xl ${meta.colour} ${meta.bg} p-2 rounded-xl">${meta.icon}</span>
-                                        <div>
-                                            <p class="text-sm font-semibold">${p.name}</p>
-                                            <p class="text-[10px] font-mono text-muted">${p.default_model || ''}</p>
-                                        </div>
-                                    </div>
-                                    <span class="provider-status px-2 py-0.5 rounded bg-success/20 text-success border border-success/30 text-[9px] font-mono">configured</span>
-                                </div>
-                                <div class="space-y-2">
-                                    <div class="space-y-1">
-                                        <label class="block text-[10px] font-mono text-muted uppercase tracking-widest">API Key</label>
-                                        <div class="relative">
-                                            <input type="password" class="w-full bg-background border border-border rounded-xl p-2 pr-8 text-xs font-mono text-text focus:outline-none focus:border-accent" value="${maskedKey}" readonly/>
-                                            <button class="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-text" onclick="toggleKeyVisibility(this)">
-                                                <span class="material-symbols-outlined text-sm">visibility</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="flex gap-2 pt-2 border-t border-border">
-                                    <button onclick="removeProvider(${p.id}, '${cardId}')" class="flex-1 bg-surface hover:bg-surface/80 border border-border text-text font-medium text-xs py-1.5 rounded-xl transition">Remove</button>
-                                </div>
-                            </div>`;
-
-                    if (grid) grid.insertAdjacentHTML('beforeend', cardHTML);
+                // Status Badge style/text
+                let statusBadgeText = p.status || 'healthy';
+                let statusBadgeClass = 'px-2 py-0.5 rounded bg-muted/10 text-muted border border-border text-[9px] font-mono';
+                
+                if (p.status === 'healthy') {
+                    statusBadgeClass = 'px-2 py-0.5 rounded bg-success/20 text-success border border-success/30 text-[9px] font-mono';
+                } else if (p.status === 'cooldown') {
+                    statusBadgeClass = 'px-2 py-0.5 rounded bg-warning/20 text-warning border border-warning/30 text-[9px] font-mono';
+                } else if (p.status === 'disabled') {
+                    statusBadgeClass = 'px-2 py-0.5 rounded bg-danger/20 text-danger border border-danger/30 text-[9px] font-mono';
                 }
+
+                // Check default checked state
+                const isDefaultChecked = p.is_default ? 'checked' : '';
+
+                // Display dynamic remaining credits / usage stats
+                const costUsd = p.estimated_cost_total || 0;
+                const costInr = (costUsd * 83).toFixed(2);
+                
+                // Cooldown countdown display
+                let cooldownTimerHTML = '';
+                if (p.status === 'cooldown' && p.cooldown_until) {
+                    const cooldownTime = new Date(p.cooldown_until);
+                    const diffMs = cooldownTime - new Date();
+                    if (diffMs > 0) {
+                        const diffSec = Math.ceil(diffMs / 1000);
+                        const h = Math.floor(diffSec / 3600);
+                        const m = Math.floor((diffSec % 3600) / 60);
+                        const s = diffSec % 60;
+                        const timeLeftStr = `${h > 0 ? h + 'h ' : ''}${m > 0 ? m + 'm ' : ''}${s}s`;
+                        cooldownTimerHTML = `
+                            <div class="flex justify-between text-[11px] font-mono text-warning timer-countdown">
+                                <span>Cooldown Ends in:</span>
+                                <span class="font-bold">${timeLeftStr}</span>
+                            </div>
+                        `;
+                    }
+                }
+
+                const existingCard = document.getElementById(cardId);
+                if (existingCard) {
+                    // Update only dynamic status and stats (prevents resetting input values/dropdowns!)
+                    const statusBadge = existingCard.querySelector('.provider-status');
+                    if (statusBadge) {
+                        statusBadge.textContent = statusBadgeText;
+                        statusBadge.className = 'provider-status ' + statusBadgeClass;
+                    }
+                    
+                    const tierBadge = existingCard.querySelector('.tier-badge');
+                    if (tierBadge) {
+                        tierBadge.textContent = p.tier;
+                    }
+
+                    const panel = existingCard.querySelector('.provider-credits-panel');
+                    if (panel) {
+                        const existingTimer = panel.querySelector('.timer-countdown');
+                        if (existingTimer) {
+                            if (cooldownTimerHTML) {
+                                existingTimer.outerHTML = cooldownTimerHTML;
+                            } else {
+                                existingTimer.remove();
+                            }
+                        } else if (cooldownTimerHTML) {
+                            panel.insertAdjacentHTML('afterbegin', cooldownTimerHTML);
+                        }
+
+                        const reqsEl = panel.querySelector('.stat-reqs');
+                        if (reqsEl) reqsEl.textContent = `${totalReqs} req (✓${successReqs} / ✗${errorReqs})`;
+
+                        const tokensEl = panel.querySelector('.stat-tokens');
+                        if (tokensEl) tokensEl.textContent = Number(p.tokens_used_total || 0).toLocaleString();
+
+                        const costEl = panel.querySelector('.stat-cost');
+                        if (costEl) costEl.textContent = `₹${costInr} ($${Number(costUsd).toFixed(4)})`;
+
+                        const errorEl = panel.querySelector('.stat-error');
+                        if (errorEl) {
+                            if (p.last_error) {
+                                errorEl.textContent = '⚠ ' + p.last_error.substring(0, 150);
+                                errorEl.classList.remove('hidden');
+                            } else {
+                                errorEl.classList.add('hidden');
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                const cardHTML = `
+                    <div class="glass-surface rounded-2xl p-5 space-y-4 border border-border hover:border-accent transition flex flex-col justify-between" id="${cardId}" data-db-id="${dbId}">
+                        <div>
+                            <!-- Header -->
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <span class="material-symbols-outlined text-xl ${meta.colour} ${meta.bg} p-2 rounded-xl">${meta.icon}</span>
+                                    <div>
+                                        <p class="text-sm font-semibold">${p.name}</p>
+                                        <span class="text-[9px] font-mono uppercase tracking-widest text-muted">${key}</span>
+                                    </div>
+                                </div>
+                                <div class="flex flex-col items-end gap-1">
+                                    <span class="provider-status ${statusBadgeClass}">${statusBadgeText}</span>
+                                    <span class="tier-badge px-1.5 py-0.5 rounded bg-surface border border-border text-[8px] font-mono uppercase tracking-wider text-muted">${p.tier}</span>
+                                </div>
+                            </div>
+
+                            <!-- Settings fields -->
+                            <div class="space-y-3 pt-3">
+                                <div class="space-y-1">
+                                    <label class="block text-[10px] font-mono text-muted uppercase tracking-widest">API Key</label>
+                                    <div class="relative">
+                                        <input type="password" data-role="api-key" autocomplete="new-password" class="w-full bg-background border border-border rounded-xl p-2 pr-8 text-xs font-mono text-text focus:outline-none focus:border-accent" value="${maskedKey}" placeholder="Configure API key..."/>
+                                        <button class="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-text" onclick="toggleKeyVisibility(this)">
+                                            <span class="material-symbols-outlined text-sm">visibility</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div class="space-y-1">
+                                        <label class="block text-[10px] font-mono text-muted uppercase tracking-widest">Default Model</label>
+                                        <input type="text" data-role="model" class="w-full bg-background border border-border rounded-xl p-2 text-xs font-mono text-text focus:outline-none focus:border-accent" value="${p.default_model || ''}"/>
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="block text-[10px] font-mono text-muted uppercase tracking-widest">Priority</label>
+                                        <input type="number" min="0" data-role="priority" class="w-full bg-background border border-border rounded-xl p-2 text-xs font-mono text-text focus:outline-none focus:border-accent" value="${p.priority || 0}"/>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div class="space-y-1">
+                                        <label class="block text-[10px] font-mono text-muted uppercase tracking-widest">Tier</label>
+                                        <select data-role="tier" class="w-full bg-background border border-border text-text text-xs rounded-xl p-2 focus:outline-none focus:border-accent">
+                                            <option value="free" ${p.tier === 'free' ? 'selected' : ''}>Free</option>
+                                            <option value="paid" ${p.tier === 'paid' ? 'selected' : ''}>Paid</option>
+                                            <option value="local" ${p.tier === 'local' ? 'selected' : ''}>Local</option>
+                                        </select>
+                                    </div>
+                                    <div class="flex items-center gap-2 pt-4">
+                                        <input type="checkbox" id="chk-default-${dbId}" class="rounded bg-background border-border text-accent focus:ring-accent/20 provider-default-chk" ${isDefaultChecked} onchange="setDefaultProvider('${dbId}')"/>
+                                        <label for="chk-default-${dbId}" class="text-[9px] font-mono text-muted uppercase cursor-pointer select-none">Set Default</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Performance & Credit stats -->
+                            <div class="provider-credits-panel pt-3 mt-3 border-t border-border/50 space-y-1.5 text-[11px] font-mono text-muted">
+                                ${cooldownTimerHTML}
+                                <div class="flex justify-between">
+                                    <span>Total / ✓ Success / ✗ Error:</span>
+                                    <span class="stat-reqs text-text font-bold">${totalReqs} req (✓${successReqs} / ✗${errorReqs})</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Tokens (Prompt + Completion):</span>
+                                    <span class="stat-tokens text-accent font-bold">${Number(p.tokens_used_total || 0).toLocaleString()} (${Number(p.prompt_tokens_total || 0).toLocaleString()} + ${Number(p.completion_tokens_total || 0).toLocaleString()})</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Estimated Cost:</span>
+                                    <span class="stat-cost text-text font-bold">₹${costInr} ($${Number(costUsd).toFixed(4)})</span>
+                                </div>
+                                ${p.credits_remaining !== null && p.credits_remaining !== undefined ? `
+                                <div class="flex justify-between">
+                                    <span>Rate Limit Remaining:</span>
+                                    <span class="stat-credits text-secondary font-bold">${Number(p.credits_remaining).toLocaleString()} / ${p.credits_total !== null ? Number(p.credits_total).toLocaleString() : '∞'} tokens</span>
+                                </div>` : ''}
+                                ${p.last_used ? `
+                                <div class="flex justify-between">
+                                    <span>Last Used:</span>
+                                    <span class="text-muted">${new Date(p.last_used).toLocaleString()}</span>
+                                </div>` : ''}
+                                <div class="stat-error text-danger text-[9px] whitespace-pre-wrap mt-1 border-t border-border/30 pt-1 ${p.last_error ? '' : 'hidden'}">
+                                    ${p.last_error ? '⚠ ' + p.last_error.substring(0, 150) : ''}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Actions footer -->
+                        <div class="flex gap-2 pt-3 mt-3 border-t border-border">
+                            <button onclick="saveProviderKey(this, ${dbId})" class="flex-1 bg-accent hover:bg-accent/80 text-background font-medium text-xs py-1.5 rounded-xl transition">Save Settings</button>
+                            ${key !== 'ollama' ? `
+                                <button type="button" onclick="refreshProviderCredits(this, ${dbId})" class="px-2.5 bg-muted/20 hover:bg-muted/30 text-text font-medium text-xs py-1.5 rounded-xl transition">Refresh</button>
+                            ` : ''}
+                            <button onclick="removeProvider(${dbId}, '${cardId}')" class="px-2.5 bg-danger/10 hover:bg-danger/20 text-danger border border-danger/20 font-medium text-xs py-1.5 rounded-xl transition">Remove</button>
+                        </div>
+                    </div>
+                `;
+                if (grid) grid.insertAdjacentHTML('beforeend', cardHTML);
             });
         } catch (err) {
             console.error("Error loading AI providers:", err);
         }
     };
 
-    window.saveProviderKey = async function (btn, providerKey) {
+    window.saveProviderKey = async function (btn, dbId) {
         const card = btn.closest('.glass-surface');
-        const keyInput = card.querySelector('input[type="password"], input[type="text"]');
+        const keyInput = card.querySelector('input[data-role="api-key"]');
         const modelEl = card.querySelector('[data-role="model"]');
+        const tierEl = card.querySelector('[data-role="tier"]');
+        const priorityEl = card.querySelector('[data-role="priority"]');
         const chkDefault = card.querySelector('.provider-default-chk');
 
         if (!keyInput) return;
         const api_key = keyInput.value.trim();
         const default_model = modelEl ? modelEl.value.trim() : '';
+        const tier = tierEl ? tierEl.value : 'free';
+        const priority = priorityEl ? parseInt(priorityEl.value) || 0 : 0;
         const is_default = chkDefault ? chkDefault.checked : false;
 
-        if (!api_key) {
-            showError("Validation Error", "API key is required to save config.");
-            return;
-        }
-
-        const originalProvider = configuredProviders[providerKey];
+        const originalProvider = configuredProviders[dbId];
         const isUnmodified = originalProvider && (api_key === '••••••••••••••••••••' || api_key === originalProvider.api_key);
 
         const payload = {
-            provider_key: providerKey,
-            name: _providerMeta[providerKey] ? _providerMeta[providerKey].label : providerKey,
             api_key: isUnmodified ? '' : api_key, // Only send key if modified
             default_model: default_model,
+            tier: tier,
+            priority: priority,
             is_default: is_default,
             is_enabled: true
         };
 
-        const dbId = card.getAttribute('data-db-id');
-        const url = dbId ? `/api/v1/providers/${dbId}` : '/api/v1/providers';
-        const method = dbId ? 'PUT' : 'POST';
+        const url = `/api/v1/providers/${dbId}`;
+        const method = 'PUT';
 
         await apiRequest(url, {
             method: method,
@@ -4270,39 +4280,20 @@
             body: JSON.stringify(payload)
         }, {
             successTitle: "Config Saved",
-            successMessage: `${payload.name} configuration saved successfully.`,
+            successMessage: `Configuration saved successfully.`,
             defaultErrorMessage: "Error saving credentials.",
             submitBtn: btn,
             onSuccess: async () => {
                 await fetchAIProviders();
-                // Auto-refresh credits on save
-                const updatedCard = document.getElementById('provider-card-' + providerKey);
-                if (updatedCard && providerKey !== 'ollama') {
-                    const refreshBtn = updatedCard.querySelector('.provider-refresh-btn');
-                    if (refreshBtn) {
-                        setTimeout(() => {
-                            refreshProviderCredits(refreshBtn, providerKey);
-                        }, 300);
-                    }
-                }
             }
         });
     };
 
-    window.setDefaultProvider = async function (selectedProvider) {
-        const card = document.getElementById('provider-card-' + selectedProvider);
-        if (!card) return;
-        const dbId = card.getAttribute('data-db-id');
-        if (!dbId) {
-            showError("Configuration Required", "Configure and save provider credentials first before setting as default.");
-            document.getElementById('chk-default-' + selectedProvider).checked = false;
-            return;
-        }
-
+    window.setDefaultProvider = async function (dbId) {
         await apiRequest(`/api/v1/providers/${dbId}/set-default`, { method: 'POST' }, {
             loadingMessage: "Setting default provider...",
             successTitle: "Default Provider Updated",
-            successMessage: `${selectedProvider.toUpperCase()} is now the default provider.`,
+            successMessage: `Provider set as default successfully.`,
             defaultErrorMessage: "Failed to update default provider.",
             onSuccess: async () => {
                 await fetchAIProviders();
@@ -4310,30 +4301,31 @@
         });
     };
 
-    window.refreshProviderCredits = async function (btn, providerKey) {
-        const card = btn.closest('.glass-surface');
-        const dbId = card.getAttribute('data-db-id');
-        if (!dbId) {
-            showError("Configuration Required", "Configure and save provider credentials first before refreshing credits.");
-            return;
-        }
-
-        await apiRequest(`/api/v1/providers/${dbId}/refresh-credits`, { method: 'POST' }, {
-            loadingMessage: "Refreshing credits from API...",
-            successTitle: "Credits Refreshed",
-            successMessage: `Successfully updated credit metrics for ${providerKey.toUpperCase()}.`,
-            defaultErrorMessage: "Failed to refresh credits. Please check your API key and network connection.",
-            submitBtn: btn,
-            onSuccess: async () => {
-                await fetchAIProviders();
+    window.refreshProviderCredits = async function (btn, dbId) {
+        if (btn) { btn.disabled = true; btn.textContent = 'Refreshing...'; }
+        try {
+            const res = await apiFetch(`/api/v1/providers/${dbId}/refresh-credits`, { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) {
+                showError('Refresh Failed', data.message || 'Could not refresh credits.');
+                return;
             }
-        });
+            showSuccess('Credits Refreshed', 'Token usage and rate limits updated from live API.');
+            // Immediately re-render providers to reflect new stats
+            await fetchAIProviders();
+        } catch (err) {
+            showError('Refresh Error', err.message || 'An unexpected error occurred.');
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; }
+        }
     };
 
     window.saveNewProvider = async function () {
         const providerVal = document.getElementById('modal-provider-select').value.trim();
         const apiKey = document.getElementById('modal-api-key').value.trim();
         const model = document.getElementById('modal-model').value.trim();
+        const tier = document.getElementById('modal-tier').value;
+        const priority = parseInt(document.getElementById('modal-priority').value) || 0;
         const errEl = document.getElementById('modal-provider-error');
 
         if (!providerVal || !apiKey || !model) {
@@ -4348,7 +4340,9 @@
             api_key: apiKey,
             default_model: model,
             is_default: false,
-            is_enabled: true
+            is_enabled: true,
+            tier: tier,
+            priority: priority
         };
 
         await apiRequest('/api/v1/providers', {
@@ -4383,6 +4377,16 @@
             }
         );
     };
+
+    // Periodically refresh providers to keep cooldown count-down timers fresh
+    if (!window.providerRefreshInterval) {
+        window.providerRefreshInterval = setInterval(() => {
+            const grid = document.getElementById('providers-grid');
+            if (grid && !grid.closest('.hidden')) {
+                fetchAIProviders();
+            }
+        }, 10000);
+    }
 
     // ─── Content Generation form validation ─────────────────────────────
     window.populatePipelineSelections = async function () {
@@ -4720,6 +4724,34 @@
         }
     };
 
+    async function getFailoverProgress() {
+        try {
+            const res = await apiFetch('/api/v1/providers');
+            if (!res.ok) return 'Connecting to provider...';
+            const result = await res.json();
+            const providers = result.data || result;
+            
+            // Sort by priority ascending to reflect orchestrator sorting
+            providers.sort((a, b) => a.priority - b.priority);
+            
+            let steps = [];
+            for (let p of providers) {
+                if (!p.has_api_key || !p.is_enabled) continue;
+                if (p.status === 'cooldown') {
+                    steps.push(`<span class="text-warning font-semibold">${p.name}</span> ➔ <span class="text-danger">Quota Exhausted</span>`);
+                } else if (p.status === 'disabled') {
+                    steps.push(`<span class="text-warning font-semibold">${p.name}</span> ➔ <span class="text-danger">Disabled</span>`);
+                } else if (p.status === 'healthy') {
+                    steps.push(`<span class="text-success font-semibold">Switching to ${p.name}...</span> ➔ <span class="text-accent animate-pulse">Generation Continued</span>`);
+                    break;
+                }
+            }
+            return steps.length ? steps.join('<br>') : 'Waiting for available provider...';
+        } catch (err) {
+            return 'Resolving orchestrator status...';
+        }
+    }
+
     async function pollForArticle(pipelineId, candidateId, selectResponse, maxAttempts = 30, intervalMs = 3000) {
         // The select endpoint may return the article directly
         const direct = selectResponse.data ?? selectResponse;
@@ -4729,8 +4761,39 @@
             return;
         }
 
+        // Show SweetAlert progress container
+        Swal.fire({
+            title: 'Generating Article...',
+            html: `
+                <div class="space-y-4 text-center">
+                    <div class="animate-spin inline-block w-8 h-8 border-4 border-accent border-t-transparent rounded-full mb-3"></div>
+                    <p class="text-xs text-muted mb-4">The AI writing pipeline is running. Failovers are managed automatically.</p>
+                    <div class="text-left">
+                        <label class="block text-[9px] font-mono text-muted uppercase tracking-widest mb-1">Failover Path:</label>
+                        <div id="failover-progress-log" class="text-[10px] font-mono border border-border/80 p-3 rounded-xl bg-background/80 max-h-[150px] overflow-y-auto leading-relaxed shadow-inner">
+                            Checking provider health...
+                        </div>
+                    </div>
+                </div>
+            `,
+            showConfirmButton: false,
+            allowOutsideClick: false,
+            background: document.documentElement.classList.contains('dark') ? '#0f172a' : '#ffffff',
+            color: document.documentElement.classList.contains('dark') ? '#f8fafc' : '#0f172a'
+        });
+
         // Otherwise poll articles list
         for (let i = 0; i < maxAttempts; i++) {
+            try {
+                const progressHTML = await getFailoverProgress();
+                const progressLog = document.getElementById('failover-progress-log');
+                if (progressLog && progressHTML) {
+                    progressLog.innerHTML = progressHTML;
+                }
+            } catch (err) {
+                console.error(err);
+            }
+
             await new Promise(r => setTimeout(r, intervalMs));
             const res = await apiFetch('/api/v1/articles');
             if (!res.ok) continue;
@@ -4738,10 +4801,12 @@
             const list = data.data ?? data;
             const latest = Array.isArray(list) && list.length > 0 ? list[0] : null;
             if (latest && (latest.pipeline_id === pipelineId || i > 5)) {
+                Swal.close();
                 showArticle(latest);
                 return;
             }
         }
+        Swal.close();
         throw new Error('Article generation timed out. Check Laravel logs.');
     }
 

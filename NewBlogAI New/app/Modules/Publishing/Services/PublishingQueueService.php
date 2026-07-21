@@ -30,7 +30,7 @@ class PublishingQueueService implements PublishingQueueInterface
             $pipeline       = $context->pipeline;
             $site           = $pipeline->site;
             $promptTemplate = $pipeline->prompt;
-            $provider       = $pipeline->provider;
+            $provider       = $context->overrideProvider ?? $pipeline->provider;
 
             if (!$site || !$promptTemplate || !$provider) {
                 throw new \RuntimeException('Incomplete pipeline dependencies in context.');
@@ -141,6 +141,7 @@ class PublishingQueueService implements PublishingQueueInterface
                     'site_id' => $site->id,
                     'user_id' => $run?->user_id,
                     'provider' => $provider->provider_key,
+                    'provider_id' => $provider->id,
                     'model' => $provider->default_model ?? 'unknown',
                     'prompt_id'       => $promptTemplate->id,
                     'topic_id'        => null,   // category-driven — no topic FK

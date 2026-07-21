@@ -138,16 +138,26 @@ class AIProviderController extends Controller
             );
 
             $limits = $result['rate_limits'] ?? [];
+            $provider->handleSuccess();
             $provider->updateRateLimits(
                 isset($limits['limit']) && $limits['limit'] !== null ? intval($limits['limit']) : null,
                 isset($limits['remaining']) && $limits['remaining'] !== null ? intval($limits['remaining']) : null,
                 $limits['reset'] ?? null
             );
 
-            // Successful call — clear any stale error message and re-enable provider
-            $provider->update([
-                'last_error'  => null,
-                'is_enabled'  => true,
+            // Write an AIRequestLog entry so token/cost metrics are immediately visible
+            // on the dashboard without needing a full article generation.
+            \App\Modules\ContentGeneration\Models\AIRequestLog::create([
+                'provider'          => $provider->provider_key,
+                'provider_id'       => $provider->id,
+                'customer_id'       => null,
+                'model'             => $provider->default_model,
+                'prompt_tokens'     => $result['prompt_tokens']     ?? 0,
+                'completion_tokens' => $result['completion_tokens'] ?? 0,
+                'total_tokens'      => $result['total_tokens']      ?? 0,
+                'estimated_cost'    => $result['estimated_cost']    ?? 0,
+                'execution_time_ms' => 0,
+                'status'            => 'success',
             ]);
 
             $provider->refresh();

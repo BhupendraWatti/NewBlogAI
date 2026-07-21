@@ -22,6 +22,8 @@ class UpdateProviderRequest extends FormRequest
             'default_model' => ['sometimes', 'nullable', 'string', 'max:255'],
             'is_default' => ['sometimes', 'boolean'],
             'is_enabled' => ['sometimes', 'boolean'],
+            'tier' => ['sometimes', 'required', 'string', 'in:free,paid,local'],
+            'priority' => ['sometimes', 'required', 'integer', 'min:0'],
         ];
     }
 }

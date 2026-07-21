@@ -327,13 +327,14 @@ class EntitlementService
         string $model,
         ?int $promptId,
         ?int $topicId,
+        ?int $providerId = null,
     ): ?AIRequestLog {
         $subscription = $this->subscriptionForSite($site);
         if (! $subscription) {
             return null;
         }
 
-        return DB::transaction(function () use ($site, $subscription, $provider, $model, $promptId, $topicId) {
+        return DB::transaction(function () use ($site, $subscription, $provider, $model, $promptId, $topicId, $providerId) {
             $locked = Subscription::query()
                 ->with('plan')
                 ->lockForUpdate()
@@ -350,6 +351,7 @@ class EntitlementService
                 'subscription_id' => $locked->id,
                 'site_id' => $site->id,
                 'provider' => $provider,
+                'provider_id' => $providerId,
                 'model' => $model,
                 'prompt_id' => $promptId,
                 'topic_id' => $topicId,

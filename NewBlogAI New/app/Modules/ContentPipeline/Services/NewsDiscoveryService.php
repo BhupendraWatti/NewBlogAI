@@ -143,6 +143,7 @@ class NewsDiscoveryService
                 $reservationProvider->default_model ?? 'unknown',
                 $prompt->id,
                 null,
+                $reservationProvider->id,
             );
 
             $site->loadMissing('customer');
@@ -245,27 +246,17 @@ class NewsDiscoveryService
             ->get()
             ->filter(fn (AIProvider $p) => ! empty($p->api_key));
 
-        // Sort by priority order defined in PROVIDER_PRIORITY
-        $priorityMap = array_flip(self::PROVIDER_PRIORITY);
+        // Cooldown check / Auto-recovery
+        $healthy = $allEnabled->filter(function (AIProvider $p) {
+            $p->checkRecovery();
+            return $p->status === 'healthy';
+        });
 
-        // Providers still inside their rate-limit reset window are pushed to the
-        // back of the list (kept as last-resort fallbacks, not dropped), so a
-        // known-throttled provider is never attempted first.
-        $sorted = $allEnabled->sortBy(function (AIProvider $p) use ($priorityMap) {
-            $throttled = $p->reset_at && $p->reset_at->isFuture() ? 1_000_000 : 0;
-
-            return $throttled + ($priorityMap[$p->provider_key] ?? PHP_INT_MAX);
+        // Sort by priority ascending, then preferred first
+        $sorted = $healthy->sortBy(function (AIProvider $p) use ($preferred) {
+            $isPreferred = ($preferred && $p->id === $preferred->id) ? 0 : 1;
+            return [$p->priority, $isPreferred, $p->id];
         })->values();
-
-        // Bubble the explicitly preferred provider to the front — unless it is
-        // currently throttled, in which case respect the reset window and let a
-        // healthy provider go first.
-        if ($preferred && ! empty($preferred->api_key) && $preferred->is_enabled
-            && ! ($preferred->reset_at && $preferred->reset_at->isFuture())) {
-            $sorted = $sorted
-                ->reject(fn (AIProvider $p) => $p->id === $preferred->id)
-                ->prepend($preferred);
-        }
 
         return $sorted;
     }
@@ -492,10 +483,10 @@ class NewsDiscoveryService
             ]);
         }
 
-        // Relax shortfall constraint: if we have at least 4 unique candidates, let the run succeed
-        // to support niche regional/filtered runs. Throw only if count is below 4 (keeps tests green).
-        if (count($unique) < 4) {
-            throw new RuntimeException("Could not generate enough unique candidates. Target: " . self::CANDIDATE_TARGET . ", found: " . count($unique));
+        // Relax shortfall constraint: accept whatever unique candidates are generated (even 1, 2, or 3)
+        // to support niche regional/filtered runs. Throw only if count is below 1.
+        if (count($unique) < 1) {
+            throw new RuntimeException("Could not generate enough unique candidates. Please broaden keywords.");
         }
 
         return [
@@ -688,13 +679,23 @@ PROMPT;
             if (! is_array($item) || trim((string) ($item['title'] ?? '')) === '') {
                 continue;
             }
+            $rawFreshness = (int) ($item['freshness_score'] ?? 0);
+            $sourceRefs   = is_array($item['source_references'] ?? null) ? $item['source_references'] : [];
+
+            // Bug Fix #1: If the AI claims freshness > 80 but provides NO source reference URL,
+            // cap it at 60 — we cannot verify the recency without a source, so treat as unverifiable.
+            $hasVerifiableSource = collect($sourceRefs)->contains(fn ($s) => !empty($s['url']) && str_starts_with((string) $s['url'], 'http'));
+            if ($rawFreshness > 80 && !$hasVerifiableSource) {
+                $rawFreshness = 60;
+            }
+
             $candidates[] = [
                 'title'             => mb_substr(trim((string) $item['title']), 0, 200),
                 'summary'           => isset($item['summary']) ? trim((string) $item['summary']) : null,
-                'source_references' => is_array($item['source_references'] ?? null) ? $item['source_references'] : [],
+                'source_references' => $sourceRefs,
                 'keywords'          => is_array($item['keywords'] ?? null) ? array_values($item['keywords']) : [],
                 'trend_score'       => $item['trend_score'] ?? 0,
-                'freshness_score'   => $item['freshness_score'] ?? 0,
+                'freshness_score'   => $rawFreshness,
                 'event_date'        => $item['event_date'] ?? null,
                 'published_at_relative' => $item['published_at_relative'] ?? null,
                 // Geographic fields
@@ -773,10 +774,15 @@ PROMPT;
                             'original'   => $originalScore,
                         ]);
                     } else {
-                        // Past event — compute how many days old
-                        $daysOld = (int) $today->diffInDays($eventDate); // always positive (both past dates)
+                        // Past event — compute how many days old.
+                        // Bug Fix #4: diffInDays(today, today) = 0, but the event
+                        // could be up to 47 hours old. Use a 1-day cap (75) for
+                        // same-day events to prevent inflated freshness on old stories.
+                        $daysOld = (int) $today->diffInDays($eventDate); // always non-negative
 
-                        if ($daysOld <= 2) {
+                        if ($daysOld === 0) {
+                            $capFromDate = 75; // same calendar day — cap, not free-pass
+                        } elseif ($daysOld <= 2) {
                             $capFromDate = null; // genuinely fresh — no cap
                         } elseif ($daysOld <= 7) {
                             $capFromDate = 65;

@@ -419,13 +419,24 @@ PROMPT;
                     : null;
             }
 
-            // Merge source_references if the LLM combined duplicates into this entry
+            // Merge source_references if the LLM combined duplicates into this entry.
+            // Bug Fix #3: SORT_REGULAR compares arrays by value, not by URL uniqueness.
+            // Deduplicate by URL key so fabricated/duplicate source entries cannot accumulate.
             if (! empty($llmResult['source_references']) && is_array($llmResult['source_references'])) {
-                $existing = (array) ($merged['source_references'] ?? []);
-                $merged['source_references'] = array_values(array_unique(
-                    array_merge($existing, $llmResult['source_references']),
-                    SORT_REGULAR
-                ));
+                $existing  = (array) ($merged['source_references'] ?? []);
+                $allSources = array_merge($existing, $llmResult['source_references']);
+                $byUrl = [];
+                foreach ($allSources as $src) {
+                    if (! is_array($src)) {
+                        continue;
+                    }
+                    $url = trim((string) ($src['url'] ?? ''));
+                    // Only keep sources with a real HTTP URL — reject placeholder/fabricated ones
+                    if ($url !== '' && str_starts_with($url, 'http')) {
+                        $byUrl[$url] = $src; // last one wins if URL repeats
+                    }
+                }
+                $merged['source_references'] = array_values($byUrl);
             }
 
             $kept[] = $merged;

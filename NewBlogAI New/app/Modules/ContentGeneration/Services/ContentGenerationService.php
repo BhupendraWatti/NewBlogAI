@@ -108,6 +108,7 @@ class ContentGenerationService
                 $provider->default_model ?? 'unknown',
                 $promptTemplate->id,
                 null,   // topic_id no longer required — pipeline is category-driven
+                $provider->id
             );
 
             // Build the initial PipelineContext (provider injected per-attempt inside failover)
@@ -138,11 +139,13 @@ class ContentGenerationService
 
             // ── Run with automatic provider failover ─────────────────────────
             $availableProviders = $this->getAvailableProviders($provider);
-            [$generatedContent, $usedProviderKey] = $this->generateWithFailover($context, $availableProviders);
+            [$generatedContent, $usedProvider] = $this->generateWithFailover($context, $availableProviders);
 
             // Update reservation with the provider that actually succeeded
             $reservation?->update([
-                'provider'      => $usedProviderKey,
+                'provider'      => $usedProvider->provider_key,
+                'provider_id'   => $usedProvider->id,
+                'model'         => $usedProvider->default_model ?? 'unknown',
                 'status'        => 'success',
                 'execution_time_ms' => (int) ((microtime(true) - $startTime) * 1000),
             ]);
@@ -158,6 +161,7 @@ class ContentGenerationService
                 'subscription_id'   => $reservation?->subscription_id ?? ($this->entitlements->subscriptionForSite($site)?->id ?? null),
                 'site_id'           => $site->id,
                 'provider'          => $provider->provider_key,
+                'provider_id'       => $provider->id,
                 'model'             => $provider->default_model ?? 'unknown',
                 'prompt_id'         => $promptTemplate->id,
                 'topic_id'          => null,
@@ -229,26 +233,17 @@ class ContentGenerationService
             ->get()
             ->filter(fn (AIProvider $p) => ! empty($p->api_key));
 
-        $priorityMap = array_flip(self::PROVIDER_PRIORITY);
+        // Cooldown check / Auto-recovery
+        $healthy = $allEnabled->filter(function (AIProvider $p) {
+            $p->checkRecovery();
+            return $p->status === 'healthy';
+        });
 
-        // Providers still inside their rate-limit reset window are pushed to the
-        // back of the list (kept as last-resort fallbacks, not dropped), so a
-        // known-throttled provider is never attempted first.
-        $sorted = $allEnabled->sortBy(function (AIProvider $p) use ($priorityMap) {
-            $throttled = $p->reset_at && $p->reset_at->isFuture() ? 1_000_000 : 0;
-
-            return $throttled + ($priorityMap[$p->provider_key] ?? PHP_INT_MAX);
+        // Sort by priority ascending, then preferred first
+        $sorted = $healthy->sortBy(function (AIProvider $p) use ($preferred) {
+            $isPreferred = ($preferred && $p->id === $preferred->id) ? 0 : 1;
+            return [$p->priority, $isPreferred, $p->id];
         })->values();
-
-        // Always try the pipeline's own provider first — unless it is currently
-        // throttled, in which case respect the reset window and let a healthy
-        // provider go first.
-        if ($preferred && ! empty($preferred->api_key) && $preferred->is_enabled
-            && ! ($preferred->reset_at && $preferred->reset_at->isFuture())) {
-            $sorted = $sorted
-                ->reject(fn (AIProvider $p) => $p->id === $preferred->id)
-                ->prepend($preferred);
-        }
 
         return $sorted;
     }
@@ -285,6 +280,7 @@ class ContentGenerationService
                     Log::info('ContentGenerationService: Trying provider.', [
                         'run_id'       => $context->run->id,
                         'provider'     => $providerKey,
+                        'provider_id'  => $provider->id,
                         'attempt'      => $attempt,
                         'max_attempts' => self::FAILOVER_MAX_ATTEMPTS,
                     ]);
@@ -306,10 +302,14 @@ class ContentGenerationService
                     Log::info('ContentGenerationService: Provider succeeded.', [
                         'run_id'   => $context->run->id,
                         'provider' => $providerKey,
+                        'provider_id' => $provider->id,
                         'attempt'  => $attempt,
                     ]);
 
-                    return [$generatedContent, $providerKey];
+                    // Mark provider success
+                    $provider->handleSuccess();
+
+                    return [$generatedContent, $provider];
 
                 } catch (\App\Modules\ContentPipeline\Exceptions\DuplicateNewsException $e) {
                     // Rethrow immediately to abort the failover loop (no point retrying other providers for duplicates)
@@ -323,6 +323,7 @@ class ContentGenerationService
                     Log::warning('ContentGenerationService: Provider attempt failed.', [
                         'run_id'   => $context->run->id,
                         'provider' => $providerKey,
+                        'provider_id' => $provider->id,
                         'attempt'  => $attempt,
                         'error'    => $errorMsg,
                     ]);
@@ -338,6 +339,7 @@ class ContentGenerationService
                         Log::info('ContentGenerationService: Not retrying this provider, moving to next.', [
                             'run_id'   => $context->run->id,
                             'provider' => $providerKey,
+                            'provider_id' => $provider->id,
                             'reason'   => ProviderErrorClassifier::reason($e),
                         ]);
                         break;
@@ -355,6 +357,7 @@ class ContentGenerationService
             Log::warning('ContentGenerationService: All attempts failed for provider, moving to next.', [
                 'run_id'   => $context->run->id,
                 'provider' => $providerKey,
+                'provider_id' => $provider->id,
                 'errors'   => $allErrors[$providerKey] ?? [],
             ]);
         }

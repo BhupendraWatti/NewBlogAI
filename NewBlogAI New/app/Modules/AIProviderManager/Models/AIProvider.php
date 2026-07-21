@@ -3,6 +3,9 @@
 namespace App\Modules\AIProviderManager\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Modules\AIProviderManager\Support\ProviderErrorClassifier;
+use Carbon\Carbon;
+
 
 class AIProvider extends Model
 {
@@ -19,6 +22,14 @@ class AIProvider extends Model
         'credits_remaining',
         'reset_at',
         'last_error',
+        'tier',
+        'priority',
+        'status',
+        'last_failure',
+        'cooldown_until',
+        'last_used',
+        'error_count',
+        'success_count',
     ];
 
     protected $hidden = [
@@ -35,6 +46,12 @@ class AIProvider extends Model
             'is_default' => 'boolean',
             'is_enabled' => 'boolean',
             'reset_at' => 'datetime',
+            'last_failure' => 'datetime',
+            'cooldown_until' => 'datetime',
+            'last_used' => 'datetime',
+            'error_count' => 'integer',
+            'success_count' => 'integer',
+            'priority' => 'integer',
         ];
     }
 
@@ -117,13 +134,37 @@ class AIProvider extends Model
      * Parse errors and update key status/errors in the database.
      * Auto-disables permanent auth or quota failures, and records rate limits.
      */
+    public function handleSuccess(): void
+    {
+        $this->success_count = ($this->success_count ?? 0) + 1;
+        $this->last_used = now();
+        $this->status = 'healthy';
+        $this->cooldown_until = null;
+        $this->last_error = null;
+        $this->reset_at = null;
+        $this->save();
+    }
+
+    public function checkRecovery(): void
+    {
+        if ($this->status === 'cooldown' && $this->cooldown_until && $this->cooldown_until->isPast()) {
+            $this->status = 'healthy';
+            $this->cooldown_until = null;
+            $this->last_error = null;
+            $this->save();
+        }
+    }
+
     public function handleFailure(\Throwable $e): void
     {
         $message = $e->getMessage();
         $this->last_error = $message;
+        $this->last_failure = now();
+        $this->error_count = ($this->error_count ?? 0) + 1;
 
-        if (str_contains(strtolower($message), 'rate limit') || str_contains($message, '429')) {
-            $this->last_error = 'Rate limit exceeded';
+        if (ProviderErrorClassifier::isRateLimit($e) || ProviderErrorClassifier::isRetryable($e)) {
+            $this->status = 'cooldown';
+            $this->last_error = 'Rate limit or connection issue (cooldown applied)';
 
             // Parse reset time from error message.
             // Groq format:   "Please try again in 1h34m7.968s"
@@ -143,17 +184,28 @@ class AIProvider extends Model
                 }
             }
 
-            $this->reset_at = now()->addSeconds(max($seconds, 60));
+            // If we couldn't parse seconds, default to 5 hours cooldown (18000s)
+            if ($seconds <= 0) {
+                $seconds = 18000; 
+            }
+
+            $this->cooldown_until = now()->addSeconds($seconds);
+            $this->reset_at = $this->cooldown_until;
         } else {
             // 401 Unauthorized or 403 Forbidden → bad/expired key → disable immediately
             // 402 Payment Required → out of credits → disable immediately
+            $this->status = 'disabled';
+            $this->is_enabled = false;
+            $this->cooldown_until = null;
+
             if (preg_match('/Status\s+(401|402|403)/', $message, $m)) {
-                $this->is_enabled = false;
                 $this->last_error = match ((int) $m[1]) {
                     402     => 'Disabled: Payment Required / Out of Credits',
                     403     => 'Disabled: Forbidden (check key permissions)',
                     default => 'Disabled: Invalid API Key',
                 };
+            } else {
+                $this->last_error = 'Disabled: ' . substr($message, 0, 200);
             }
         }
 

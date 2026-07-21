@@ -13,6 +13,7 @@ class AIRequestLog extends Model
 
     protected $fillable = [
         'provider',
+        'provider_id',
         'customer_id',
         'subscription_id',
         'site_id',
