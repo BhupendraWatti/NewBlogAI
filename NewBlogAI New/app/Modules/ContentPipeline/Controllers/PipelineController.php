@@ -99,13 +99,14 @@ class PipelineController extends Controller
         ]);
     }
 
-    /**
-     * Trigger execution run for a pipeline.
-     */
     public function execute(string $id): JsonResponse
     {
         $pipeline = $this->findPipelineOrFail($id);
-        $run = $this->pipelineService->triggerRun($pipeline);
+        try {
+            $run = $this->pipelineService->triggerRun($pipeline);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         return response()->json([
             'message' => 'Content generation run queued successfully.',
@@ -119,7 +120,11 @@ class PipelineController extends Controller
     public function retry(string $runId): JsonResponse
     {
         $run = $this->findRunOrFail($runId, ['pipeline']);
-        $newRun = $this->pipelineService->retryRun($run);
+        try {
+            $newRun = $this->pipelineService->retryRun($run);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         return response()->json([
             'message' => 'Retry run queued successfully.',

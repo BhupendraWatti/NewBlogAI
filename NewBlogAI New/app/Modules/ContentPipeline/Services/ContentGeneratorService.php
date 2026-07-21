@@ -14,7 +14,8 @@ class ContentGeneratorService implements ContentGeneratorInterface
 {
     public function __construct(
         protected AIProviderService $providerService,
-        protected PromptEngine $promptEngine
+        protected PromptEngine $promptEngine,
+        protected SourceCollectionService $sourceCollector
     ) {}
 
     /**
@@ -81,6 +82,7 @@ class ContentGeneratorService implements ContentGeneratorInterface
             $keywords = implode(', ', array_slice($keywordsList, 0, 5));
 
             $variables = [
+                'topic'    => $categoryLabel,
                 'category' => $categoryLabel,
                 'language' => $language,
                 'website'  => $website,
@@ -96,20 +98,100 @@ class ContentGeneratorService implements ContentGeneratorInterface
             $selectedNews = $context->metadata['selected_news'] ?? null;
             if (is_array($selectedNews) && ! empty($selectedNews['title'])) {
                 $variables['headline'] = $selectedNews['title'];
+                $variables['topic']    = $selectedNews['title'];
                 $variables['summary']  = (string) ($selectedNews['summary'] ?? '');
-                $variables['sources']  = implode(', ', array_filter(
+
+                // ── ATTRIBUTION FIX ───────────────────────────────────────────
+                // Pass only domain names (not editorial brand names like NDTV/The Hindu)
+                // to prevent the AI from falsely claiming brand-owned reporting.
+                $sourceUrls  = array_filter(
                     array_column((array) ($selectedNews['source_references'] ?? []), 'url')
-                ));
+                );
+                $sourceDomains = array_unique(array_filter(array_map(function (string $u): string {
+                    $host = parse_url($u, PHP_URL_HOST) ?? '';
+                    return preg_replace('/^www\./', '', strtolower($host));
+                }, $sourceUrls)));
+                $variables['sources'] = implode(', ', $sourceDomains) ?: $website;
 
                 $candidateKeywords = array_filter(array_map('strval', (array) ($selectedNews['keywords'] ?? [])));
                 if (! empty($candidateKeywords)) {
                     $variables['keywords'] = implode(', ', array_slice($candidateKeywords, 0, 5));
                     $variables['Keywords'] = $variables['keywords'];
                 }
+
+                // ── REAL ARTICLE BODY SCRAPING ────────────────────────────────
+                // Fetch actual paragraph text from up to 2 source URLs so the AI
+                // writes from reported facts, not imagination.
+                $scrapedParts = [];
+                $scraped = 0;
+                foreach ($sourceUrls as $srcUrl) {
+                    if ($scraped >= 2) {
+                        break;
+                    }
+                    $body = $this->sourceCollector->scrapeArticleBody($srcUrl);
+                    if (! empty($body)) {
+                        $domain         = preg_replace('/^www\./', '', strtolower(parse_url($srcUrl, PHP_URL_HOST) ?? 'source'));
+                        $scrapedParts[] = "[Source: {$domain}]\n" . $body;
+                        $scraped++;
+                    }
+                }
+
+                $scrapedBody = implode("\n\n---\n\n", $scrapedParts);
+                $context->metadata['scraped_article_body'] = $scrapedBody;
+                $variables['research_context'] = $scrapedBody
+                    ?: "No article body could be retrieved from the source URLs. Write only what is verifiable from the headline and summary above. Do NOT invent facts, quotes, or statistics.";
+
+                Log::info('ContentGeneratorService: article body scraping complete.', [
+                    'candidate_title' => mb_substr($selectedNews['title'], 0, 80),
+                    'urls_attempted'  => count($sourceUrls),
+                    'urls_scraped'    => $scraped,
+                    'body_chars'      => strlen($scrapedBody),
+                ]);
+
+            } elseif (! empty($context->sources)) {
+                // Dynamic automated newsroom mode: use the discovered sources
+                $topSource = $context->sources[0];
+                $variables['headline'] = $topSource->title ?? ($categoryLabel . " Updates");
+                $variables['topic']    = $topSource->title ?? $categoryLabel;
+                $variables['summary']  = $topSource->snippet ?? '';
+
+                // Extract source domains
+                $sourceUrls = array_filter(array_map(fn($s) => $s->url ?? null, $context->sources));
+                $sourceDomains = array_unique(array_filter(array_map(function (string $u): string {
+                    $host = parse_url($u, PHP_URL_HOST) ?? '';
+                    return preg_replace('/^www\./', '', strtolower($host));
+                }, $sourceUrls)));
+                $variables['sources'] = implode(', ', $sourceDomains) ?: $website;
+
+                // Keywords from sources
+                $candidateKeywords = [];
+                foreach ($context->sources as $src) {
+                    if (! empty($src->keywords)) {
+                        $candidateKeywords = array_merge($candidateKeywords, $src->keywords);
+                    }
+                }
+                $candidateKeywords = array_unique(array_filter(array_map('strval', $candidateKeywords)));
+                if (! empty($candidateKeywords)) {
+                    $variables['keywords'] = implode(', ', array_slice($candidateKeywords, 0, 5));
+                    $variables['Keywords'] = $variables['keywords'];
+                }
+
+                // Scraped body from context (already set by SourceCollectorService)
+                $scrapedBody = trim($context->metadata['scraped_article_body'] ?? '');
+                $variables['research_context'] = $scrapedBody
+                    ?: "No article body could be retrieved from the source URLs. Write only what is verifiable from the headline and summary above. Do NOT invent facts, quotes, or statistics.";
+
+                Log::info('ContentGeneratorService: dynamic automated research context parsed.', [
+                    'top_source_title' => mb_substr($topSource->title ?? '', 0, 80),
+                    'urls_discovered'  => count($context->sources),
+                    'body_chars'       => strlen($scrapedBody),
+                ]);
             } else {
                 $variables['headline'] = $categoryLabel . " Updates";
                 $variables['summary']  = "Latest current events, news developments, and analysis on " . $categoryLabel . " in " . ($pipeline->target_country ?: "Global");
                 $variables['sources']  = $website;
+                $variables['research_context'] = 'No specific article selected. Write a general overview based on your knowledge of current events in this category.';
+                $context->metadata['scraped_article_body'] = '';
             }
 
             // 2. Modular prompt compilation

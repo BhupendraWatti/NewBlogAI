@@ -47,6 +47,10 @@ class MediaPreparationService implements MediaPreparatorInterface
             $htmlContent = $this->contentPostProcessor->convertMarkdownToHtml($markdown);
 
             $tempHtml = $htmlContent;
+            // Clean up double-wrapped/escaped paragraphs around comment tags (e.g. <p>&lt;p&gt;<!-- ... -->&lt;/p&gt;</p>)
+            $tempHtml = preg_replace('/<p>\s*(?:&lt;|<)p(?:&gt;|>)\s*(<!--.*?-->)\s*(?:&lt;|<)\/p(?:&gt;|>)\s*<\/p>/i', '$1', $tempHtml);
+            $tempHtml = preg_replace('/<p>\s*(?:&lt;|<)p(?:&gt;|>)\s*(&lt;!--.*?--&gt;)\s*(?:&lt;|<)\/p(?:&gt;|>)\s*<\/p>/i', '$1', $tempHtml);
+
             $blockSpecs = [];
             $inlineSpecs = [];
             
@@ -234,6 +238,10 @@ class MediaPreparationService implements MediaPreparatorInterface
                     return '<!-- image-placeholder-failed: ' . e($parsed['prompt']) . ' -->';
                 }
             };
+
+            // Clean up double-wrapped/escaped paragraphs around comment tags (e.g. <p>&lt;p&gt;<!-- ... -->&lt;/p&gt;</p>)
+            $htmlContent = preg_replace('/<p>\s*(?:&lt;|<)p(?:&gt;|>)\s*(<!--.*?-->)\s*(?:&lt;|<)\/p(?:&gt;|>)\s*<\/p>/i', '$1', $htmlContent);
+            $htmlContent = preg_replace('/<p>\s*(?:&lt;|<)p(?:&gt;|>)\s*(&lt;!--.*?--&gt;)\s*(?:&lt;|<)\/p(?:&gt;|>)\s*<\/p>/i', '$1', $htmlContent);
 
             // Replace block comments
             $htmlContent = preg_replace_callback($patternBlock, $callbackBlock, $htmlContent);

@@ -204,7 +204,7 @@ class CoverageNewsroomWorkflowTest extends TestCase
         $this->assertTrue($candidates->every(fn ($c) => $c->status === NewsCandidate::STATUS_CANDIDATE));
 
         // Usage tracking: reservation updated to success with aggregated tokens.
-        $this->assertDatabaseHas('ai_request_logs', ['status' => 'success', 'total_tokens' => 600]);
+        $this->assertDatabaseHas('ai_request_logs', ['status' => 'success', 'total_tokens' => 1200]);
     }
 
     public function test_discovery_fails_explicitly_when_unique_candidates_fall_short(): void

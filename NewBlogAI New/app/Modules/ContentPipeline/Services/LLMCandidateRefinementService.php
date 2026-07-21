@@ -361,15 +361,6 @@ PROMPT;
             return $fallback;
         }
 
-        $decoded = json_decode(substr($text, $start, $end - $start + 1), true);
-
-        if (! is_array($decoded) || ! isset($decoded['results']) || ! is_array($decoded['results'])) {
-            Log::warning('LLMCandidateRefinementService: invalid response structure, using raw candidates.', [
-                'json_error' => json_last_error_msg(),
-            ]);
-            return $fallback;
-        }
-
         // Index LLM results by _idx for O(1) lookup
         $resultMap = [];
         foreach ($decoded['results'] as $item) {

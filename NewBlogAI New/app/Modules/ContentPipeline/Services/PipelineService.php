@@ -148,7 +148,7 @@ class PipelineService
             });
         } catch (\Exception $e) {
             Log::error('Failed to trigger pipeline run: '.$e->getMessage());
-            throw new \RuntimeException('Failed to queue pipeline execution run.', 0, $e);
+            throw new \RuntimeException($e->getMessage(), 0, $e);
         }
     }
 
@@ -222,7 +222,7 @@ class PipelineService
             });
         } catch (\Exception $e) {
             Log::error('Failed to trigger coverage discovery run: '.$e->getMessage());
-            throw new \RuntimeException('Failed to queue coverage discovery run.', 0, $e);
+            throw new \RuntimeException($e->getMessage(), 0, $e);
         }
     }
 

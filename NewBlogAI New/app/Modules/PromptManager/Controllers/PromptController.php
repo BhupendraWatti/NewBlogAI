@@ -126,6 +126,7 @@ class PromptController extends Controller
 
         // Add standard fallback mock variables if not provided
         $mockVars = array_merge([
+            'topic' => 'AI Revolutionizes Modern Workflows',
             'category' => 'Technology',
             'keywords' => 'AI, tech, innovation',
             'language' => 'en',

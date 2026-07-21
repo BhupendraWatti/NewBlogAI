@@ -270,4 +270,34 @@ class PipelineServicesImplementationTest extends TestCase
         $this->assertEquals('completed', $this->run->fresh()->status);
         $this->assertEquals('completed', $this->pipeline->fresh()->status);
     }
+
+    public function test_publishing_queue_service_low_fact_score_sets_pending_review(): void
+    {
+        $queue = app(\App\Modules\ContentPipeline\Contracts\PublishingQueueInterface::class);
+        $context = new PipelineContext($this->run, $this->pipeline);
+        $context->resolvedTopic = 'Laravel 12 Features';
+        $context->title = 'Article: Laravel 12 Features - ' . now()->format('Y-m-d');
+        $context->generatedContent = '<div class="post-featured-image">...</div><h1>Laravel 12</h1><p>Content.</p>';
+        $context->metadata['prompt_tokens'] = 150;
+        $context->metadata['completion_tokens'] = 200;
+        $context->metadata['total_tokens'] = 350;
+        $context->metadata['estimated_cost'] = 0.05;
+        $context->metadata['fact_audit'] = [
+            'fact_score' => 60, // Low fact score < 70
+        ];
+
+        $context = $queue->handle($context);
+
+        $this->assertFalse($context->hasErrors());
+        $generatedContent = $context->metadata['generated_content_model'] ?? null;
+        $this->assertInstanceOf(\App\Modules\ContentGeneration\Models\GeneratedContent::class, $generatedContent);
+
+        // Verify status is pending_review due to low fact score
+        $this->assertEquals('pending_review', $generatedContent->status);
+
+        $this->assertDatabaseHas('generated_contents', [
+            'id' => $generatedContent->id,
+            'status' => 'pending_review',
+        ]);
+    }
 }

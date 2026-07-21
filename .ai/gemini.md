@@ -8,7 +8,8 @@
 > 3. [.ai/BUSINESS_RULES.md](file:///D:/Company%20Work/Company%20projects/NewBlogAI/.ai/BUSINESS_RULES.md) - Mandatory product constraints, tenancy logic, and database preservation rules.
 > 4. [.ai/CODING_STANDARDS.md](file:///D:/Company%20Work/Company%20projects/NewBlogAI/.ai/CODING_STANDARDS.md) - Code style, module layouts, and testing expectations.
 > 5. [.ai/guide.md](file:///D:/Company%20Work/Company%20projects/NewBlogAI/.ai/guide.md) - Detailed guide on prompt variables and image generator placeholders.
-> 6. [.ai/refactoring_report.md](file:///D:/Company%20Work/Company%20projects/NewBlogAI/.ai/refactoring_report.md) - Refactoring, API token optimizations, and error classifier details.
+> 6. [.ai/refactoring_report.md](file:///D:/Company%20Work/Company%20projects/NewBlogAI/.ai/refactoring_report.md) - Refactoring, API token optimizations, and error classifier details. 
+> 7. [.ai/current_issues.md] (file://D:\Company Work\Company projects\NewBlogAI\.ai\current_issues.md) - this file current the current issues of the projects before making new feature or fixing new feature make sure these all issues won't arise again. 
 
 ## 1. Preserve Original Test Data
 * **DO NOT** run `migrate:fresh` or clear database tables unless explicitly requested by the user.
@@ -31,4 +32,7 @@
   * Update [.ai/MODULE_OWNERSHIP.md](file:///D:/Company%20Work/Company%20projects/NewBlogAI/.ai/MODULE_OWNERSHIP.md) if capabilities or interactions between modules change.
   * Update [.ai/guide.md](file:///D:/Company%20Work/Company%20projects/NewBlogAI/.ai/guide.md) if template variables, placeholders, or prompt formats are added/modified.
   * Any new AI session relies entirely on these `.md` files to understand the system state without scanning the whole codebase. Make sure all documentation is 100% accurate, up-to-date, and contains explicit file paths/links.
+
+## 5. Use the skills if it mentioned in the Prompt. 
+ If any of the skills mentions like Systematic debugging skills, Frontend Design skills or more (take the skills  from this folder C:\Users\bhupe\.gemini\antigravity-cli\skills ) open the skills folder and use these skills to solve the current issues that user is defining as well as skills like these Stochastic Multi-Agent Consensus and Video-to-Action via Gemini Passthrough present at the .ai/ folder. Use these skills as well. 
 

@@ -87,6 +87,14 @@ class PublishingQueueService implements PublishingQueueInterface
                 $metadataField['pipeline_run_id'] = $run->id;
             }
 
+            $factAudit = $context->metadata['fact_audit'] ?? null;
+            $factScore = isset($factAudit['fact_score']) ? (int) $factAudit['fact_score'] : 100;
+            $initialStatus = 'generated';
+            if ($factScore < \App\Modules\ContentPipeline\Services\FactAuditService::MIN_FACT_SCORE) {
+                $initialStatus = 'pending_review';
+                Log::warning("PublishingQueueService: Fact score {$factScore}% is below the threshold of " . \App\Modules\ContentPipeline\Services\FactAuditService::MIN_FACT_SCORE . "%. Content status set to 'pending_review'.");
+            }
+
             $generatedContent = DB::transaction(function () use (
                 $pipeline,
                 $site,
@@ -103,16 +111,17 @@ class PublishingQueueService implements PublishingQueueInterface
                 $estimatedCost,
                 $rawResponse,
                 $run,
-                $context
+                $context,
+                $initialStatus
             ) {
-                // 1. Create Generated Content record with status = 'draft' (enforced)
+                // 1. Create Generated Content record with status calculated from fact audit
                 $generatedContent = GeneratedContent::create([
                     'pipeline_id' => $pipeline->id,
                     'site_id'     => $site->id,
                     'topic_id'    => null,   // category-driven — no topic FK
                     'title'       => $title,
                     'content'     => $content,
-                    'status'      => 'generated',
+                    'status'      => $initialStatus,
                     'metadata'    => $metadataField,
                 ]);
 

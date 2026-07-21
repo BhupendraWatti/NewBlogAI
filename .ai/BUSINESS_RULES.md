@@ -75,3 +75,33 @@ When an AI request fails, the pipeline must attempt automatic failover to altern
 Rule 18
 
 AI Providers track dynamic credits and freshness. System settings option `enable_image_generation` can be toggled to disable image generation requests. Manual credit refresh must be supported to fetch accurate limits upon key updates.
+
+
+
+Rule 19
+
+If any of the skills is mentions and in use check the these path C:\Users\bhupe\.gemini\antigravity-cli\skills and D:\Company Work\Company projects\NewBlogAI\.ai for the specific skill and use it. If you need an more information about the task before beginning ask the user for the correct context instead of the burtforcing. 
+
+Rule 20
+
+After each changes make sure to updates gemini.md and all the  Project Entry Point .md files and tell the user that current changes and current rules (as well as future rules) are all implemented and fixed. 
+
+Rule 21
+
+Background research and real-time news search is strictly restricted to grounded search providers (like Gemini). Non-grounded search query fallback (prompt-based search) is disabled to prevent hallucinations. If grounding is unavailable and no manual newsroom candidate has been selected, the generation run must fail.
+
+Rule 22
+
+During automated/scheduled runs, the pipeline performs duplicate news checks on the top collected source to verify it does not overlap with recently published content, aborting the run if a duplicate is found.
+
+Rule 23
+
+Generated articles are subjected to a Fact Audit. If the calculated fact score is below the mandatory threshold of 70%, the article status is set to 'pending_review' instead of being auto-published/generated, requiring human verification. 
+
+Rule 24
+
+Newsroom candidate discovery target count is 9. To ensure stability and avoid failure on niche regional topics or duplicate-heavy categories, the discovery run is allowed to complete successfully if at least 4 unique candidates are generated. If fewer than 4 unique candidates are found after retries, a shortfall exception is thrown and the run is failed. 
+
+Rule 25
+
+All generated news articles must contain a clear AI disclosure statement at the end, avoid direct verbatim copying to prevent plagiarism, and write with complete neutrality. Visual media comment placeholders must be stripped of double-wrapped or escaped paragraph tags during HTML post-processing. 

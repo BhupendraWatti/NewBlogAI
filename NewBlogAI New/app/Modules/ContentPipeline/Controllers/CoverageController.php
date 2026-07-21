@@ -48,7 +48,7 @@ class CoverageController extends Controller
 
         try {
             $run = $this->pipelineService->triggerDiscovery($pipeline, $discoveryProvider);
-        } catch (InvalidArgumentException $e) {
+        } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
 

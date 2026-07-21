@@ -88,7 +88,7 @@ class TopicResolverService implements TopicResolverInterface
             'health'        => 'latest health and medical news today',
             'science'       => 'latest science and research news today',
             'entertainment' => 'top entertainment and culture news today',
-            default         => 'latest news headlines today',
+            default         => "latest {$category} news today",
         };
     }
 

@@ -59,6 +59,10 @@ class ContentPostProcessor
             }
         };
 
+        // Clean up double-wrapped/escaped paragraphs around comment tags (e.g. <p>&lt;p&gt;<!-- ... -->&lt;/p&gt;</p>)
+        $htmlContent = preg_replace('/<p>\s*(?:&lt;|<)p(?:&gt;|>)\s*(<!--.*?-->)\s*(?:&lt;|<)\/p(?:&gt;|>)\s*<\/p>/i', '$1', $htmlContent);
+        $htmlContent = preg_replace('/<p>\s*(?:&lt;|<)p(?:&gt;|>)\s*(&lt;!--.*?--&gt;)\s*(?:&lt;|<)\/p(?:&gt;|>)\s*<\/p>/i', '$1', $htmlContent);
+
         // Standalone block comments: <p>&lt;!-- image-placeholder: ... --&gt;</p> or <p><!-- image-placeholder: ... --></p>
         $patternBlock = '/<p>\s*(?:&lt;|<)!--\s*image-placeholder:\s*(.*?)\s*--(?:\s*&gt;|>)\s*<\/p>/i';
         $htmlContent = preg_replace_callback($patternBlock, $callback, $htmlContent);
@@ -68,8 +72,12 @@ class ContentPostProcessor
         $htmlContent = preg_replace_callback($patternInline, $callback, $htmlContent);
 
         // 3. Generate a featured image
-        $topicName = $generatedContent->topic?->name ?? 'blog post';
-        $imagePrompt = "A professional and high-quality featured image representing: {$topicName}";
+        // Prefer the article title for a specific image prompt. Falls back to
+        // news_category from the pipeline (e.g. "Ujjain"), then "blog post".
+        $topicName = $generatedContent->title
+            ?? $generatedContent->pipeline?->news_category
+            ?? 'blog post';
+        $imagePrompt = "A professional and high-quality featured image for a news article titled: {$topicName}";
 
         try {
             Log::info("Generating featured image for GeneratedContent ID {$generatedContent->id} using prompt: '{$imagePrompt}'");

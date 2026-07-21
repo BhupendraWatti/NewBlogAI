@@ -174,4 +174,34 @@ class FactAuditTest extends TestCase
         $this->assertContains('https://laravel.com/blog/laravel-12', $urls);
         $this->assertContains('https://laravel-news.com/benchmarks', $urls);
     }
+
+    /**
+     * Test that FactAuditService validates 5 Ws and H correctly.
+     */
+    public function test_fact_audit_service_w_and_h_validation(): void
+    {
+        $auditor = app(FactAuditorInterface::class);
+        $context = new PipelineContext($this->run, $this->pipeline);
+        
+        // 1. Content that passes W's and H validation
+        $context->generatedContent = "उज्जैन में 20 जुलाई 2026 को पुलिस ने एक हिंसक झड़प के मामले में कार्रवाई की।";
+        $context = $auditor->handle($context);
+        
+        $this->assertArrayHasKey('w_h_validation', $context->metadata['fact_audit']);
+        $validation = $context->metadata['fact_audit']['w_h_validation'];
+        
+        $this->assertTrue($validation['who_what']);
+        $this->assertTrue($validation['when']);
+        $this->assertTrue($validation['where']);
+        $this->assertTrue($validation['how_why']);
+        $this->assertTrue($validation['passed']);
+
+        // 2. Content that fails W's and H validation (missing location and date/time)
+        $context2 = new PipelineContext($this->run, $this->pipeline);
+        $context2->generatedContent = "एक साधारण सी बात है।";
+        $context2 = $auditor->handle($context2);
+        
+        $validation2 = $context2->metadata['fact_audit']['w_h_validation'];
+        $this->assertFalse($validation2['passed']);
+    }
 }

@@ -10,7 +10,7 @@ When you create a Prompt Template in the system, you can use curly brace variabl
 
 | Variable | Description | Example Value |
 | :--- | :--- | :--- |
-| `{{topic}}` | The target keyword or subject name | `Laravel Testing` |
+| `{{topic}}` | The target keyword/subject name. (Falls back to category label in automated mode; maps to selected headline in newsroom mode). | `Laravel Testing` |
 | `{{category}}` | The category group of the topic | `Technology` |
 | `{{language}}` | The target writing language | `en` |
 | `{{website}}` | The destination blog domain url | `https://example-blog.com` |
@@ -20,6 +20,8 @@ When you create a Prompt Template in the system, you can use curly brace variabl
 
 > [!NOTE]
 > To escape the variable mapping and print literal curly braces (for example, in code blocks), prefix it with `@` like: `@{{topic}}`.
+>
+> **Fallback Rules:** If a custom prompt uses variables like `{{headline}}` or `{{summary}}` in automated mode (where no news candidate is selected), they automatically fallback to general placeholder text (e.g. `{{headline}}` falls back to `"[Category] Updates"`).
 
 ---
 

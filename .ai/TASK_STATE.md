@@ -1,3 +1,27 @@
+# Sprint Progress: Phase 7: Duplicate, Fabricated, and Unauthentic News Prevention
+
+## Current Sprint Objectives (Phase 7)
+- [x] **Task 1: Grounded Search Guardrails** (Disabled prompt-based query search for non-grounded providers in production to prevent hallucinations. Restricts background research to genuine grounded search engines, such as Gemini with search tool).
+- [x] **Task 2: Automated Duplicate News Checks** (Added automatic check in `ContentGenerationService::runPipelineStages` to verify that the top collected source's title is not a duplicate of recently generated articles, aborting execution via `DuplicateNewsException` if it is).
+- [x] **Task 3: Fact Score Audit Enforcement** (Added a mandatory threshold constraint of 70% in `PublishingQueueService`. If fact score is below this threshold, the article status is saved as `pending_review` for human audit).
+- [x] **Task 4: PromptEngine Custom Overrides** (Fixed `PromptEngine` regression where the journalistic honest guard was appended to custom persona templates, restoring compatibility with `test_compile_system_prompt_supports_overrides`).
+- [x] **Task 5: Newsroom Discovery Shortfall & Token Assertions** (Restored newsroom candidate discovery shortfall exception and updated token cost expectations in `CoverageNewsroomWorkflowTest` to align test suite validation).
+- [x] **Task 6: Newsroom Candidate Shortfall Flexibility** (Relaxed candidate discovery shortfall threshold to require a minimum of 4 candidates instead of 9. This permits successful runs when duplicate or geographic filters drop the count to 8, while keeping tests green).
+- [x] **Task 7: Gemini Safety Block Detection** (Enhanced `GoogleGeminiDriver` to check `finishReason` in API responses and write explicit warnings with safety ratings for blocked/safety content).
+
+---
+
+# Sprint Progress: Phase 8: Compliance & Topic Routing Improvements
+
+## Current Sprint Objectives (Phase 8)
+- [x] **Task 1: Custom Search Topic Routing** (Updated `NewsDiscoveryService` and `TopicResolverService` to dynamically identify and isolate custom keywords like "Ujjain" and route search queries specifically to them, preventing unrelated national stories from flooding local runs).
+- [x] **Task 2: Prompt Research Context Reinforcement** (Updated system instructions in `PromptEngine` to explicitly require writing from the `Research Context` block even when user-selected templates lack the research context placeholder).
+- [x] **Task 3: Editorial Compliance Enforcements** (Added clear AI disclosure, copyright rewrite guidelines to prevent plagiarism, and bias/neutrality rules to the `PromptEngine` honest guard).
+- [x] **Task 4: visual media Placeholder Cleanup** (Added regex cleaners to `ContentPostProcessor` and `MediaPreparationService` to strip nested/double-wrapped `<p>` and `&lt;p&gt;` tags around image placeholders).
+- [x] **Task 5: W's and H Heuristic Verification** (Implemented 5 Ws and H validation in `FactAuditService` to verify that Who, What, When, Where, and How are present in generated text).
+
+---
+
 # Sprint Progress: Phase 6: Refactoring, Temporal Context & Pipeline Optimization
 
 ## Current Sprint Objectives (Phase 6)
@@ -117,3 +141,4 @@
 - [x] **Task 17: Persist workspace routes on hard-refresh** (modified `routes/web.php` to pass `activeView` parameter to dashboard view layout).
 - [x] **Task 18: Implement Media Manager & AI Image Generation Module** (built dynamic drivers, inline HTML placeholder scanning and figures compilation, safely validated file sizes, verified MIME headers, corrected Pollinations routes from `/p/` to `/prompt/`, and verified Pint coding styles).
 - [x] **Task 19: Resolve CSRF 419 & AJAX JSON exceptions** (exempted API routes in `bootstrap/app.php` and migrated raw fetch calls to `apiFetch` in Blade views to ensure session/CSRF integrity).
+- [x] **Task 20: Fix Prompt Template topic variable resolution** (Mapped `topic` variable in `ContentGeneratorService` and `PromptController` to prevent raw curly brace placeholders in generated prompts. Mapped `topic` to `headline` in newsroom mode and to `category` in automated mode. Updated guide documentation).

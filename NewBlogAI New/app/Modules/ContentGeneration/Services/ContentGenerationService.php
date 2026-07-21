@@ -311,6 +311,9 @@ class ContentGenerationService
 
                     return [$generatedContent, $providerKey];
 
+                } catch (\App\Modules\ContentPipeline\Exceptions\DuplicateNewsException $e) {
+                    // Rethrow immediately to abort the failover loop (no point retrying other providers for duplicates)
+                    throw $e;
                 } catch (\Exception $e) {
                     $errorMsg = $e->getMessage();
                     $allErrors[$providerKey][] = "attempt {$attempt}: {$errorMsg}";
@@ -357,14 +360,8 @@ class ContentGenerationService
         }
 
         // Every provider failed — build a descriptive exception
-        $summary = collect($allErrors)
-            ->map(fn ($errs, $key) => "{$key}: ".implode('; ', $errs))
-            ->implode(' | ');
-
         throw new \RuntimeException(
-            'Content generation failed on all available providers. '
-            .'Fix the API keys flagged as "auth failed" or wait for rate-limited providers to reset. '
-            .'Errors — '.$summary
+            \App\Modules\ContentPipeline\Support\PipelineErrorFormatter::format($allErrors, 'Content generation')
         );
     }
 
@@ -393,6 +390,32 @@ class ContentGenerationService
                 function (PipelineContext $context, \Closure $next) {
                     if ($context->hasErrors()) { return $next($context); }
                     $context = app(\App\Modules\ContentPipeline\Contracts\SourceCollectorInterface::class)->handle($context);
+                    return $next($context);
+                },
+                function (PipelineContext $context, \Closure $next) {
+                    if ($context->hasErrors()) { return $next($context); }
+                    
+                    // Duplicate check for automated/scheduled runs (runs without manual selection)
+                    $selectedNews = $context->metadata['selected_news'] ?? null;
+                    if (! is_array($selectedNews) && ! empty($context->sources)) {
+                        $topSource = $context->sources[0] ?? null;
+                        if ($topSource) {
+                            $title = $topSource->title ?? '';
+                            $keywords = $topSource->keywords ?? [];
+                            $duplicatesService = app(\App\Modules\ContentPipeline\Services\DuplicateDetectionService::class);
+                            
+                            if ($duplicatesService->isDuplicate((string) $title, (array) $keywords, $context->pipeline->site_id)) {
+                                Log::info("ContentGenerationService: Pipeline run aborted. News event '{$title}' is duplicate of recently published content.", [
+                                    'title' => $title,
+                                    'site_id' => $context->pipeline->site_id,
+                                    'run_id' => $context->run->id,
+                                ]);
+                                throw new \App\Modules\ContentPipeline\Exceptions\DuplicateNewsException(
+                                    "This news event ('{$title}') has already been covered recently on this website."
+                                );
+                            }
+                        }
+                    }
                     return $next($context);
                 },
                 function (PipelineContext $context, \Closure $next) {

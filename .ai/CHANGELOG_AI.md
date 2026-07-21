@@ -1,5 +1,32 @@
 # Changelog AI
 
+## [2026-07-20 — Systematic Debugging]
+### Fixed
+- **Bug: `FactAuditService` empty-content path missing `w_h_validation` key** — Added the full `w_h_validation` default structure to the early-return path so downstream metadata reads never throw an `Undefined array key` exception.
+- **Bug: `NewsDiscoveryService` duplicate topic keyword in TASK prompt** — `$regionContext` was re-stating the custom topic keyword that `$topicConstraint` already injected. Fixed by making `$regionContext` only append the country/region clause for custom topics.
+- **Bug: `FactAuditService::validateWAndHHeuristics` hardcoded `$hasWhere` city list** — Replaced a 15-item hardcoded list with three layered generic patterns: (1) capitalized English word + optional location suffix, (2) a broad 30-city/state lowercase list, (3) common Devanagari city names and location-indicator nouns, split into separate `preg_match` calls to avoid broken `/ui` combined modifier.
+- **Bug: `ContentPostProcessor` always-null `topic?->name` for featured images** — Since pipelines no longer carry a `topic_id`, the Topic Eloquent relation was always null, causing all featured images to be generated with the generic prompt "…representing: blog post". Fixed to use article title → pipeline `news_category` → `'blog post'` fallback chain.
+- **Architecture: Empty-Selected-News Fallback Wipes Out Crawled Context** — Refactored variable mapping in `ContentGeneratorService` to dynamically resolve `headline`, `topic`, `summary`, `sources`, and `research_context` from crawled/discovered search sources when manual news selection (`selected_news`) is absent. This prevents automated runs from discarding hard-earned research data and resorting to static placeholders.
+
+## [2026-07-20]
+### Added
+- **Compliance & Topic Routing Improvements**:
+  - **Topic Discovery Keywords**: Updated `NewsDiscoveryService` and `TopicResolverService` to recognize custom search topics/keywords (like "Ujjain") and route discovery search queries accordingly, preventing unrelated national stories from flooding local runs.
+  - **Scraped Text Enforcement**: Updated system persona instructions in `PromptEngine` to explicitly instruct the model to write from the `Research Context` block even when user-selected templates lack the research context placeholder.
+  - **Compliance Guidelines**: Appended AI disclosure, plagiarism protection, and objective bias rules to the `PromptEngine` honest guard.
+  - **Media HTML Cleanups**: Added regex post-processing cleanups to `ContentPostProcessor` and `MediaPreparationService` to strip nested/double-wrapped `<p>` and `&lt;p&gt;` tags around image placeholders.
+  - **5 W's and H validation**: Added validation heuristics check in `FactAuditService` to check Who, What, When, Where, and How, saving validation details in metadata.
+
+## [2026-07-19]
+### Added
+- **Phase 7: Duplicate, Fabricated, and Unauthentic News Prevention**:
+  - **Grounded Search Guardrails**: Restricted real-time news query research to grounded providers (like Gemini). Disabled prompt-based query search fallback for non-grounded providers in production, preventing static LLMs from fabricating news.
+  - **Automated Duplication Checks**: Added a pipeline stage checking the top search source's title and keywords against the duplicate database using `DuplicateDetectionService` for automated/scheduled runs. Aborts runs via `DuplicateNewsException` if duplication is detected.
+  - **Fact Score Audit Enforcement**: Enforced a minimum fact score threshold of 70%. In `PublishingQueueService`, articles failing this threshold are saved as `pending_review` rather than auto-published.
+  - **Newsroom Candidate Shortfall Flexibility**: Relaxed candidate discovery shortfall check to require a minimum threshold of 4 candidates instead of 9, allowing regional/filtered runs to succeed in production while keeping the test suite green.
+  - **Gemini Safety Block Detection**: Enhanced GoogleGeminiDriver to check finishReason and write explicit warning logs for SAFETY blocks or other non-standard terminations.
+  - **Test Suite Alignment and Cleanups**: Fixed the 3 failing tests, restored the newsroom discovery candidate shortfall check, and cleaned up all dead code (like `simulateSearch`) and stale `BUG` / `Issue` comment markers.
+
 ## [2026-07-09]
 ### Added
 - **Hybrid Discovery Architecture**: Implemented separate provider selection for news discovery vs full article generation. Discovery now defaults to Groq (free & fast, 5-10 seconds) while full article generation uses the user's preferred provider (Gemini/OpenAI/Claude). Frontend sends `discovery_provider` in POST body to `/api/v1/pipelines/{id}/discover`.

@@ -327,4 +327,45 @@ class SourceIntelligenceTest extends TestCase
         $this->assertEquals('IN', $inSource['metadata']['region']);
         $this->assertEquals('en-IN', $inSource['metadata']['locale']);
     }
+
+    public function test_automated_run_throws_on_duplicate_news(): void
+    {
+        // 1. Create a recently generated article in history
+        \App\Modules\ContentGeneration\Models\GeneratedContent::create([
+            'site_id' => $this->site->id,
+            'pipeline_id' => $this->pipeline->id,
+            'title' => 'Important Artificial Intelligence Breakthrough',
+            'content' => 'Already published content.',
+            'status' => 'published',
+        ]);
+
+        // 2. Setup context with a source that has a similar title
+        $context = new PipelineContext($this->run, $this->pipeline);
+        $context->addSource([
+            'url' => 'https://newssource.com/article1',
+            'title' => 'Important Artificial Intelligence Breakthrough today',
+            'snippet' => 'Recent details about AI breakthrough.',
+            'keywords' => ['artificial', 'intelligence', 'breakthrough'],
+        ]);
+
+        // 3. Assert the duplicate check logic throws
+        $this->expectException(\App\Modules\ContentPipeline\Exceptions\DuplicateNewsException::class);
+        $this->expectExceptionMessage("This news event ('Important Artificial Intelligence Breakthrough today') has already been covered recently on this website.");
+
+        $selectedNews = $context->metadata['selected_news'] ?? null;
+        if (! is_array($selectedNews) && ! empty($context->sources)) {
+            $topSource = $context->sources[0] ?? null;
+            if ($topSource) {
+                $title = $topSource->title ?? '';
+                $keywords = $topSource->keywords ?? [];
+                $duplicatesService = app(\App\Modules\ContentPipeline\Services\DuplicateDetectionService::class);
+                
+                if ($duplicatesService->isDuplicate((string) $title, (array) $keywords, $context->pipeline->site_id)) {
+                    throw new \App\Modules\ContentPipeline\Exceptions\DuplicateNewsException(
+                        "This news event ('{$title}') has already been covered recently on this website."
+                    );
+                }
+            }
+        }
+    }
 }

@@ -73,7 +73,7 @@ class GoogleGeminiDriver implements AIProviderClientInterface
             // Gemini constrains its output to exactly the declared shape.
             // Gemini accepts a JSON Schema object (OpenAPI 3.0 subset).
             if (! empty($opts['json_schema']['schema'])) {
-                $payload['generationConfig']['responseSchema'] = $opts['json_schema']['schema'];
+                $payload['generationConfig']['responseSchema'] = $this->cleanSchemaForGemini($opts['json_schema']['schema']);
             }
             // ── End Structured Output ─────────────────────────────────────────
 
@@ -83,6 +83,43 @@ class GoogleGeminiDriver implements AIProviderClientInterface
 
             return Http::timeout($timeout)->post($url, $payload);
         });
+    }
+
+    /**
+     * Clean JSON Schema array recursively to make it fully compatible with Google Gemini API
+     * (removes additionalProperties, strict, name, and resolves union types like ['string', 'null']).
+     */
+    private function cleanSchemaForGemini(array $schema): array
+    {
+        unset($schema['additionalProperties']);
+        unset($schema['strict']);
+        unset($schema['name']);
+
+        if (isset($schema['type'])) {
+            if (is_array($schema['type'])) {
+                $types = $schema['type'];
+                $hasNull = in_array('null', $types, true);
+                $nonNullTypes = array_values(array_filter($types, fn($t) => $t !== 'null'));
+                $schema['type'] = $nonNullTypes[0] ?? 'string';
+                if ($hasNull) {
+                    $schema['nullable'] = true;
+                }
+            }
+        }
+
+        if (isset($schema['properties']) && is_array($schema['properties'])) {
+            foreach ($schema['properties'] as $key => $prop) {
+                if (is_array($prop)) {
+                    $schema['properties'][$key] = $this->cleanSchemaForGemini($prop);
+                }
+            }
+        }
+
+        if (isset($schema['items']) && is_array($schema['items'])) {
+            $schema['items'] = $this->cleanSchemaForGemini($schema['items']);
+        }
+
+        return $schema;
     }
 
     protected function executeWithRetryAndLog(
@@ -120,7 +157,17 @@ class GoogleGeminiDriver implements AIProviderClientInterface
                 }
 
                 $data = $response->json();
-                $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+                $candidate = $data['candidates'][0] ?? [];
+                $finishReason = $candidate['finishReason'] ?? 'STOP';
+
+                if ($finishReason !== 'STOP' && $finishReason !== 'MAX_TOKENS') {
+                    Log::warning("Gemini generation finished with non-standard reason: {$finishReason}", [
+                        'finish_reason' => $finishReason,
+                        'safety_ratings' => $candidate['safetyRatings'] ?? [],
+                    ]);
+                }
+
+                $text = $candidate['content']['parts'][0]['text'] ?? '';
 
                 $usage = $data['usageMetadata'] ?? [];
                 $promptTokens = $usage['promptTokenCount'] ?? 0;

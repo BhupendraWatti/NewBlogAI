@@ -13,7 +13,30 @@ class PromptEngine
      */
     public function compileSystemPrompt(array $options = []): string
     {
-        return $options['persona'] ?? 'You are a professional news journalist and editor. Your role is to write accurate, well-researched, and engaging news articles based on the provided research context and editorial guidelines. Always report facts objectively, attribute claims to sources, and write in a clear journalistic style appropriate for a global online news publication.';
+        $base = $options['persona'] ?? 'You are a professional news journalist and editor. Your role is to write accurate, well-researched, and engaging news articles based on the provided research context and editorial guidelines. Always report facts objectively, attribute claims to sources, and write in a clear journalistic style appropriate for a global online news publication. You MUST write the news article using the detailed facts, timelines, and information provided in the "Research Context" block below. The "User Prompt" defines the headline and template structure, but all detailed facts must be drawn directly from the Research Context. Do NOT write from your training weights.';
+
+        if (isset($options['persona'])) {
+            return $base;
+        }
+
+        // ── JOURNALISTIC HONESTY GUARD ───────────────────────────────────────────────
+        // This guard is mandatory and overrides any instruction in the user prompt.
+        $honestGuard = <<<'GUARD'
+
+CRITICAL JOURNALISTIC INTEGRITY RULES (non-negotiable):
+1. FACT-ANCHORING: You MUST write ONLY from the facts present in the "Research Context" section below. Do NOT invent, extrapolate, or embellish any detail that is not explicitly stated in the source text.
+2. NO FABRICATED QUOTES: Never invent direct quotes or official statements from government officials, police, or any person. If the Research Context contains no quote, do not include one.
+3. NO FABRICATED STATISTICS: Do not invent numbers, percentages, distances, amounts, or dates that are not in the Research Context.
+4. NO FABRICATED MILESTONES: Do not state that a building was inaugurated, a project was completed, or a law was passed unless that specific fact appears in the Research Context.
+5. HONEST GAPS: If the Research Context is sparse, write a shorter, honest article. Use phrases like "details are still emerging" or "according to initial reports" rather than padding with invented details.
+6. ATTRIBUTION: Attribute facts to "reports" or "[domain.com]" — NEVER claim a specific editorial brand (NDTV, The Hindu, Times of India) authored facts you are synthesising.
+7. NO CIRCULAR LOGIC: Do not write cause-and-effect sentences where the cause and effect are the same thing rephrased.
+8. CLEAR DISCLOSURE: You MUST append this exact markdown disclosure statement on a new line at the very end of the article: "*Disclosure: This report was synthesized with AI assistance and is undergoing human verification.*"
+9. COPYRIGHT & ORIGINALITY: Do NOT copy phrases or sentences verbatim from the Research Context. Restructure all facts and write them in your own words to prevent plagiarism.
+10. BIAS & NEUTRALITY: Write with complete objectivity. Eliminate speculative adjectives, emotional language, and biased framing.
+GUARD;
+
+        return $base . "\n" . $honestGuard;
     }
 
     /**
@@ -24,7 +47,7 @@ class PromptEngine
         $researchContext = "Research Context:\n";
         
         if (!empty($context->sources)) {
-            $researchContext .= "Normalized Sources:\n";
+            $researchContext .= "Source References:\n";
             // Limit to top 3 sources to keep prompt tokens within the target budget
             $sources = array_slice($context->sources, 0, 3);
             foreach ($sources as $source) {
@@ -54,6 +77,22 @@ class PromptEngine
             }
         } else {
             $researchContext .= "No sources collected.\n";
+        }
+
+        // ── SCRAPED ARTICLE BODY ───────────────────────────────────────────────────
+        // Real article body text fetched at generation time by ContentGeneratorService.
+        // This is the PRIMARY fact source the AI must write from.
+        $scrapedBody = trim($context->metadata['scraped_article_body'] ?? '');
+        if (! empty($scrapedBody)) {
+            $researchContext .= "\n--- ARTICLE BODY TEXT (PRIMARY FACT SOURCE) ---\n";
+            $researchContext .= "The following is the ACTUAL text scraped from the source article(s). ";
+            $researchContext .= "You MUST use ONLY the facts contained here. Do NOT add details not present in this text.\n\n";
+            $researchContext .= $scrapedBody . "\n";
+            $researchContext .= "--- END OF ARTICLE BODY TEXT ---\n";
+        } else {
+            $researchContext .= "\n[NOTE: No article body text could be retrieved from the source URLs. ";
+            $researchContext .= "Write ONLY what is verifiable from the headline and summary. ";
+            $researchContext .= "Do NOT invent facts, quotes, statistics, or milestones.]\n";
         }
 
         // Add topic clusters/regions

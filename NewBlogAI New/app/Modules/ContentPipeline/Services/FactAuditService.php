@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Log;
 
 class FactAuditService implements FactAuditorInterface
 {
+    public const MIN_FACT_SCORE = 70;
+
     /**
      * Process the current stage of the content pipeline.
      */
@@ -23,11 +25,18 @@ class FactAuditService implements FactAuditorInterface
             if (empty($content)) {
                 Log::warning('FactAuditService: No generated content to audit.');
                 $context->metadata['fact_audit'] = [
-                    'fact_score' => 100,
-                    'confidence_score' => 0.0,
-                    'supported_claims' => [],
+                    'fact_score'      => 100,
+                    'confidence_score'=> 0.0,
+                    'supported_claims'=> [],
                     'unsupported_claims' => [],
-                    'references' => [],
+                    'references'      => [],
+                    'w_h_validation'  => [
+                        'who_what' => false,
+                        'when'     => false,
+                        'where'    => false,
+                        'how_why'  => false,
+                        'passed'   => false,
+                    ],
                 ];
                 return $context;
             }
@@ -103,12 +112,15 @@ class FactAuditService implements FactAuditorInterface
             $factScore = max(0, min(100, $factScore));
             $confidenceScore = max(0.0, min(1.0, $confidenceScore));
 
+            $wHValidation = $this->validateWAndHHeuristics($content);
+
             $factAuditResult = [
                 'fact_score' => $factScore,
                 'confidence_score' => $confidenceScore,
                 'supported_claims' => $supportedClaims,
                 'unsupported_claims' => $unsupportedClaims,
                 'references' => array_values($usedReferences),
+                'w_h_validation' => $wHValidation,
             ];
 
             $context->metadata['fact_audit'] = $factAuditResult;
@@ -198,5 +210,67 @@ class FactAuditService implements FactAuditorInterface
 
         // Return ratio of matching keywords
         return $matchCount / count($keywords);
+    }
+
+    /**
+     * Heuristic verification check to see if the content covers the 5 Ws and H.
+     * Searches for keywords, entities, and patterns representing Who/What, When, Where, Why, and How.
+     */
+    protected function validateWAndHHeuristics(string $content): array
+    {
+        $contentLower = mb_strtolower($content);
+
+        // 1. When — year (19xx/20xx), or any named month/time-of-day indicator in English or Hindi
+        $hasWhen = preg_match(
+            '/(?:19|20)\d{2}|\b(?:today|yesterday|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|am|pm)\b/i',
+            $content
+        ) === 1
+        || preg_match(
+            '/\b(?:जनवरी|फ़रवरी|मार्च|अप्रैल|मई|जून|जुलाई|अगस्त|सितंबर|अक्टूबर|नवंबर|दिसंबर|बजे|वर्ष|साल|महीने|आज|कल|परसों)\b/u',
+            $content
+        ) === 1;
+
+        // 2. Where — detect a place indicator generically:
+        //    English: any capitalised word followed by known location suffixes (City/District/State/Village/Pradesh/Nagar),
+        //    OR a word from the 18 largest Indian states/UTs appearing anywhere (case-insensitive),
+        //    Hindi: location-indicator nouns (शहर, जिला, राज्य, स्थान, देश, इलाके, नगर, गाँव, ग्राम, मोहल्ला, तहसील, ज़िला)
+        $hasWhere = preg_match(
+            '/\b[A-Z][a-z]+(?: City| District| State| Pradesh| Nagar| Village| Town)?\b/u',
+            $content
+        ) === 1
+        || preg_match(
+            '/\b(?:india|pakistan|delhi|mumbai|kolkata|chennai|bengaluru|bangalore|hyderabad|pune|ahmedabad|surat|jaipur|lucknow|bhopal|indore|nagpur|patna|vadodara|agra|nashik|ujjain|madhya pradesh|maharashtra|gujarat|rajasthan|uttar pradesh|bihar|odisha|karnataka|kerala|tamil nadu|west bengal|assam|punjab|haryana|himachal|goa|jharkhand|uttarakhand|chhattisgarh|telangana|andhra pradesh)\b/i',
+            $contentLower
+        ) === 1
+        || preg_match(
+            '/\b(?:शहर|जिला|ज़िला|राज्य|स्थान|देश|इलाके|नगर|गाँव|ग्राम|मोहल्ला|तहसील|भारत|प्रदेश|उज्जैन|दिल्ली|मुंबई|हैदराबाद|बेंगलुरु|पुणे|अहमदाबाद|जयपुर|लखनऊ|भोपाल|इंदौर|नागपुर|पटना|सूरत|आगरा|नासिक|कोलकाता|चेन्नई)\b/u',
+            $content
+        ) === 1;
+
+        // 3. Who/What — English: any capitalized proper noun (≥ 2 chars after first cap);
+        //    Hindi: known role/organization indicator nouns
+        $hasWho = preg_match('/\b[A-Z][a-zA-Z]{1,}\b/u', $content) === 1
+            || preg_match(
+                '/\b(?:पुलिस|प्रशासन|मुख्यमंत्री|प्रधानमंत्री|सरकार|कंपनी|अधिकारी|लोग|बचाव दल|नेता|मंत्री|विभाग|संगठन|संस्था)\b/u',
+                $content
+            ) === 1;
+
+        // 4. How/Why — English action/cause verbs; Hindi cause/action terms
+        $hasHowWhy = preg_match(
+            '/\b(?:because|why|how|cause|reason|due to|following|amid|after|clashed|arrested|killed|died|injured|collapsed|attacked|injured|accused|alleged|protest|clash|explosion|fire|flood|accident|crash)\b/i',
+            $contentLower
+        ) === 1
+        || preg_match(
+            '/\b(?:क्योंकि|इसलिए|कारण|वजह|कैसे|हिंसक|हमला|हादसा|मौत|हत्या|घायल|गिरफ्तार|आग|बाढ़|दुर्घटना|विस्फोट|टक्कर|प्रदर्शन|झड़प)\b/u',
+            $content
+        ) === 1;
+
+        return [
+            'who_what' => $hasWho,
+            'when'     => $hasWhen,
+            'where'    => $hasWhere,
+            'how_why'  => $hasHowWhy,
+            'passed'   => ($hasWho && $hasWhen && $hasWhere && $hasHowWhy),
+        ];
     }
 }

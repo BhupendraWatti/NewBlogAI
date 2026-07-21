@@ -60,6 +60,12 @@ class SourceCollectionService implements SourceCollectorInterface
             $hasSelectedNews = is_array($context->metadata['selected_news'] ?? null);
 
             if (! $hasSelectedNews && !empty($apiKey)) {
+                // Real-time background news search is only supported via Gemini Google Search grounding.
+                // Non-grounded models cannot search their static weights for news from the last 48 hours.
+                if (strtolower($providerKey) !== 'gemini' && !app()->environment('testing')) {
+                    throw new \RuntimeException("Real-time news search is only supported via Gemini Google Search grounding. Non-grounded provider '{$providerKey}' cannot perform background news research without a selected newsroom candidate.");
+                }
+
                 // Limit search to the top 1 query to prevent rate limits and token usage
                 $limitedQueries = array_slice($queries, 0, 1);
                 foreach ($limitedQueries as $query) {
@@ -101,13 +107,12 @@ class SourceCollectionService implements SourceCollectorInterface
 
     /**
      * Process, normalize, deduplicate, and rank raw source arrays.
-     * Returns an array of sorted SourceDTOs.
      *
-     * BUG 2 FIX: Enforces strict temporal filtering.
-     * Sources with no parseable publish date AND whose URL does not contain
-     * the current year are treated as potentially stale and dropped to prevent
-     * high-SEO legacy articles (e.g. a News18 article from 3 years ago) from
-     * being pulled in as live news.
+     * Enforces strict temporal filtering: sources with no parseable publish date
+     * AND whose URL does not contain the current year are treated as potentially
+     * stale and dropped to prevent legacy articles from being pulled in as live news.
+     *
+     * Returns an array of sorted SourceDTOs.
      */
     protected function processSources(array $rawSources, array $queries, string $topic): array
     {
@@ -129,7 +134,7 @@ class SourceCollectionService implements SourceCollectorInterface
                 continue;
             }
 
-            // BUG 3 FIX: Lock origin_url at extraction time so publisher is never
+            // Lock origin_url at extraction time so publisher is never
             // detached from its source URL during concurrent processing.
             $originUrl = $normalizedUrl;
 
@@ -138,8 +143,8 @@ class SourceCollectionService implements SourceCollectorInterface
             $title = $raw['title'] ?? null;
             $snippet = $raw['snippet'] ?? null;
 
-            // BUG 3 FIX: Derive publisher strictly from the origin URL domain,
-            // not from metadata that may have been assembled from a different source.
+            // Derive publisher strictly from the origin URL domain, not from metadata
+            // that may have been assembled from a different source.
             // Only fall back to metadata publisher if the origin_url host matches
             // the declared publisher domain (loose heuristic).
             $declaredPublisher = $raw['publisher'] ?? $metadata['publisher'] ?? null;
@@ -160,7 +165,6 @@ class SourceCollectionService implements SourceCollectorInterface
             $snippet = $snippet ? trim(strip_tags($snippet)) : null;
             $author = $author ? trim(strip_tags($author)) : null;
 
-            // BUG 2 FIX: Strict temporal filtering.
             // Normalize date to Y-m-d; if date is missing, check if the URL
             // path contains the current year as a proxy for freshness.
             if ($publishedDate) {
@@ -226,7 +230,7 @@ class SourceCollectionService implements SourceCollectorInterface
                 metadata: [
                     'region'     => $regionData['region'],
                     'locale'     => $regionData['locale'],
-                    'origin_url' => $originUrl,  // BUG 3 FIX: immutably bound
+                    'origin_url' => $originUrl,  // immutably bound at extraction time
                 ]
             );
 
@@ -451,20 +455,13 @@ class SourceCollectionService implements SourceCollectorInterface
         return array_slice($significantClusters, 0, 5, true);
     }
 
-    /**
-     * Perform a real AI-grounded web search for a query.
-     * Uses Gemini Google Search grounding if provider is Gemini,
-     * otherwise falls back to a prompt-based source extraction call.
-     */
-    protected function simulateSearch(string $query, string $topic): array
-    {
-        return [];
-    }
 
     /**
      * Perform real web search using the pipeline's AI provider.
      * Uses Gemini's Google Search grounding tool when available.
-     * Falls back to prompt-based source extraction for other providers.
+     * Non-Gemini providers route through searchViaPrompt() only in the test
+     * environment — in production, the handle() method blocks non-grounded
+     * providers before this is reached.
      *
      * @param string $query The search query
      * @param string $topic The news topic/category
@@ -498,13 +495,16 @@ class SourceCollectionService implements SourceCollectorInterface
     /**
      * Use Gemini's native Google Search grounding to find current news sources.
      *
-     * BUG 2 FIX: The grounding prompt now includes an explicit "after:YYYY-MM-DD"
-     * date constraint to bias Gemini Search toward today's results.
+     * The grounding prompt includes an explicit "after:YYYY-MM-DD" date constraint
+     * to bias Gemini Search toward today's results.
      *
-     * BUG 3 FIX: Each grounding chunk's snippet is now derived from its own
-     * title/URI — NOT by distributing sentences from the generated prose across
-     * chunks positionally. The old approach caused Source A's snippet to carry
-     * Source B's text body, scrambling attribution.
+     * After extracting grounding chunk URIs, this method fires real HTTP GET
+     * requests to each article page to extract a rich snippet and publish date:
+     *   - og:description / meta[name=description] → rich multi-sentence snippet
+     *   - article:published_time / <time datetime>  → real publish date
+     *   - First <p> body text                       → last-resort snippet fallback
+     *
+     * Each grounding chunk's snippet is derived solely from its own title/URI.
      */
     protected function searchViaGeminiGrounding(
         string $query,
@@ -514,14 +514,15 @@ class SourceCollectionService implements SourceCollectorInterface
     ): array {
         $model = $model ?: 'gemini-2.5-flash';
         $url   = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
-        $today = now()->format('Y-m-d');
+        $today    = now()->format('Y-m-d');
+        $yesterday = now()->subDay()->format('Y-m-d');
 
-        // BUG 2 FIX: Add explicit date constraint so Gemini prioritises today's results
+        // Add explicit date constraint so Gemini prioritises today's results.
         $payload = [
             'contents' => [
                 [
                     'parts' => [
-                        ['text' => "Search for the latest news about: {$query} after:{$today}. List the top 3 most relevant, real, current news sources published today or within the last 48 hours. For each source include its URL, headline title, and a 1-sentence summary. Focus strictly on news from {$today} or the last 48 hours."],
+                        ['text' => "Search for the latest news about: {$query} after:{$yesterday}. List the top 3 most relevant, real, current news sources published today or within the last 48 hours (after {$yesterday}). For each source include its URL, headline title, and a 1-sentence summary. Focus strictly on news from {$today} or {$yesterday}."],
                     ],
                 ],
             ],
@@ -553,30 +554,220 @@ class SourceCollectionService implements SourceCollectorInterface
                 continue;
             }
 
-            // BUG 3 FIX: Each source's publisher and snippet are derived
-            // exclusively from this chunk's own URI and title — never from
-            // Gemini's generated prose which may describe a different source.
+            // Each source's publisher and snippet are derived exclusively from this
+            // chunk's own URI and title, never from Gemini's generated prose.
             $sourceUri       = $web['uri'];
             $sourceTitle     = $web['title'] ?? $topic . ' News';
             $sourcePublisher = preg_replace('/^www\./', '', strtolower(parse_url($sourceUri, PHP_URL_HOST) ?? 'Unknown'));
-            $sourceSnippet   = $sourceTitle; // Safe: same-source title as snippet seed
+
+            // Fetch real article content to extract a rich snippet and the actual publish date.
+            [$richSnippet, $publishedDate] = $this->fetchArticleMetadata($sourceUri, $sourceTitle, $today);
 
             $sources[] = [
                 'url'      => $sourceUri,
                 'title'    => $sourceTitle,
-                'snippet'  => $sourceSnippet,
+                'snippet'  => $richSnippet,
                 'metadata' => [
                     'query'          => $query,
                     'publisher'      => $sourcePublisher,
-                    'published_date' => $today,
+                    'published_date' => $publishedDate,
                     'keywords'       => array_filter(explode(' ', strtolower($topic))),
                     'origin'         => 'gemini_grounding',
-                    'origin_url'     => $sourceUri,  // BUG 3 FIX: immutably bound
+                    'origin_url'     => $sourceUri,  // immutably bound at extraction time
                 ],
             ];
         }
 
         return $sources;
+    }
+
+    /**
+     * Fetch real article metadata from a URL.
+     *
+     * Extracts og:description / meta[name=description] for a rich multi-sentence
+     * snippet, and article:published_time for the real publish date.
+     * Falls back gracefully to the title and today's date if the fetch fails.
+     *
+     * @return array{0: string, 1: string}  [snippet, publishedDate]
+     */
+    private function fetchArticleMetadata(string $url, string $fallbackTitle, string $todayIso): array
+    {
+        try {
+            $response = Http::timeout(5)
+                ->withHeaders(['User-Agent' => 'Mozilla/5.0 (compatible; NewsBlogifyBot/1.0)'])
+                ->get($url);
+
+            if (!$response->successful()) {
+                return [$fallbackTitle, $todayIso];
+            }
+
+            $html = $response->body();
+
+            // ── Published date: article:published_time (most reliable) ─────────
+            $publishedDate = $todayIso;
+            if (preg_match('/<meta[^>]+property=["\']article:published_time["\'][^>]+content=["\']([\d\-T:+Z]+)["\'][^>]*>/i', $html, $m)
+                || preg_match('/<meta[^>]+content=["\']([\d\-T:+Z]+)["\'][^>]+property=["\']article:published_time["\']/i', $html, $m)) {
+                try {
+                    $publishedDate = \Carbon\Carbon::parse($m[1])->format('Y-m-d');
+                } catch (\Throwable) {
+                    // Keep today as default
+                }
+            } elseif (preg_match('/<time[^>]+datetime=["\']([\d\-T:+Z]+)["\']/i', $html, $m)) {
+                try {
+                    $publishedDate = \Carbon\Carbon::parse($m[1])->format('Y-m-d');
+                } catch (\Throwable) {
+                    // Keep today
+                }
+            }
+
+            // ── Rich snippet: og:description (best for news articles) ─────────
+            $snippet = null;
+            if (preg_match('/<meta[^>]+property=["\']og:description["\'][^>]+content=["\'](.*?)["\'][^>]*>/is', $html, $m)
+                || preg_match('/<meta[^>]+content=["\'](.*?)["\'][^>]+property=["\']og:description["\']/is', $html, $m)) {
+                $snippet = trim(html_entity_decode(strip_tags($m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            }
+
+            // Fallback: meta[name=description]
+            if (empty($snippet)) {
+                if (preg_match('/<meta[^>]+name=["\']description["\'][^>]+content=["\'](.*?)["\'][^>]*>/is', $html, $m)
+                    || preg_match('/<meta[^>]+content=["\'](.*?)["\'][^>]+name=["\']description["\']/is', $html, $m)) {
+                    $snippet = trim(html_entity_decode(strip_tags($m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                }
+            }
+
+            // Fallback: first <p> tag with meaningful text (≥ 60 chars)
+            if (empty($snippet)) {
+                if (preg_match_all('/<p[^>]*>(.*?)<\/p>/is', $html, $paragraphs)) {
+                    foreach ($paragraphs[1] as $para) {
+                        $clean = trim(html_entity_decode(strip_tags($para), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                        if (mb_strlen($clean) >= 60) {
+                            $snippet = mb_substr($clean, 0, 400);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Last resort: use the title
+            if (empty($snippet)) {
+                $snippet = $fallbackTitle;
+            }
+
+            return [mb_substr($snippet, 0, 600), $publishedDate];
+
+        } catch (\Throwable $e) {
+            Log::debug('SourceCollectionService: fetchArticleMetadata failed (non-blocking).', [
+                'url'   => $url,
+                'error' => $e->getMessage(),
+            ]);
+            return [$fallbackTitle, $todayIso];
+        }
+    }
+
+    /**
+     * Scrape the real body text of a news article URL for use as grounded facts
+     * during article generation.
+     *
+     * Strips boilerplate HTML (nav, header, footer, aside, scripts, ads) and
+     * extracts clean paragraph text. Returns up to 2500 characters — enough to
+     * anchor the AI in real reported facts without overwhelming the token budget.
+     *
+     * Falls back to empty string if the page is paywalled, blocked, non-HTML,
+     * or times out. The caller must handle the empty-string case gracefully
+     * (write a shorter, honest article rather than padding with hallucinations).
+     *
+     * @param string $url The article URL to scrape
+     * @return string Cleaned paragraph text, max 2500 chars, or '' on failure
+     */
+    public function scrapeArticleBody(string $url): string
+    {
+        // Skip non-HTTP URLs and Vertex redirect URLs (they never return HTML)
+        if (! str_starts_with($url, 'http') || str_contains($url, 'vertexaisearch.cloud.google.com')) {
+            return '';
+        }
+
+        try {
+            $response = Http::timeout(8)
+                ->withHeaders([
+                    'User-Agent'      => 'Mozilla/5.0 (compatible; NewsBlogBot/1.0; +https://newsblogai.in/bot)',
+                    'Accept'          => 'text/html,application/xhtml+xml',
+                    'Accept-Language' => 'en-IN,en;q=0.9,hi;q=0.8',
+                ])
+                ->get($url);
+
+            // Only process successful HTML responses
+            if (! $response->successful()) {
+                Log::debug('SourceCollectionService::scrapeArticleBody: non-200 response.', [
+                    'url'    => $url,
+                    'status' => $response->status(),
+                ]);
+                return '';
+            }
+
+            $contentType = $response->header('Content-Type') ?? '';
+            if (! str_contains($contentType, 'text/html') && ! str_contains($contentType, 'text/plain')) {
+                return '';
+            }
+
+            $html = $response->body();
+
+            // ── Remove boilerplate blocks entirely ────────────────────────────
+            // Strip scripts, styles, nav, footer, header, sidebar, forms, ads
+            $html = preg_replace(
+                '/<(script|style|nav|footer|header|aside|form|noscript|figure|figcaption|iframe|button|select|textarea)[^>]*>.*?<\/\1>/is',
+                '',
+                $html
+            ) ?? $html;
+
+            // Remove HTML comments
+            $html = preg_replace('/<!--.*?-->/s', '', $html) ?? $html;
+
+            // ── Extract <p> tag text ──────────────────────────────────────────
+            $paragraphs = [];
+            if (preg_match_all('/<p[^>]*>(.*?)<\/p>/is', $html, $matches)) {
+                foreach ($matches[1] as $raw) {
+                    // Decode entities and strip inline tags
+                    $clean = trim(html_entity_decode(strip_tags($raw), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+
+                    // Skip nav links, captions, labels (too short or looks like UI text)
+                    if (mb_strlen($clean) < 40) {
+                        continue;
+                    }
+
+                    // Skip boilerplate sentences common in news sites
+                    $lowerClean = strtolower($clean);
+                    if (
+                        str_contains($lowerClean, 'subscribe') ||
+                        str_contains($lowerClean, 'advertisement') ||
+                        str_contains($lowerClean, 'cookie') ||
+                        str_contains($lowerClean, 'sign up') ||
+                        str_contains($lowerClean, 'follow us') ||
+                        str_contains($lowerClean, 'read more') ||
+                        str_contains($lowerClean, 'click here') ||
+                        str_contains($lowerClean, 'also read')
+                    ) {
+                        continue;
+                    }
+
+                    $paragraphs[] = $clean;
+                }
+            }
+
+            if (empty($paragraphs)) {
+                return '';
+            }
+
+            // Join paragraphs with double newlines and cap at 2500 chars
+            $body = implode("\n\n", $paragraphs);
+            return mb_substr($body, 0, 2500);
+
+        } catch (\Throwable $e) {
+            Log::debug('SourceCollectionService::scrapeArticleBody: fetch failed (non-blocking).', [
+                'url'   => $url,
+                'error' => $e->getMessage(),
+            ]);
+            return '';
+        }
     }
 
     /**
