@@ -641,9 +641,6 @@
         if (node === 'audit' && window.fetchAuditLogs) {
             window.fetchAuditLogs();
         }
-        if (node === 'prompts' && window.fetchPromptTemplates) {
-            window.fetchPromptTemplates();
-        }
         if (node === 'settings' && window.fetchSystemSettings) {
             window.fetchSystemSettings();
         }
@@ -1973,286 +1970,7 @@
         });
     }
 
-    // Prompt Template selector
-    let activePromptId = 'promt_001';
-    function selectPromptTemplate(id, name, category, version, status, promt = '') {
-        activePromptId = id;
 
-        // Toggle delete button visibility based on whether the prompt is saved (numeric ID)
-        const isNew = id === 'new' || isNaN(id);
-        const deleteBtn = document.getElementById('delete-prompt-btn');
-        if (deleteBtn) {
-            if (isNew) {
-                deleteBtn.classList.add('hidden');
-            } else {
-                deleteBtn.classList.remove('hidden');
-            }
-        }
-
-        // Highlight selected item in list
-        document.querySelectorAll('.prompt-list-item').forEach(item => {
-            item.classList.remove('bg-white/5', 'border-accent');
-            item.classList.add('bg-transparent', 'border-border');
-        });
-        const selectedItem = document.getElementById('prompt-item-' + id);
-        if (selectedItem) {
-            selectedItem.classList.remove('bg-transparent', 'border-border');
-            selectedItem.classList.add('bg-white/5', 'border-accent');
-        }
-
-        document.getElementById('prompt-editor-id').innerText = "Active: " + id;
-        document.getElementById('prompt-edit-name').value = name;
-        document.getElementById('prompt-edit-category').value = category;
-        document.getElementById('prompt-edit-version').value = version;
-        document.getElementById('prompt-edit-status').value = status;
-
-        if (promt !== '') {
-            document.getElementById('prompt-editor-textarea').value = promt;
-        } else {
-            let text = "";
-            const ob = '{' + '{', cb = '}' + '}';
-            if (id === 'promt_001') {
-                text = "You are a senior tech reporter. Summarize the following news details regarding " + ob + "topic" + cb + " in a professional, engaging format with key bullet points. Target keyword: " + ob + "keyword" + cb + ".";
-            } else if (id === 'promt_002') {
-                text = "Compose a structured bulletin highlighting key developments in " + ob + "topic" + cb + ". Use tone: " + ob + "tone" + cb + ". Language should target " + ob + "language" + cb + ".";
-            } else {
-                text = "Analyze financial reports and output a trend summary for " + ob + "topic" + cb + ". Extract core indicators and model predictions.";
-            }
-            document.getElementById('prompt-editor-textarea').value = text;
-        }
-    }
-
-    window.openNewPromptTemplate = function () {
-        activePromptId = 'new';
-
-        const deleteBtn = document.getElementById('delete-prompt-btn');
-        if (deleteBtn) {
-            deleteBtn.classList.add('hidden');
-        }
-
-        document.querySelectorAll('.prompt-list-item').forEach(item => {
-            item.classList.remove('bg-white/5', 'border-accent');
-            item.classList.add('bg-transparent', 'border-border');
-        });
-
-        document.getElementById('prompt-editor-id').innerText = "Active: New Template";
-        document.getElementById('prompt-edit-name').value = '';
-        document.getElementById('prompt-edit-category').selectedIndex = 0;
-        document.getElementById('prompt-edit-version').value = 'v1.0';
-        document.getElementById('prompt-edit-status').value = 'active';
-        document.getElementById('prompt-editor-textarea').value = '';
-    };
-
-    window.fetchPromptTemplates = async function () {
-        const listContainer = document.getElementById('prompt-templates-list');
-        if (!listContainer) return;
-
-        try {
-            const response = await apiFetch('/api/v1/prompts');
-            if (!response.ok) return;
-            const result = await response.json();
-            const prompts = result.data || result;
-
-            listContainer.innerHTML = '';
-
-            if (prompts.length === 0) {
-                listContainer.innerHTML = `
-                        <div class="p-4 text-center text-xs text-muted font-mono">
-                            No prompts found. Click "Create Template" to add one.
-                        </div>
-                    `;
-                return;
-            }
-
-            prompts.forEach((p, index) => {
-                const div = document.createElement('div');
-                div.id = `prompt-item-${p.id}`;
-
-                const isSelected = activePromptId === p.id || (index === 0 && activePromptId === 'promt_001');
-                if (isSelected) {
-                    activePromptId = p.id;
-                    div.className = "p-3 bg-white/5 border border-accent rounded-xl cursor-pointer hover:border-accent transition group relative prompt-list-item";
-                } else {
-                    div.className = "p-3 bg-transparent border border-border rounded-xl cursor-pointer hover:bg-white/5 transition group relative prompt-list-item";
-                }
-
-                const safeName = p.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                const safeCategory = p.category.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                const safeVersion = (p.version || 'v1.0').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                const safeStatus = (p.status || 'active').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                const safePrompt = (p.content || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n');
-
-                div.setAttribute('onclick', `selectPromptTemplate(${p.id}, '${safeName}', '${safeCategory}', '${safeVersion}', '${safeStatus}', '${safePrompt}')`);
-
-                div.innerHTML = `
-                        <div class="flex justify-between items-center mb-1">
-                            <p class="text-xs font-semibold text-text">${p.name}</p>
-                            <span class="text-[9px] font-mono ${isSelected ? 'bg-accent/20 text-accent border border-accent/30' : 'bg-white/10 text-muted border border-border'} px-1.5 py-0.5 rounded">${p.version || 'v1.0'}</span>
-                        </div>
-                        <div class="flex justify-between items-center text-[10px] font-mono text-muted">
-                            <span>Category: ${p.category}</span>
-                            <span class="${p.status === 'active' ? 'text-success' : 'text-warning'}">${p.status || 'active'}</span>
-                        </div>
-                    `;
-
-                listContainer.appendChild(div);
-            });
-
-            if (activePromptId && activePromptId !== 'new') {
-                const activeP = prompts.find(p => p.id == activePromptId);
-                if (activeP) {
-                    selectPromptTemplate(activeP.id, activeP.name, activeP.category, activeP.version || 'v1.0', activeP.status || 'active', activeP.content);
-                }
-            }
-        } catch (err) {
-            console.error("Error fetching prompt templates:", err);
-        }
-    };
-
-    // Live edit local sync logic
-    function updatePromptField(field) {
-        const listItem = document.getElementById('prompt-item-' + activePromptId);
-        if (!listItem) return;
-
-        if (field === 'name') {
-            const val = document.getElementById('prompt-edit-name').value;
-            listItem.querySelector('p').innerText = val;
-        } else if (field === 'category') {
-            const val = document.getElementById('prompt-edit-category').value;
-            listItem.querySelector('.font-mono div span:first-child').innerText = 'Category: ' + val;
-        } else if (field === 'version') {
-            const val = document.getElementById('prompt-edit-version').value;
-            listItem.querySelector('span[class*="font-mono"]').innerText = val;
-        } else if (field === 'status') {
-            const val = document.getElementById('prompt-edit-status').value;
-            const statusSpan = listItem.querySelector('.font-mono div span:last-child');
-            if (statusSpan) {
-                statusSpan.innerText = val;
-                if (val === 'active') {
-                    statusSpan.className = 'text-success';
-                } else {
-                    statusSpan.className = 'text-warning';
-                }
-            }
-        }
-    }
-
-    async function saveActivePrompt() {
-        const payload = {
-            name: document.getElementById('prompt-edit-name')?.value || '',
-            category: document.getElementById('prompt-edit-category')?.value || '',
-            version: document.getElementById('prompt-edit-version')?.value || '',
-            status: document.getElementById('prompt-edit-status')?.value || 'active',
-            prompt: document.getElementById('prompt-editor-textarea')?.value || ''
-        };
-
-        const isNew = activePromptId === 'new' || isNaN(activePromptId);
-        const url = isNew ? '/api/v1/prompts' : `/api/v1/prompts/${activePromptId}`;
-        const method = isNew ? 'POST' : 'PUT';
-
-        await apiRequest(url, {
-            method: method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        }, {
-            successTitle: "Prompt Saved",
-            successMessage: "Prompt template saved successfully in the Library!",
-            defaultErrorMessage: "Could not save prompt template.",
-            onSuccess: (result) => {
-                if (result && result.data && result.data.id) {
-                    activePromptId = result.data.id;
-                } else if (result && result.id) {
-                    activePromptId = result.id;
-                }
-            }
-        });
-
-        if (window.fetchPromptTemplates) {
-            await window.fetchPromptTemplates();
-        }
-    }
-
-    window.deleteActivePrompt = async function () {
-        if (!activePromptId || activePromptId === 'new' || isNaN(activePromptId)) {
-            return;
-        }
-
-        const result = await Swal.fire({
-            title: 'Delete Prompt Template?',
-            text: "Are you sure you want to delete this prompt template from the library? This action cannot be undone.",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#EF4444',
-            cancelButtonColor: '#64748B',
-            confirmButtonText: 'Yes, delete it',
-            cancelButtonText: 'Cancel',
-            background: document.documentElement.classList.contains('dark') ? '#0f172a' : '#ffffff',
-            color: document.documentElement.classList.contains('dark') ? '#f8fafc' : '#0f172a'
-        });
-
-        if (!result.isConfirmed) {
-            return;
-        }
-
-        const success = await apiRequest(`/api/v1/prompts/${activePromptId}`, {
-            method: 'DELETE'
-        }, {
-            successTitle: "Prompt Deleted",
-            successMessage: "The prompt template was successfully deleted.",
-            defaultErrorMessage: "Could not delete prompt template."
-        });
-
-        if (success) {
-            activePromptId = 'new';
-            if (window.fetchPromptTemplates) {
-                await window.fetchPromptTemplates();
-            }
-            openNewPromptTemplate();
-        }
-    };
-
-
-    // Execute live prompt testing dry-run
-    async function runPromptTestSimulation() {
-        const outWindow = document.getElementById('prompt-test-output-window');
-        if (!outWindow) return;
-
-        if (!activePromptId || activePromptId === 'new' || isNaN(activePromptId)) {
-            outWindow.innerText = "Error: Please save the prompt template settings first before executing a dry-run.";
-            return;
-        }
-
-        const category = document.getElementById('test-category')?.value || 'Technology';
-        const keywords = document.getElementById('test-keywords')?.value || 'AI, tech';
-
-        outWindow.innerText = "Connecting to AI Provider...\n";
-        outWindow.innerText += "Sending mock variables (Category: '" + category + "', Keywords: '" + keywords + "')...\n";
-        outWindow.innerText += "Compiling prompt template and waiting for response...\n\n";
-
-        try {
-            const response = await apiFetch(`/api/v1/prompts/${activePromptId}/test`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    variables: {
-                        category: category,
-                        keywords: keywords
-                    }
-                })
-            });
-
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.message || "Failed to execute prompt test.");
-            }
-
-            const result = await response.json();
-            outWindow.innerText = result.text || "Model execution returned an empty response.";
-        } catch (err) {
-            console.error("Prompt dry-run error:", err);
-            outWindow.innerText = "Dry-run Failed:\n" + err.message;
-        }
-    }
 
     // Simulate real-time pipeline run loops
     function simulatePipelineRun() {
@@ -3524,7 +3242,7 @@
                                 <span class="text-[9px] font-mono bg-white/10 text-muted border border-border px-1.5 py-0.5 rounded">${prompt.version || 'v1.0'}</span>
                             </div>
                             <div class="flex justify-between items-center text-[10px] font-mono text-muted">
-                                <span>Category: ${escapeJsString(prompt.category || 'General')}</span>
+                                <span>Universal Template</span>
                                 <span class="${statusColor}">${prompt.status || 'active'}</span>
                             </div>
                         `;
@@ -3548,10 +3266,9 @@
 
         document.getElementById('prompt-active-id').value = prompt.id;
         document.getElementById('prompt-edit-name').value = prompt.name || '';
-        document.getElementById('prompt-edit-category').value = prompt.category || '';
         document.getElementById('prompt-edit-version').value = prompt.version || 'v1.0';
         document.getElementById('prompt-edit-status').value = prompt.status || 'active';
-        document.getElementById('prompt-editor-textarea').value = prompt.prompt || '';
+        document.getElementById('prompt-editor-textarea').value = prompt.prompt || prompt.content || '';
         document.getElementById('prompt-editor-id').innerText = `ACTIVE: PROMPT #${prompt.id}`;
 
         const deleteBtn = document.getElementById('delete-prompt-btn');
@@ -3572,7 +3289,6 @@
     window.openNewPromptTemplate = function () {
         document.getElementById('prompt-active-id').value = '';
         document.getElementById('prompt-edit-name').value = '';
-        document.getElementById('prompt-edit-category').value = '';
         document.getElementById('prompt-edit-version').value = 'v1.0';
         document.getElementById('prompt-edit-status').value = 'active';
         document.getElementById('prompt-editor-textarea').value = '';
@@ -3590,7 +3306,6 @@
     window.saveActivePrompt = async function () {
         const id = document.getElementById('prompt-active-id').value;
         const name = document.getElementById('prompt-edit-name').value;
-        const category = document.getElementById('prompt-edit-category').value;
         const version = document.getElementById('prompt-edit-version').value;
         const status = document.getElementById('prompt-edit-status').value;
         const promptText = document.getElementById('prompt-editor-textarea').value;
@@ -3606,7 +3321,6 @@
 
         const payload = {
             name,
-            category,
             version,
             status,
             prompt: promptText
@@ -3622,7 +3336,11 @@
         }, {
             successTitle: id ? "Prompt Template Updated" : "Prompt Template Created",
             successMessage: id ? "Prompt template updated successfully." : "New prompt template registered successfully.",
-            onSuccess: async () => {
+            onSuccess: async (res) => {
+                if (res && (res.id || (res.data && res.data.id))) {
+                    const savedId = res.id || res.data.id;
+                    document.getElementById('prompt-active-id').value = savedId;
+                }
                 await window.fetchPrompts();
             }
         });
@@ -3694,7 +3412,7 @@
         const outputWin = document.getElementById('prompt-test-output-window');
         if (!outputWin) return;
 
-        const category = document.getElementById('test-category')?.value || 'Technology';
+        const topic = document.getElementById('test-topic')?.value || 'Indian Startup Funding & AI Tech';
         const keywords = document.getElementById('test-keywords')?.value || 'AI';
 
         outputWin.innerText = "Connecting to AI Provider dry-run pipeline...";
@@ -3705,7 +3423,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        variables: { category, keywords }
+                        variables: { topic, keywords }
                     })
                 });
                 if (res.ok) {
@@ -3718,7 +3436,7 @@
             // Fallback compilation preview
             const promptText = document.getElementById('prompt-editor-textarea')?.value || '';
             let compiled = promptText
-                .replaceAll('@{{category}}', category)
+                .replaceAll('@{{topic}}', topic)
                 .replaceAll('@{{keywords}}', keywords)
                 .replaceAll('@{{tone}}', 'Professional')
                 .replaceAll('@{{language}}', 'English')

@@ -49,14 +49,10 @@
                                 
                                 <!-- Editor Pane -->
                                 <div id="prompt-pane-editor" class="prompt-tab-view space-y-4">
-                                    <div class="grid grid-cols-2 gap-4 p-4 bg-background border border-border rounded-xl">
+                                    <div class="grid grid-cols-3 gap-4 p-4 bg-background border border-border rounded-xl">
                                         <div class="space-y-1.5">
                                             <label class="block text-[9px] font-mono text-muted uppercase">Prompt Name</label>
-                                            <input id="prompt-edit-name" class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent" type="text" placeholder="e.g. News Summarizer" value=""/>
-                                        </div>
-                                        <div class="space-y-1.5">
-                                            <label class="block text-[9px] font-mono text-muted uppercase">Target Category</label>
-                                            <input id="prompt-edit-category" class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent" type="text" placeholder="e.g. Technology" value=""/>
+                                            <input id="prompt-edit-name" class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent" type="text" placeholder="e.g. Universal News Summarizer" value=""/>
                                         </div>
                                         <div class="space-y-1.5">
                                             <label class="block text-[9px] font-mono text-muted uppercase">Version</label>
@@ -88,7 +84,7 @@
                                     <!-- Code Editor Input Box -->
                                     <div class="space-y-1.5 flex-1 flex flex-col">
                                         <label class="block text-[9px] font-mono text-muted uppercase">Prompt Template Instructions</label>
-                                        <textarea id="prompt-editor-textarea" class="w-full h-56 bg-background border border-border rounded-xl p-4 font-mono text-xs text-text focus:outline-none focus:border-accent focus:ring-0 leading-relaxed" placeholder="Enter prompt instructions using @{{topic}}, @{{category}}, @{{website}} placeholders..."></textarea>
+                                        <textarea id="prompt-editor-textarea" class="w-full h-56 bg-background border border-border rounded-xl p-4 font-mono text-xs text-text focus:outline-none focus:border-accent focus:ring-0 leading-relaxed" placeholder="Enter prompt instructions using @{{topic}}, @{{keywords}}, @{{website}} placeholders..."></textarea>
                                     </div>
 
                                     <!-- Footer Actions -->
@@ -111,8 +107,8 @@
                                             <h4 class="text-xs font-mono uppercase tracking-widest text-muted">Variable Mock Inputs</h4>
                                             <div class="space-y-3">
                                                 <div>
-                                                    <label class="block text-[10px] font-mono text-muted mb-1" for="test-category">&#123;&#123;category&#125;&#125;</label>
-                                                    <input id="test-category" class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent" type="text" value="Technology"/>
+                                                    <label class="block text-[10px] font-mono text-muted mb-1" for="test-topic">&#123;&#123;topic&#125;&#125;</label>
+                                                    <input id="test-topic" class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent" type="text" value="Indian Startup Funding & AI Tech"/>
                                                 </div>
                                                 <div>
                                                     <label class="block text-[10px] font-mono text-muted mb-1" for="test-keywords">&#123;&#123;keywords&#125;&#125;</label>

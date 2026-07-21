@@ -24,11 +24,6 @@ class PromptController extends Controller
     {
         $query = Prompt::query()->latest();
 
-        // Filtering by category
-        if ($request->filled('category')) {
-            $query->where('category', $request->input('category'));
-        }
-
         // Filtering by status
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));

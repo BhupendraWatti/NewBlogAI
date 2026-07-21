@@ -17,7 +17,6 @@ class UpdatePromptRequest extends FormRequest
             'topic_id' => ['sometimes', 'nullable', 'integer', 'exists:topics,id'],
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'prompt' => ['sometimes', 'required', 'string'],
-            'category' => ['sometimes', 'required', 'string', 'max:255'],
             'variables' => ['sometimes', 'nullable', 'array'],
             'variables.*' => ['string'],
             'version' => ['sometimes', 'required', 'string', 'max:50'],

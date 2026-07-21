@@ -31,8 +31,7 @@ class PromptLibraryTest extends TestCase
         $response = $this->actingAs($this->user)
             ->postJson('/api/v1/prompts', [
                 'name' => 'SEO Meta generator',
-                'prompt' => 'Write meta tags for @{{topic}}.',
-                'category' => 'SEO',
+                'prompt' => 'Write meta tags for {{topic}}.',
                 'variables' => ['topic'],
                 'version' => 'v1.1',
                 'status' => 'active',
@@ -40,13 +39,11 @@ class PromptLibraryTest extends TestCase
 
         $response->assertStatus(201)
             ->assertJsonPath('data.name', 'SEO Meta generator')
-            ->assertJsonPath('data.category', 'SEO')
             ->assertJsonPath('data.variables', ['topic'])
             ->assertJsonPath('data.version', 'v1.1');
 
         $this->assertDatabaseHas('prompts', [
             'name' => 'SEO Meta generator',
-            'category' => 'SEO',
         ]);
     }
 
@@ -56,7 +53,6 @@ class PromptLibraryTest extends TestCase
         Prompt::create([
             'name' => 'A Prompt',
             'prompt' => 'Content A',
-            'category' => 'Tech',
             'variables' => [],
             'version' => 'v1.0',
             'status' => 'active',
@@ -65,19 +61,10 @@ class PromptLibraryTest extends TestCase
         Prompt::create([
             'name' => 'B Prompt',
             'prompt' => 'Content B',
-            'category' => 'Finance',
             'variables' => [],
             'version' => 'v1.0',
             'status' => 'inactive',
         ]);
-
-        // Filter by category = Tech
-        $response1 = $this->actingAs($this->user)
-            ->getJson('/api/v1/prompts?category=Tech');
-
-        $response1->assertStatus(200)
-            ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.name', 'A Prompt');
 
         // Filter by status = inactive
         $response2 = $this->actingAs($this->user)

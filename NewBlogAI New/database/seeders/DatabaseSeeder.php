@@ -123,14 +123,9 @@ class DatabaseSeeder extends Seeder
 
         // Seed Prompts — must be 'active' for pipeline validation
         $prompt1 = Prompt::create([
-            'name' => 'Newsletter Compiler',
-            'prompt' => 'Synthesize the latest news on the topic {{topic}} into an engaging weekly newsletter format. Use markdown. Website: {{website}}.',
-            'status' => 'active',
-        ]);
-
-        $prompt2 = Prompt::create([
-            'name' => 'Tech Blog Writer',
-            'prompt' => 'Write a deeply analytical blog post about {{topic}}. Language: {{language}}. Keep the tone professional. Website: {{website}}.',
+            'name' => 'Standard Universal Article Generator',
+            'prompt' => 'You are a professional news journalist writing a comprehensive update on {{topic}}. Incorporate key insights and maintain an objective, engaging tone. Language: {{language}}. Website: {{website}}.',
+            'version' => 'v1.0',
             'status' => 'active',
         ]);
     }

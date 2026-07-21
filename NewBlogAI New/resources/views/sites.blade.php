@@ -355,16 +355,21 @@
 
         async function fetchPrompts() {
             try {
-                prompts = [
-                    { id: 1, name: 'Newsletter Compiler' },
-                    { id: 2, name: 'Tech Blog Writer' }
-                ];
+                const response = await apiFetch('/api/v1/prompts');
+                if (response.ok) {
+                    const result = await response.json();
+                    prompts = result.data || result;
+                } else {
+                    prompts = [];
+                }
                 
                 const select = document.getElementById('prompt_id');
-                select.innerHTML = '<option value="">Select Prompt Template</option>';
-                prompts.forEach(p => {
-                    select.innerHTML += `<option value="${p.id}">${p.name}</option>`;
-                });
+                if (select) {
+                    select.innerHTML = '<option value="">Select Prompt Template</option>';
+                    prompts.forEach(p => {
+                        select.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+                    });
+                }
             } catch (err) {
                 console.error("Error fetching prompts:", err);
             }

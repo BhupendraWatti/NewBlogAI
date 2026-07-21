@@ -16,7 +16,6 @@ class Prompt extends Model
         'name',
         'topic_id',
         'prompt', // the raw prompt text
-        'category',
         'variables', // json list of variables, e.g. ["topic", "keyword", "tone"]
         'version',
         'status', // active, inactive

@@ -368,7 +368,7 @@ Source Text:
                         <span onclick="event.stopPropagation(); deletePrompt(${p.id})" class="material-symbols-outlined text-outline hover:text-error text-sm">delete</span>
                     </div>
                     <h3 class="font-label-md text-label-md text-on-surface mb-1 relative z-10">${p.name}</h3>
-                    <p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-2 relative z-10">${p.promt}</p>
+                    <p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-2 relative z-10">${p.prompt || p.content || ''}</p>
                 `;
                 container.appendChild(item);
             });
@@ -381,7 +381,7 @@ Source Text:
         function selectPrompt(p) {
             activePromptId = p.id;
             document.getElementById('prompt-name').value = p.name;
-            document.getElementById('prompt-text').value = p.promt;
+            document.getElementById('prompt-text').value = p.prompt || p.content || '';
             renderPrompts(loadedPrompts);
         }
 
@@ -399,9 +399,9 @@ Source Text:
 
         async function savePrompt() {
             const name = document.getElementById('prompt-name').value;
-            const promt = document.getElementById('prompt-text').value;
+            const promptText = document.getElementById('prompt-text').value;
 
-            if (!name || !promt) {
+            if (!name || !promptText) {
                 showWarning("Input Required", "Prompt name and template content are required.");
                 return;
             }
@@ -412,13 +412,13 @@ Source Text:
                     response = await apiFetch(`/api/v1/prompts/${activePromptId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name, promt })
+                        body: JSON.stringify({ name, prompt: promptText })
                     });
                 } else {
                     response = await apiFetch('/api/v1/prompts', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name, promt })
+                        body: JSON.stringify({ name, prompt: promptText })
                     });
                 }
 
