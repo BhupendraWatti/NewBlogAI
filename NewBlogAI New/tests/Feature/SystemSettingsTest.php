@@ -46,7 +46,7 @@ class SystemSettingsTest extends TestCase
             ->getJson('/api/v1/settings');
 
         $response->assertStatus(200)
-            ->assertJsonPath('settings.currency', 'USD')
+            ->assertJsonPath('settings.currency', 'INR')
             ->assertJsonPath('settings.timezone', 'UTC');
     }
 
@@ -96,18 +96,18 @@ class SystemSettingsTest extends TestCase
         $service = new SystemSettingsService;
 
         // Fresh retrieval triggers DB hit
-        $val1 = $service->get('currency', 'USD');
-        $this->assertEquals('USD', $val1);
+        $val1 = $service->get('currency', 'INR');
+        $this->assertEquals('INR', $val1);
 
         // Put direct config in DB (bypassing service to test cache)
-        Setting::updateOrCreate(['key' => 'currency'], ['value' => 'INR']);
+        Setting::updateOrCreate(['key' => 'currency'], ['value' => 'EUR']);
 
-        // Service should still return cached 'USD'
-        $val2 = $service->get('currency', 'USD');
-        $this->assertEquals('USD', $val2);
+        // Service should still return cached 'INR'
+        $val2 = $service->get('currency', 'INR');
+        $this->assertEquals('INR', $val2);
 
         // Service sets new value, cache is cleared
-        $service->set('currency', 'INR');
-        $this->assertEquals('INR', $service->get('currency'));
+        $service->set('currency', 'EUR');
+        $this->assertEquals('EUR', $service->get('currency'));
     }
 }

@@ -16,7 +16,9 @@ class SubscribeRequest extends FormRequest
         return [
             'plan_id' => ['required', 'exists:plans,id'],
             'billing_period' => ['required', 'string', 'in:monthly,yearly'],
-            'payment_token' => ['nullable', 'string'], // Stub token for commented payment gateway flow
+            'payment_token' => ['nullable', 'string'],
+            'coupon_code' => ['nullable', 'string'],
+            'status' => ['nullable', 'string', 'in:trial,active'],
         ];
     }
 }

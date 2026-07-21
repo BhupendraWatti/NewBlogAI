@@ -105,3 +105,23 @@ Newsroom candidate discovery target count is 9. To ensure stability and avoid fa
 Rule 25
 
 All generated news articles must contain a clear AI disclosure statement at the end, avoid direct verbatim copying to prevent plagiarism, and write with complete neutrality. Visual media comment placeholders must be stripped of double-wrapped or escaped paragraph tags during HTML post-processing. 
+
+Rule 26
+
+Billing ledgers are populated dynamically with tenant-isolated invoices and transactions. Invoices and transactions are created and finalized upon new subscription signups, plan upgrades, and recurring cycles. All public entities (invoices, transactions, coupons) use secure UUIDv7 or ULID string primary keys.
+
+Rule 27
+
+Active expired subscriptions are processed daily by the `subscription-lifecycle-automation` scheduler command. The scheduler attempts to auto-charge the customer's payment method via the active gateway adapter and extends the subscription duration by the billing period (month/year) on successful payment, generating a paid invoice and transaction. If the charge fails, it falls back to marking the subscription as expired.
+
+Rule 28
+
+Every generated content draft, pipeline execution run, and AI request log must track the `user_id` of the actor (employee or system user) who initiated the workflow, ensuring complete user/employee cost attribution across the tenant workspace. 
+
+Rule 29
+
+System authorization roles are restricted to exactly three tiers: Super Admin (1), Customer (2), and Employee (3). All user creation, updates, and access controls validate against this simplified hierarchy.
+
+Rule 30
+
+The system operates strictly under Indian Rupees (INR) for all financial ledgers, invoicing calculations, transactions, and settings. Front-end pricing details and dashboard invoices display the Rupee symbol (₹).

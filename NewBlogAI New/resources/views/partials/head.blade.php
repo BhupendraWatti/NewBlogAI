@@ -215,6 +215,20 @@
             border-color: rgba(0, 0, 0, 0.15);
         }
 
+        /* ─── Light Mode Specific Variable Overrides ─── */
+        :root:not(.dark) .border-border {
+            border-color: rgba(0, 0, 0, 0.12) !important;
+        }
+        :root:not(.dark) .bg-surface\/50 {
+            background-color: #F8FAFC !important;
+        }
+        :root:not(.dark) .bg-background {
+            background-color: #FFFFFF !important;
+        }
+        :root:not(.dark) .sheet-overlay {
+            background: rgba(15, 23, 42, 0.35);
+        }
+
         /* ── Global Modal Styling ────────────────────────────────────────── */
         .modal-overlay {
             position: fixed;
@@ -249,13 +263,53 @@
             transform: scale(0.95);
             transition: transform 0.25s ease;
         }
-        .modal-overlay.active .modal-container {
-            transform: scale(1);
-        }
         :root:not(.dark) .modal-container {
             background: #FFFFFF;
             color: #0F172A;
             box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+        }
+
+        /* ─── Premium Slide-Over Sheet (Drawer) ────────────────────────────── */
+        .sheet-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            display: flex;
+            justify-content: flex-end;
+            align-items: stretch;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .sheet-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .sheet-container {
+            background: var(--color-surface);
+            border-left: 1px solid var(--color-border);
+            width: 640px;
+            max-width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -10px 0 35px rgba(0, 0, 0, 0.4);
+            transform: translateX(100%);
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .sheet-overlay.active .sheet-container {
+            transform: translateX(0);
+        }
+        :root:not(.dark) .sheet-container {
+            background: #FFFFFF;
+            color: #0F172A;
+            box-shadow: -10px 0 35px rgba(0, 0, 0, 0.08);
         }
     </style>
 </head>

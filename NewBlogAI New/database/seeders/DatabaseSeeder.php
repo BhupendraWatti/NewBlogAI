@@ -44,7 +44,7 @@ class DatabaseSeeder extends Seeder
                 'customer_id' => $customer->id,
             ]
         );
-        if (! $user->customer_id) {
+        if (!$user->customer_id) {
             $user->update(['customer_id' => $customer->id]);
         }
 
@@ -65,18 +65,11 @@ class DatabaseSeeder extends Seeder
             'monthly_generation_limit' => 500,
             'minimum_publishing_frequency' => 'hourly',
             'feature_flags' => ['seo_optimizer' => true],
+            // ── Feature Entitlements ─────────────────────────────
+            'analytics_access' => true,   // Enables per-site analytics dashboard
+            'priority_support' => true,   // Enables priority support badge
         ]);
 
-        // Seed Subscription
-        $subscription = Subscription::create([
-            'customer_id' => $customer->id,
-            'plan_id' => $plan->id,
-            'status' => 'active',
-            'billing_period' => 'monthly',
-            'starts_at' => now()->subDay(),
-            'ends_at' => now()->addMonth(),
-            'limits' => $plan->toArray(),
-        ]);
 
         // Seed AI Providers
         AIProvider::create([
@@ -139,51 +132,6 @@ class DatabaseSeeder extends Seeder
             'name' => 'Tech Blog Writer',
             'prompt' => 'Write a deeply analytical blog post about {{topic}}. Language: {{language}}. Keep the tone professional. Website: {{website}}.',
             'status' => 'active',
-        ]);
-
-        // Seed Topics — must be 'active' for pipeline validation
-        Topic::create(['name' => 'Generative AI', 'status' => 'active']);
-        Topic::create(['name' => 'Venture Capital', 'status' => 'active']);
-        Topic::create(['name' => 'Healthy Living', 'status' => 'active']);
-
-        // Seed Keys
-        $key1 = Key::create([
-            'name' => 'Primary OpenAI Key',
-            'key' => 'sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-        ]);
-
-        $key2 = Key::create([
-            'name' => 'Claude Anthropic Key',
-            'key' => 'sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-        ]);
-
-        // Seed Sites
-        Site::create([
-            'domain_url' => 'https://tech-insider.com',
-            'customer_id' => $customer->id,
-            'is_active' => true,
-            'api_key' => $key1->id, // References the key id
-            'last_sync_status' => 'success',
-            'last_synced_at' => now()->subMinutes(2),
-        ]);
-
-        Site::create([
-            'domain_url' => 'https://finance-daily.net',
-            'customer_id' => $customer->id,
-            'is_active' => true,
-            'api_key' => $key1->id,
-            'last_sync_status' => 'syncing',
-            'last_synced_at' => now()->subMinutes(45),
-        ]);
-
-        Site::create([
-            'domain_url' => 'https://health-trends.org',
-            'customer_id' => $customer->id,
-            'is_active' => true,
-            'api_key' => $key2->id,
-            'last_sync_status' => 'failed',
-            'last_synced_at' => now()->subHours(3),
-            'error_log' => 'WordPress Sync failed: HTTP 403 Forbidden. Invalid API Key credentials configured.',
         ]);
     }
 }

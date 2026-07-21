@@ -136,6 +136,7 @@ class PipelineService
                     'pipeline_id' => $pipeline->id,
                     'status'      => 'queued',
                     'properties'  => $properties ?: null,
+                    'user_id'     => auth()->id(),
                 ]);
 
                 // Update pipeline status
@@ -214,6 +215,7 @@ class PipelineService
                     'status'      => 'queued',
                     'run_type'    => PipelineRun::TYPE_DISCOVERY,
                     'properties'  => $properties ?: null,
+                    'user_id'     => auth()->id(),
                 ]);
 
                 GenerateNewsCandidatesJob::dispatch($run->id);
@@ -247,6 +249,7 @@ class PipelineService
                     'run_type'    => $run->run_type ?? PipelineRun::TYPE_FULL,
                     'retry_count' => $run->retry_count + 1,
                     'properties'  => $run->properties,
+                    'user_id'     => auth()->id() ?? $run->user_id,
                 ]);
 
                 if ($newRun->isDiscovery()) {

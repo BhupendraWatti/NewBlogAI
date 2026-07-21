@@ -21,6 +21,7 @@ class PipelineRun extends Model
 
     protected $fillable = [
         'pipeline_id',
+        'user_id',
         'status',
         'run_type',
         'retry_count',
@@ -39,6 +40,11 @@ class PipelineRun extends Model
     protected $attributes = [
         'run_type' => self::TYPE_FULL,
     ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'user_id');
+    }
 
     public function pipeline(): BelongsTo
     {

@@ -16,6 +16,7 @@ class AIRequestLog extends Model
         'customer_id',
         'subscription_id',
         'site_id',
+        'user_id',
         'model',
         'prompt_id',
         'topic_id',
@@ -42,6 +43,11 @@ class AIRequestLog extends Model
         static::creating(function ($model) {
             $model->created_at = $model->freshTimestamp();
         });
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'user_id');
     }
 
     public function prompt(): BelongsTo

@@ -23,9 +23,10 @@ Laravel is the platform's single source of truth. WordPress is an execution adap
 ## Allowed interactions
 
 - Product modules ask SubscriptionManager whether an operation is allowed; they do not inspect plan columns directly.
+- SubscriptionManager manages invoices, transactions, and coupon redemptions, providing secure tenant-isolated ledgers.
 - SiteManager composes plugin configuration by reading owning modules. Other modules do not construct plugin payloads.
 - ScheduleManager decides when work is due and delegates generation to ContentPipeline.
-- ContentPipeline validates composition, enforces concurrency gates, and delegates AI work to ContentGeneration.
+- ContentPipeline and ContentGeneration capture and propagate the user_id to all runs, generated drafts, and request logs for user/employee attribution.
 - ContentGeneration uses AIProviderManager, handles provider failover retries, and records attributable usage.
 - Publishing delegates remote WordPress transport to SiteManager's WordPress client.
 - Operations reads other modules for reporting and dispatches notifications, but does not mutate their core business state.

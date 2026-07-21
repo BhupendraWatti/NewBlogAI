@@ -1,3 +1,22 @@
+# Sprint Progress: Phase 9: Billing & Subscription System Implementation
+
+## Current Sprint Objectives (Phase 9)
+- [x] **Task 1: Non-Destructive Database Schema Extension** (Created and ran migrations for `invoices`, `transactions`, `coupons`, and `coupon_redemptions` tables using UUIDv7 primary keys. Added `user_id` to `generated_contents`, `pipeline_runs`, and `ai_request_logs` tables).
+- [x] **Task 2: Decoupled Payment Gateway Factory** (Refactored `PaymentGatewayInterface` and `PaymentGatewayStub` to add `refund` and `createCustomer`. Created concrete adapters for Stripe, Razorpay, and PhonePe with dynamic service container binding).
+- [x] **Task 3: Billing & Renewal Engine** (Created `Invoice`, `Transaction`, `Coupon`, and `CouponRedemption` models. Created `CouponService` for discount calculations. Extended the `subscription-lifecycle-automation` scheduled task in `routes/console.php` to auto-renew active expired subscriptions).
+- [x] **Task 4: API Routes & Tenant-Isolated Controller** (Fixed the missing `subscriptions` endpoint and added secure, role-restricted, tenant-isolated `InvoiceController` routes inside `routes/api.php`).
+- [x] **Task 5: UI & Scripts Refactoring** (Fixed JavaScript templates in `scripts.blade.php` to resolve `.monthly_price` / `.yearly_price` variables instead of `.price` to prevent `NaN` listings. Integrated an optional Coupon Code input field in the update plan modal).
+- [x] **Task 6: Verification & Test Coverage** (Wrote `BillingCouponAndInvoiceTest.php` to verify coupon logic, invoice/transaction generation, and scheduled auto-renewal loops. Verified that the full test suite runs with 176 passing tests).
+- [x] **Task 7: Role Simplification & Indian Currency Localisation** (Simplified user scopes to Super Admin, Customer, and Employee. Configured Indian names, country placeholder, and phone inputs. Switched default settings and ledger calculations to INR with Rupee ₹ prints in views).
+- [x] **Task 8: Customer Registry Navigation & User Table Role Correction** (Added Customers menu item to sidebar. Updated roleName map in JS list and PHP footer arrays to correctly display Customer and Employee instead of Admin and Editor).
+- [x] **Task 9: Dynamic Subscription Plan Manager Workspace** (Implemented `plans.blade.php` workspace view to allow full dynamic creation, edition, and deletion of plans. Registered workspace node, navigation links, and JS functions block).
+- [x] **Task 10: Slide-Over Sheet Transition & High-Contrast Light/Dark Theming** (Implemented right-aligned slide-out drawer style via sheet-overlay/sheet-container classes in head.blade.php. Cleaned up plans.blade.php form inputs to use dynamic CSS custom variables. Passed all test suites).
+- [x] **Task 11: Route Mapping Fix & Accessible Border Contrast** (Registered plans path inside web.php routing array to prevent 404 errors on hard refresh. Standardized light theme borders to rgba(0,0,0,0.12) and configured solid grey checklist backgrounds).
+- [x] **Task 12: Dynamic Modal Input Aesthetics & Accessible Badges Contrast** (Replaced all remaining static bg-[#071018] instances in changePlan/assignSubscription modal inputs, log detail panels, and pricing plan listing row feature badges with dynamic theme bg-background classes to guarantee accessibility. Verified all test suites).
+- [x] **Task 13: Full System QA Audit, Dead Code Removal & Dynamic Select Data-Binding** (Conducted full browser & code QA audit across all workspaces. Fixed hardcoded bg-[#071018] and dead border-outline-variant classes across topics, scheduler, rules, settings, customers, roles, creation-wizard, and prompts modal views. Added full frontend Topic CRUD JS integration and dynamic AI provider primary model routing. All 176 PHP unit tests pass successfully).
+
+---
+
 # Sprint Progress: Phase 7: Duplicate, Fabricated, and Unauthentic News Prevention
 
 ## Current Sprint Objectives (Phase 7)

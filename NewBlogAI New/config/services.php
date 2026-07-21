@@ -35,4 +35,19 @@ return [
         ],
     ],
 
+    'payment_gateway' => env('PAYMENT_GATEWAY_PROVIDER', 'stub'),
+
+    'stripe' => [
+        'secret' => env('STRIPE_SECRET_KEY', 'sk_test_mock'),
+    ],
+
+    'razorpay' => [
+        'key_id' => env('RAZORPAY_KEY_ID', 'rzp_test_mock'),
+        'key_secret' => env('RAZORPAY_KEY_SECRET', 'mock_secret'),
+    ],
+
+    'phonepe' => [
+        'merchant_id' => env('PHONEPE_MERCHANT_ID', 'MID_MOCK'),
+    ],
+
 ];

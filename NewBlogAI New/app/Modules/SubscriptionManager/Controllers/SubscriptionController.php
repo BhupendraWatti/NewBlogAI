@@ -50,8 +50,10 @@ class SubscriptionController extends Controller
         $plan = Plan::find($request->input('plan_id'));
         $billingPeriod = $request->input('billing_period');
         $paymentToken = $request->input('payment_token');
+        $couponCode = $request->input('coupon_code');
+        $status = $request->input('status');
 
-        $subscription = $this->service->subscribe($customer, $plan, $billingPeriod, $paymentToken);
+        $subscription = $this->service->subscribe($customer, $plan, $billingPeriod, $paymentToken, $couponCode, $status);
 
         return (new SubscriptionResource($subscription))
             ->response()
@@ -88,8 +90,9 @@ class SubscriptionController extends Controller
         $newPlan = Plan::find($request->input('plan_id'));
         $billingPeriod = $request->input('billing_period');
         $paymentToken = $request->input('payment_token');
+        $couponCode = $request->input('coupon_code');
 
-        $updated = $this->service->upgrade($subscription, $newPlan, $billingPeriod, $paymentToken);
+        $updated = $this->service->upgrade($subscription, $newPlan, $billingPeriod, $paymentToken, $couponCode);
 
         return new SubscriptionResource($updated);
     }

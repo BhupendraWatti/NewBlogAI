@@ -107,6 +107,14 @@
                         <span class="material-symbols-outlined text-xs transition-transform duration-200 group-open/menu:rotate-180 text-muted/60">expand_more</span>
                     </summary>
                     <div class="space-y-1 mt-2 pl-1">
+                        <button onclick="switchWorkspace('customers')" data-node="customers" class="w-full flex items-center gap-3 text-left px-3 py-2 rounded-xl font-medium text-sm transition-all duration-200 text-muted hover:text-text hover:bg-white/5">
+                            <span class="material-symbols-outlined text-lg">group</span>
+                            Customers
+                        </button>
+                        <button onclick="switchWorkspace('plans')" data-node="plans" class="w-full flex items-center gap-3 text-left px-3 py-2 rounded-xl font-medium text-sm transition-all duration-200 text-muted hover:text-text hover:bg-white/5">
+                            <span class="material-symbols-outlined text-lg">card_membership</span>
+                            Subscription Plans
+                        </button>
                         <button onclick="switchWorkspace('roles')" data-node="roles" class="w-full flex items-center gap-3 text-left px-3 py-2 rounded-xl font-medium text-sm transition-all duration-200 text-muted hover:text-text hover:bg-white/5">
                             <span class="material-symbols-outlined text-lg">admin_panel_settings</span>
                             Users &amp; Roles
@@ -154,10 +162,8 @@
             if ($auth_user) {
                 $roleNames = [
                     1 => 'Super Admin',
-                    2 => 'Admin',
-                    3 => 'Editor',
-                    4 => 'SEO Specialist',
-                    5 => 'Support'
+                    2 => 'Customer',
+                    3 => 'Employee'
                 ];
                 $displayRole = $roleNames[$auth_user->role] ?? 'Operator';
             }

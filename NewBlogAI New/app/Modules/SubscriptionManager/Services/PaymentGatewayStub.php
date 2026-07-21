@@ -46,4 +46,30 @@ class PaymentGatewayStub implements PaymentGatewayInterface
 
         return true;
     }
+
+    public function refund(string $transactionId, float $amount): array
+    {
+        Log::info('Stubbing Payment Refund', [
+            'transaction_id' => $transactionId,
+            'amount' => $amount,
+        ]);
+
+        return [
+            'refund_id' => 're_'.bin2hex(random_bytes(8)),
+            'status' => 'succeeded',
+            'amount' => $amount,
+            'currency' => 'usd',
+            'gateway' => 'Stripe Mock Core',
+        ];
+    }
+
+    public function createCustomer(string $email, string $name): string
+    {
+        Log::info('Stubbing Customer Creation', [
+            'email' => $email,
+            'name' => $name,
+        ]);
+
+        return 'cus_'.bin2hex(random_bytes(8));
+    }
 }

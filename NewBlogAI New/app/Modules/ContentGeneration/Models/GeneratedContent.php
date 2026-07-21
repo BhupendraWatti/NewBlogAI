@@ -17,6 +17,7 @@ class GeneratedContent extends Model
         'pipeline_id',
         'site_id',
         'topic_id',
+        'user_id',
         'title',
         'content',
         'status', // draft, pending_review, approved, rejected, published
@@ -26,6 +27,11 @@ class GeneratedContent extends Model
     protected $casts = [
         'metadata' => 'array',
     ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'user_id');
+    }
 
     public function pipeline(): BelongsTo
     {

@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Route;
 
 // Named workspace slugs served by the SPA shell
 $workspaces = [
-    'dashboard', 'customers', 'fleet', 'sites', 'prompts', 'topics',
+    'dashboard', 'customers', 'plans', 'fleet', 'sites', 'prompts', 'topics',
     'pipeline', 'scheduler', 'providers', 'media', 'seo', 'analytics',
     'notifications', 'roles', 'billing', 'settings', 'audit', 'design',
 ];

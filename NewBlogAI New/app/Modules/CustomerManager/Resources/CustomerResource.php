@@ -31,6 +31,10 @@ class CustomerResource extends JsonResource
             'deleted_at' => $this->deleted_at?->toIso8601String(),
             'notes' => CustomerNoteResource::collection($this->whenLoaded('notes')),
             'activities' => CustomerActivityResource::collection($this->whenLoaded('activities')),
+            // Subscription summary for the customer table's action column
+            'subscription_status' => optional($this->subscription)->status,
+            'plan_name' => optional($this->subscription?->plan)->name,
+            'plan_id' => optional($this->subscription)->plan_id,
         ];
     }
 }

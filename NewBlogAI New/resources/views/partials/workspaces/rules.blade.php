@@ -59,47 +59,46 @@
                     </div>
                 </div>
 
-                <!-- Add/Edit Pipeline Workflow Modal -->
                 <div class="modal-overlay" id="workflow-modal">
                     <div class="modal-container">
-                        <div class="flex justify-between items-center mb-6 border-b border-outline-variant pb-3">
-                            <h3 class="text-lg font-semibold font-headline-md text-primary" id="workflow-modal-title">Register Automation Workflow</h3>
-                            <button class="text-outline hover:text-on-surface text-xl" onclick="closeWorkflowModal()">&times;</button>
+                        <div class="flex justify-between items-center mb-6 border-b border-border pb-3">
+                            <h3 class="text-base font-bold font-display text-text" id="workflow-modal-title">Register Automation Workflow</h3>
+                            <button class="text-muted hover:text-text text-xl transition" onclick="closeWorkflowModal()">&times;</button>
                         </div>
                         <form id="workflow-form" onsubmit="saveWorkflow(event)">
                             <input type="hidden" id="workflow-id">
                             
                             <div class="mb-4">
-                                <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="workflow-site">Target WordPress Site</label>
-                                <select id="workflow-site" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" required>
+                                <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="workflow-site">Target WordPress Site</label>
+                                <select id="workflow-site" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" required>
                                     <option value="">— Select Connected Site —</option>
                                 </select>
                             </div>
 
                             <div class="mb-4">
-                                <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="workflow-topic">Content Topic Target</label>
-                                <select id="workflow-topic" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" required>
+                                <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="workflow-topic">Content Topic Target</label>
+                                <select id="workflow-topic" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" required>
                                     <option value="">— Select Topic —</option>
                                 </select>
                             </div>
 
                             <div class="mb-4">
-                                <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="workflow-prompt">Prompt Template</label>
-                                <select id="workflow-prompt" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" required>
+                                <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="workflow-prompt">Prompt Template</label>
+                                <select id="workflow-prompt" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" required>
                                     <option value="">— Select Template —</option>
                                 </select>
                             </div>
 
                             <div class="mb-4">
-                                <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="workflow-provider">AI Provider Credentials</label>
-                                <select id="workflow-provider" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" required>
+                                <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="workflow-provider">AI Provider Credentials</label>
+                                <select id="workflow-provider" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" required>
                                     <option value="">— Select Provider —</option>
                                 </select>
                             </div>
 
-                            <div class="flex justify-end gap-3 mt-6 border-t border-outline-variant pt-4">
-                                <button type="button" class="border border-outline-variant text-outline hover:text-on-surface hover:bg-surface-container-high px-4 py-2.5 rounded-lg font-medium" onclick="closeWorkflowModal()">Cancel</button>
-                                <button type="submit" class="bg-primary text-on-primary hover:bg-primary-fixed px-5 py-2.5 rounded-lg font-semibold transition-colors">Save Workflow</button>
+                            <div class="flex justify-end gap-3 mt-6 border-t border-border pt-4">
+                                <button type="button" class="border border-border text-muted hover:text-text hover:bg-white/5 px-4 py-2.5 rounded-xl font-medium transition" onclick="closeWorkflowModal()">Cancel</button>
+                                <button type="submit" class="bg-accent hover:bg-accent/80 text-background px-5 py-2.5 rounded-xl font-semibold transition">Save Workflow</button>
                             </div>
                         </form>
                     </div>

@@ -23,7 +23,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->bind(PaymentGatewayInterface::class, PaymentGatewayStub::class);
+        $gatewayProvider = config('services.payment_gateway', 'stub');
+        $gatewayClass = match (strtolower($gatewayProvider)) {
+            'stripe' => \App\Modules\SubscriptionManager\Services\Adapters\StripeGatewayAdapter::class,
+            'razorpay' => \App\Modules\SubscriptionManager\Services\Adapters\RazorpayGatewayAdapter::class,
+            'phonepe' => \App\Modules\SubscriptionManager\Services\Adapters\PhonePeGatewayAdapter::class,
+            default => PaymentGatewayStub::class,
+        };
+        $this->app->bind(PaymentGatewayInterface::class, $gatewayClass);
 
         // Content Pipeline Interface Bindings with Concrete Services
         $this->app->bind(

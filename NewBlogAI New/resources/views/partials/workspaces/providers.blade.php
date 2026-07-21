@@ -115,6 +115,14 @@
                                     <span class="credits-remaining text-text font-bold">—</span>
                                 </div>
                                 <div class="flex justify-between">
+                                    <span>Tokens Consumed:</span>
+                                    <span class="tokens-used text-accent font-bold">—</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Cost / API Calls:</span>
+                                    <span class="provider-cost-req text-text font-bold">—</span>
+                                </div>
+                                <div class="flex justify-between">
                                     <span>Reset Time:</span>
                                     <span class="credits-reset text-text font-bold">—</span>
                                 </div>
@@ -171,6 +179,14 @@
                                     <span class="credits-remaining text-text font-bold">—</span>
                                 </div>
                                 <div class="flex justify-between">
+                                    <span>Tokens Consumed:</span>
+                                    <span class="tokens-used text-accent font-bold">—</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Cost / API Calls:</span>
+                                    <span class="provider-cost-req text-text font-bold">—</span>
+                                </div>
+                                <div class="flex justify-between">
                                     <span>Reset Time:</span>
                                     <span class="credits-reset text-text font-bold">—</span>
                                 </div>
@@ -225,6 +241,14 @@
                                 <div class="flex justify-between">
                                     <span>Remaining Credit:</span>
                                     <span class="credits-remaining text-text font-bold">—</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Tokens Consumed:</span>
+                                    <span class="tokens-used text-accent font-bold">—</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Cost / API Calls:</span>
+                                    <span class="provider-cost-req text-text font-bold">—</span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span>Reset Time:</span>
@@ -285,6 +309,14 @@
                                     <span class="credits-remaining text-text font-bold">—</span>
                                 </div>
                                 <div class="flex justify-between">
+                                    <span>Tokens Consumed:</span>
+                                    <span class="tokens-used text-accent font-bold">—</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Cost / API Calls:</span>
+                                    <span class="provider-cost-req text-text font-bold">—</span>
+                                </div>
+                                <div class="flex justify-between">
                                     <span>Reset Time:</span>
                                     <span class="credits-reset text-text font-bold">—</span>
                                 </div>
@@ -339,6 +371,14 @@
                                 <div class="flex justify-between">
                                     <span>Remaining Credit:</span>
                                     <span class="credits-remaining text-text font-bold">—</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Tokens Consumed:</span>
+                                    <span class="tokens-used text-accent font-bold">—</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Cost / API Calls:</span>
+                                    <span class="provider-cost-req text-text font-bold">—</span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span>Reset Time:</span>

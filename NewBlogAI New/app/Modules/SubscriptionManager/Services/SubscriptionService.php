@@ -8,20 +8,29 @@ use App\Modules\SubscriptionManager\Contracts\PaymentGatewayInterface;
 use App\Modules\SubscriptionManager\Models\Plan;
 use App\Modules\SubscriptionManager\Models\Subscription;
 use App\Modules\SubscriptionManager\Models\SubscriptionHistory;
+use App\Modules\SubscriptionManager\Models\Invoice;
+use App\Modules\SubscriptionManager\Models\Transaction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class SubscriptionService
 {
     public function __construct(
-        protected PaymentGatewayInterface $gateway
+        protected PaymentGatewayInterface $gateway,
+        protected CouponService $couponService
     ) {}
 
     /**
      * Subscribe a customer to a plan.
      */
-    public function subscribe(Customer $customer, Plan $plan, string $billingPeriod, ?string $paymentToken = null): Subscription
-    {
+    public function subscribe(
+        Customer $customer,
+        Plan $plan,
+        string $billingPeriod,
+        ?string $paymentToken = null,
+        ?string $couponCode = null,
+        ?string $status = 'active'
+    ): Subscription {
         // 1. Fail Fast: Check active subscriptions
         $existing = Subscription::where('customer_id', $customer->id)->first();
         if ($existing) {
@@ -32,25 +41,95 @@ class SubscriptionService
             throw new \DomainException('Cannot subscribe to an inactive plan.');
         }
 
-        $price = $billingPeriod === 'yearly' ? $plan->yearly_price : $plan->monthly_price;
+        $originalPrice = $billingPeriod === 'yearly' ? (float) $plan->yearly_price : (float) $plan->monthly_price;
+        $price = $originalPrice;
+        $discount = 0.00;
+        $coupon = null;
+
+        if ($couponCode) {
+            $coupon = $this->couponService->validateCoupon($couponCode);
+            $price = $this->couponService->calculateDiscountedPrice($coupon, $originalPrice);
+            $discount = $originalPrice - $price;
+        }
+
+        $subscriptionStatus = $status ?: 'active';
+        $trialEndsAt = null;
+
+        if ($subscriptionStatus === 'trial') {
+            $price = 0.00;
+            $discount = $originalPrice;
+            $trialEndsAt = now()->addDays(14);
+        }
 
         try {
-            return DB::transaction(function () use ($customer, $plan, $billingPeriod, $price, $paymentToken) {
-                // 2. Charge via injected gateway adapter
-                $this->gateway->charge($customer->email, $price, $paymentToken);
+            return DB::transaction(function () use (
+                $customer,
+                $plan,
+                $billingPeriod,
+                $originalPrice,
+                $price,
+                $discount,
+                $coupon,
+                $couponCode,
+                $subscriptionStatus,
+                $trialEndsAt,
+                $paymentToken
+            ) {
+                $gatewayTxId = null;
+
+                // 2. Charge via gateway if active and price > 0
+                if ($subscriptionStatus === 'active' && $price > 0) {
+                    $chargeResult = $this->gateway->charge($customer->email, $price, $paymentToken);
+                    $gatewayTxId = $chargeResult['transaction_id'] ?? null;
+                }
 
                 // 3. Create active subscription and snapshot limits
                 $subscription = Subscription::create([
                     'customer_id' => $customer->id,
                     'plan_id' => $plan->id,
-                    'status' => 'active',
+                    'status' => $subscriptionStatus,
                     'billing_period' => $billingPeriod,
                     'starts_at' => now(),
-                    'ends_at' => $billingPeriod === 'yearly' ? now()->addYear() : now()->addMonth(),
+                    'ends_at' => $subscriptionStatus === 'trial' ? null : ($billingPeriod === 'yearly' ? now()->addYear() : now()->addMonth()),
+                    'trial_ends_at' => $trialEndsAt,
                     'limits' => $plan->toArray(),
                 ]);
 
-                // 4. Log subscription history
+                // 4. Create Invoice
+                $invoiceNumber = 'INV-' . now()->format('Ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
+                $invoice = Invoice::create([
+                    'customer_id' => $customer->id,
+                    'subscription_id' => $subscription->id,
+                    'invoice_number' => $invoiceNumber,
+                    'subtotal' => $originalPrice,
+                    'discount' => $discount,
+                    'total' => $price,
+                    'currency' => 'INR',
+                    'status' => 'paid',
+                    'due_at' => now(),
+                    'paid_at' => now(),
+                    'billing_reason' => $subscriptionStatus === 'trial' ? 'trial_activation' : 'subscription_create',
+                    'gateway_invoice_id' => $gatewayTxId,
+                ]);
+
+                // 5. Create Transaction
+                Transaction::create([
+                    'customer_id' => $customer->id,
+                    'invoice_id' => $invoice->id,
+                    'gateway' => $couponCode ? 'coupon' : (config('services.payment_gateway', 'stub')),
+                    'gateway_transaction_id' => $gatewayTxId,
+                    'amount' => $price,
+                    'currency' => 'INR',
+                    'type' => 'charge',
+                    'status' => 'succeeded',
+                ]);
+
+                // 6. Redeem Coupon if applied
+                if ($couponCode && $coupon) {
+                    $this->couponService->redeemCoupon($couponCode, $customer, $subscription);
+                }
+
+                // 7. Log subscription history
                 SubscriptionHistory::create([
                     'customer_id' => $customer->id,
                     'plan_id' => $plan->id,
@@ -59,12 +138,12 @@ class SubscriptionService
                     'amount_paid' => $price,
                 ]);
 
-                // 5. Record customer activity
+                // 8. Record customer activity
                 CustomerActivity::create([
                     'customer_id' => $customer->id,
                     'event_type' => 'subscription_created',
                     'description' => "Subscribed to plan '{$plan->name}' ($billingPeriod).",
-                    'properties' => ['plan_id' => $plan->id, 'price' => $price],
+                    'properties' => ['plan_id' => $plan->id, 'price' => $price, 'coupon' => $couponCode],
                 ]);
 
                 return $subscription;
@@ -78,17 +157,46 @@ class SubscriptionService
     /**
      * Upgrade subscription immediately.
      */
-    public function upgrade(Subscription $subscription, Plan $newPlan, string $billingPeriod, ?string $paymentToken = null): Subscription
-    {
+    public function upgrade(
+        Subscription $subscription,
+        Plan $newPlan,
+        string $billingPeriod,
+        ?string $paymentToken = null,
+        ?string $couponCode = null
+    ): Subscription {
         if ($newPlan->status !== 'active') {
             throw new \DomainException('Cannot upgrade to an inactive plan.');
         }
 
-        $price = $billingPeriod === 'yearly' ? $newPlan->yearly_price : $newPlan->monthly_price;
+        $originalPrice = $billingPeriod === 'yearly' ? (float) $newPlan->yearly_price : (float) $newPlan->monthly_price;
+        $price = $originalPrice;
+        $discount = 0.00;
+        $coupon = null;
+
+        if ($couponCode) {
+            $coupon = $this->couponService->validateCoupon($couponCode);
+            $price = $this->couponService->calculateDiscountedPrice($coupon, $originalPrice);
+            $discount = $originalPrice - $price;
+        }
 
         try {
-            return DB::transaction(function () use ($subscription, $newPlan, $billingPeriod, $price, $paymentToken) {
-                $this->gateway->charge($subscription->customer->email, $price, $paymentToken);
+            return DB::transaction(function () use (
+                $subscription,
+                $newPlan,
+                $billingPeriod,
+                $originalPrice,
+                $price,
+                $discount,
+                $coupon,
+                $couponCode,
+                $paymentToken
+            ) {
+                $gatewayTxId = null;
+
+                if ($price > 0) {
+                    $chargeResult = $this->gateway->charge($subscription->customer->email, $price, $paymentToken);
+                    $gatewayTxId = $chargeResult['transaction_id'] ?? null;
+                }
 
                 $subscription->update([
                     'plan_id' => $newPlan->id,
@@ -96,8 +204,43 @@ class SubscriptionService
                     'billing_period' => $billingPeriod,
                     'starts_at' => now(),
                     'ends_at' => $billingPeriod === 'yearly' ? now()->addYear() : now()->addMonth(),
+                    'trial_ends_at' => null,
                     'limits' => $newPlan->toArray(),
                 ]);
+
+                // Create Invoice
+                $invoiceNumber = 'INV-' . now()->format('Ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
+                $invoice = Invoice::create([
+                    'customer_id' => $subscription->customer_id,
+                    'subscription_id' => $subscription->id,
+                    'invoice_number' => $invoiceNumber,
+                    'subtotal' => $originalPrice,
+                    'discount' => $discount,
+                    'total' => $price,
+                    'currency' => 'INR',
+                    'status' => 'paid',
+                    'due_at' => now(),
+                    'paid_at' => now(),
+                    'billing_reason' => 'subscription_update',
+                    'gateway_invoice_id' => $gatewayTxId,
+                ]);
+
+                // Create Transaction
+                Transaction::create([
+                    'customer_id' => $subscription->customer_id,
+                    'invoice_id' => $invoice->id,
+                    'gateway' => $couponCode ? 'coupon' : (config('services.payment_gateway', 'stub')),
+                    'gateway_transaction_id' => $gatewayTxId,
+                    'amount' => $price,
+                    'currency' => 'INR',
+                    'type' => 'charge',
+                    'status' => 'succeeded',
+                ]);
+
+                // Redeem Coupon if applied
+                if ($couponCode && $coupon) {
+                    $this->couponService->redeemCoupon($couponCode, $subscription->customer, $subscription);
+                }
 
                 SubscriptionHistory::create([
                     'customer_id' => $subscription->customer_id,
@@ -111,7 +254,7 @@ class SubscriptionService
                     'customer_id' => $subscription->customer_id,
                     'event_type' => 'subscription_upgraded',
                     'description' => "Upgraded subscription to plan '{$newPlan->name}'.",
-                    'properties' => ['plan_id' => $newPlan->id, 'price' => $price],
+                    'properties' => ['plan_id' => $newPlan->id, 'price' => $price, 'coupon' => $couponCode],
                 ]);
 
                 return $subscription;
@@ -206,7 +349,7 @@ class SubscriptionService
             'cancelled_at' => now(),
         ]);
 
-        $this->gateway->cancelSubscription($subscription->id);
+        $this->gateway->cancelSubscription((string) $subscription->id);
 
         CustomerActivity::create([
             'customer_id' => $subscription->customer_id,

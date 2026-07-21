@@ -79,7 +79,7 @@ class OperationsMonitoringTest extends TestCase
         AuditLog::create([
             'user_id' => $this->admin->id,
             'event' => 'settings_updated',
-            'old_values' => ['currency' => 'USD'],
+            'old_values' => ['currency' => 'GBP'],
             'new_values' => ['currency' => 'INR'],
             'ip_address' => '127.0.0.1',
         ]);

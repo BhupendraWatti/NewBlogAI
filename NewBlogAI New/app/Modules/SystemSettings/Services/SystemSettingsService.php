@@ -50,7 +50,7 @@ class SystemSettingsService
 
             // Add standard defaults
             $defaults = [
-                'currency' => 'USD',
+                'currency' => 'INR',
                 'timezone' => 'UTC',
                 'language' => 'en',
                 'ai_default_provider' => 'gemini',

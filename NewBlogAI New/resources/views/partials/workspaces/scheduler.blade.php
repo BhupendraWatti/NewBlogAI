@@ -89,31 +89,30 @@
                     </div>
                 </div>
 
-                <!-- Create/Edit Schedule Modal -->
                 <div class="modal-overlay" id="schedule-modal">
                     <div class="modal-container">
-                        <div class="flex justify-between items-center mb-6 border-b border-outline-variant pb-3">
-                            <h3 class="text-lg font-semibold font-headline-md text-primary" id="schedule-modal-title">Create Publishing Schedule</h3>
-                            <button class="text-outline hover:text-on-surface text-xl" onclick="closeScheduleModal()">&times;</button>
+                        <div class="flex justify-between items-center mb-6 border-b border-border pb-3">
+                            <h3 class="text-base font-bold font-display text-text" id="schedule-modal-title">Create Publishing Schedule</h3>
+                            <button class="text-muted hover:text-text text-xl transition" onclick="closeScheduleModal()">&times;</button>
                         </div>
                         <form id="schedule-form" onsubmit="saveSchedule(event)">
                             <input type="hidden" id="schedule-id">
                             
                             <div class="mb-4">
-                                <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="schedule-name">Schedule Name</label>
-                                <input type="text" id="schedule-name" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="e.g. Daily Tech Insights Post" required>
+                                <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="schedule-name">Schedule Name</label>
+                                <input type="text" id="schedule-name" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" placeholder="e.g. Daily Tech Insights Post" required>
                             </div>
 
                             <div class="grid grid-cols-2 gap-4 mb-4">
                                 <div>
-                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="schedule-site-id">Target Site</label>
-                                    <select id="schedule-site-id" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" onchange="populateSchedulePipelines(this.value)" required>
+                                    <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="schedule-site-id">Target Site</label>
+                                    <select id="schedule-site-id" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" onchange="populateSchedulePipelines(this.value)" required>
                                         <!-- Populated dynamically -->
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="schedule-pipeline-id">Content Pipeline</label>
-                                    <select id="schedule-pipeline-id" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary">
+                                    <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="schedule-pipeline-id">Content Pipeline</label>
+                                    <select id="schedule-pipeline-id" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent">
                                         <option value="">No Pipeline (Sync Only)</option>
                                         <!-- Populated dynamically -->
                                     </select>
@@ -122,8 +121,8 @@
 
                             <div class="grid grid-cols-3 gap-4 mb-4">
                                 <div>
-                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="schedule-frequency">Frequency</label>
-                                    <select id="schedule-frequency" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" onchange="toggleScheduleDaysField(this.value)">
+                                    <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="schedule-frequency">Frequency</label>
+                                    <select id="schedule-frequency" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" onchange="toggleScheduleDaysField(this.value)">
                                         <option value="daily" selected>Daily</option>
                                         <option value="hourly">Hourly</option>
                                         <option value="twice_daily">Twice Daily</option>
@@ -132,12 +131,12 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="schedule-time-of-day">Time of Day (UTC)</label>
-                                    <input type="text" id="schedule-time-of-day" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="14:30" value="09:00">
+                                    <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="schedule-time-of-day">Time of Day (UTC)</label>
+                                    <input type="text" id="schedule-time-of-day" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" placeholder="14:30" value="09:00">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="schedule-timezone">Timezone</label>
-                                    <input type="text" id="schedule-timezone" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="UTC" value="UTC" required>
+                                    <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="schedule-timezone">Timezone</label>
+                                    <input type="text" id="schedule-timezone" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" placeholder="UTC" value="UTC" required>
                                 </div>
                             </div>
 
@@ -155,15 +154,15 @@
                             </div>
 
                             <div class="mb-4">
-                                <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold text-outline uppercase tracking-wider">
+                                <label class="flex items-center gap-2 cursor-pointer text-[10px] font-mono font-bold text-muted uppercase tracking-widest">
                                     <input type="checkbox" id="schedule-active" checked>
                                     <span>Schedule Active</span>
                                 </label>
                             </div>
 
-                            <div class="flex justify-end gap-3 mt-6 border-t border-outline-variant pt-4">
-                                <button type="button" class="border border-outline-variant text-outline hover:text-on-surface hover:bg-surface-container-high px-4 py-2.5 rounded-lg font-medium" onclick="closeScheduleModal()">Cancel</button>
-                                <button type="submit" class="bg-accent text-background hover:bg-accent/80 px-5 py-2.5 rounded-lg font-semibold transition-colors">Save Schedule</button>
+                            <div class="flex justify-end gap-3 mt-6 border-t border-border pt-4">
+                                <button type="button" class="border border-border text-muted hover:text-text hover:bg-white/5 px-4 py-2.5 rounded-xl font-medium transition" onclick="closeScheduleModal()">Cancel</button>
+                                <button type="submit" class="bg-accent text-background hover:bg-accent/80 px-5 py-2.5 rounded-xl font-semibold transition">Save Schedule</button>
                             </div>
                         </form>
                     </div>

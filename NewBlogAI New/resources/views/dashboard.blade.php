@@ -1,4 +1,4 @@
-﻿@include('partials.head')
+@include('partials.head')
 <body class="font-sans antialiased overflow-hidden min-h-screen flex h-screen w-full select-none bg-background text-text">
 
     @include('partials.sidebar')
@@ -18,6 +18,7 @@
 
                 @include('partials.workspaces.dashboard')
                 @include('partials.workspaces.customers')
+                @include('partials.workspaces.plans')
                 @include('partials.workspaces.fleet')
                 @include('partials.workspaces.sites')
                 @include('partials.workspaces.prompts')

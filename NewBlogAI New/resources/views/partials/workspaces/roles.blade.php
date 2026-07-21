@@ -21,8 +21,8 @@
                         </div>
                         <div class="glass-surface rounded-2xl p-5 relative overflow-hidden group transition hover:border-accent">
                             <p class="text-[10px] font-mono text-muted uppercase tracking-widest mb-1">Active Roles</p>
-                            <h3 class="text-3xl font-display font-bold">5 Scopes</h3>
-                            <div class="mt-2 text-[10px] font-mono text-muted">Super, Admin, Editor, SEO, Support</div>
+                            <h3 class="text-3xl font-display font-bold">3 Scopes</h3>
+                            <div class="mt-2 text-[10px] font-mono text-muted">Super Admin, Customer, Employee</div>
                         </div>
                         <div class="glass-surface rounded-2xl p-5 relative overflow-hidden group transition hover:border-accent">
                             <p class="text-[10px] font-mono text-muted uppercase tracking-widest mb-1">SAML SSO Integration</p>
@@ -56,46 +56,43 @@
                     </div>
                 </div>
 
-                <!-- Add/Edit User Modal -->
                 <div class="modal-overlay" id="user-modal">
                     <div class="modal-container">
-                        <div class="flex justify-between items-center mb-6 border-b border-outline-variant pb-3">
-                            <h3 class="text-lg font-semibold font-headline-md text-primary" id="user-modal-title">Invite Platform Operator</h3>
-                            <button class="text-outline hover:text-on-surface text-xl" onclick="closeUserModal()">&times;</button>
+                        <div class="flex justify-between items-center mb-6 border-b border-border pb-3">
+                            <h3 class="text-base font-bold font-display text-text" id="user-modal-title">Invite Platform Operator</h3>
+                            <button class="text-muted hover:text-text text-xl transition" onclick="closeUserModal()">&times;</button>
                         </div>
                         <form id="user-form" onsubmit="saveUser(event)">
                             <input type="hidden" id="user-id">
                             
                             <div class="mb-4">
-                                <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="user-name">Full Name</label>
-                                <input type="text" id="user-name" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="e.g. Alice Smith" required>
+                                <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="user-name">Full Name</label>
+                                <input type="text" id="user-name" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" placeholder="e.g. Aarav Sharma" required>
                             </div>
 
                             <div class="mb-4">
-                                <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="user-email">Email Address</label>
-                                <input type="email" id="user-email" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="e.g. alice@company.com" required>
+                                <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="user-email">Email Address</label>
+                                <input type="email" id="user-email" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" placeholder="e.g. aarav@company.com" required>
                             </div>
 
                             <div class="grid grid-cols-2 gap-4 mb-4">
                                 <div>
-                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="user-role-select">Assigned Role</label>
-                                    <select id="user-role-select" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary">
+                                    <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="user-role-select">Assigned Role</label>
+                                    <select id="user-role-select" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent">
                                         <option value="1">Super Admin</option>
-                                        <option value="2">Admin</option>
-                                        <option value="3" selected>Editor</option>
-                                        <option value="4">SEO Specialist</option>
-                                        <option value="5">Support</option>
+                                        <option value="2">Customer</option>
+                                        <option value="3" selected>Employee</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="user-password">Password</label>
-                                    <input type="password" id="user-password" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="Set secure password">
+                                    <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="user-password">Password</label>
+                                    <input type="password" id="user-password" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" placeholder="Set secure password">
                                 </div>
                             </div>
 
-                            <div class="flex justify-end gap-3 mt-6 border-t border-outline-variant pt-4">
-                                <button type="button" class="border border-outline-variant text-outline hover:text-on-surface hover:bg-surface-container-high px-4 py-2.5 rounded-lg font-medium" onclick="closeUserModal()">Cancel</button>
-                                <button type="submit" class="bg-primary text-on-primary hover:bg-primary-fixed px-5 py-2.5 rounded-lg font-semibold transition-colors">Save Operator</button>
+                            <div class="flex justify-end gap-3 mt-6 border-t border-border pt-4">
+                                <button type="button" class="border border-border text-muted hover:text-text hover:bg-white/5 px-4 py-2.5 rounded-xl font-medium transition" onclick="closeUserModal()">Cancel</button>
+                                <button type="submit" class="bg-accent hover:bg-accent/80 text-background px-5 py-2.5 rounded-xl font-semibold transition">Save User</button>
                             </div>
                         </form>
                     </div>

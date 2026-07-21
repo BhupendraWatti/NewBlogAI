@@ -59,24 +59,8 @@
                             <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-muted text-lg">search</span>
                             <input class="w-full bg-background border border-border rounded-xl py-1.5 pl-10 pr-4 text-xs font-mono text-text placeholder-muted focus:outline-none focus:border-accent focus:ring-0" placeholder="Search topics..." type="text"/>
                         </div>
-                        <select class="bg-background border border-border text-text text-xs rounded-xl py-1.5 pl-2 pr-6 cursor-pointer focus:ring-accent">
+                         <select class="bg-background border border-border text-text text-xs rounded-xl py-1.5 pl-2 pr-6 cursor-pointer focus:ring-accent" id="topic-filter-category" onchange="filterTopics()">
                             <option value="">All Categories</option>
-                            <option>Technology</option>
-                            <option>Finance</option>
-                            <option>Health</option>
-                            <option>Science</option>
-                        </select>
-                        <select class="bg-background border border-border text-text text-xs rounded-xl py-1.5 pl-2 pr-6 cursor-pointer focus:ring-accent">
-                            <option value="">All Languages</option>
-                            <option>English</option>
-                            <option>Spanish</option>
-                            <option>French</option>
-                        </select>
-                        <select class="bg-background border border-border text-text text-xs rounded-xl py-1.5 pl-2 pr-6 cursor-pointer focus:ring-accent">
-                            <option value="">All Statuses</option>
-                            <option>active</option>
-                            <option>paused</option>
-                            <option>draft</option>
                         </select>
                         <button class="text-xs text-muted hover:text-text font-mono ml-auto">Reset Filters</button>
                     </div>
@@ -122,70 +106,69 @@
                     </div>
                 </div>
 
-                <!-- Add/Edit Topic Modal -->
                 <div class="modal-overlay" id="topic-modal">
                     <div class="modal-container">
-                        <div class="flex justify-between items-center mb-6 border-b border-outline-variant pb-3">
-                            <h3 class="text-lg font-semibold font-headline-md text-primary" id="topic-modal-title">Add Content Topic</h3>
-                            <button class="text-outline hover:text-on-surface text-xl" onclick="closeTopicModal()">&times;</button>
+                        <div class="flex justify-between items-center mb-6 border-b border-border pb-3">
+                            <h3 class="text-base font-bold font-display text-text" id="topic-modal-title">Add Content Topic</h3>
+                            <button class="text-muted hover:text-text text-xl transition" onclick="closeTopicModal()">&times;</button>
                         </div>
                         <form id="topic-form" onsubmit="saveTopic(event)">
                             <input type="hidden" id="topic-id">
                             
                             <div class="mb-4">
-                                <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="topic-name">Topic Name</label>
-                                <input type="text" id="topic-name" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="e.g. Quantum Computing Innovations" required>
+                                <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="topic-name">Topic Name</label>
+                                <input type="text" id="topic-name" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" placeholder="e.g. Quantum Computing Innovations" required>
                             </div>
 
                             <div class="grid grid-cols-2 gap-4 mb-4">
                                 <div>
-                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="topic-category">Category</label>
-                                    <input type="text" id="topic-category" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="e.g. Technology" required>
+                                    <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="topic-category">Category</label>
+                                    <input type="text" id="topic-category" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" placeholder="e.g. Technology" required>
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="topic-language">Language</label>
-                                    <input type="text" id="topic-language" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="e.g. English" required>
+                                    <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="topic-language">Language</label>
+                                    <input type="text" id="topic-language" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" placeholder="e.g. English" required>
                                 </div>
                             </div>
 
                             <div class="grid grid-cols-3 gap-4 mb-4">
                                 <div>
-                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="topic-priority">Priority</label>
-                                    <select id="topic-priority" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary">
+                                    <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="topic-priority">Priority</label>
+                                    <select id="topic-priority" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent">
                                         <option value="low">Low</option>
                                         <option value="medium" selected>Medium</option>
                                         <option value="high">High</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="topic-status">Status</label>
-                                    <select id="topic-status" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary">
+                                    <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="topic-status">Status</label>
+                                    <select id="topic-status" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent">
                                         <option value="active" selected>Active</option>
                                         <option value="inactive">Inactive</option>
                                         <option value="draft">Draft</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="topic-frequency">Frequency</label>
-                                    <input type="text" id="topic-frequency" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="e.g. daily" required>
+                                    <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="topic-frequency">Frequency</label>
+                                    <input type="text" id="topic-frequency" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" placeholder="e.g. daily" required>
                                 </div>
                             </div>
 
                             <div class="mb-4">
-                                <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="topic-prompt-id">Associated Prompt</label>
-                                <select id="topic-prompt-id" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary">
+                                <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="topic-prompt-id">Associated Prompt</label>
+                                <select id="topic-prompt-id" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent">
                                     <!-- Populated dynamically -->
                                 </select>
                             </div>
 
                             <div class="mb-4">
-                                <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="topic-tags">Tags (Comma-separated)</label>
-                                <input type="text" id="topic-tags" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="e.g. tech, quantum, ai">
+                                <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="topic-tags">Tags (Comma-separated)</label>
+                                <input type="text" id="topic-tags" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" placeholder="e.g. tech, quantum, ai">
                             </div>
 
-                            <div class="flex justify-end gap-3 mt-6 border-t border-outline-variant pt-4">
-                                <button type="button" class="border border-outline-variant text-outline hover:text-on-surface hover:bg-surface-container-high px-4 py-2.5 rounded-lg font-medium" onclick="closeTopicModal()">Cancel</button>
-                                <button type="submit" class="bg-primary text-on-primary hover:bg-primary-fixed px-5 py-2.5 rounded-lg font-semibold transition-colors">Save Topic</button>
+                            <div class="flex justify-end gap-3 mt-6 border-t border-border pt-4">
+                                <button type="button" class="border border-border text-muted hover:text-text hover:bg-white/5 px-4 py-2.5 rounded-xl font-medium transition" onclick="closeTopicModal()">Cancel</button>
+                                <button type="submit" class="bg-accent hover:bg-accent/80 text-background px-5 py-2.5 rounded-xl font-semibold transition">Save Topic</button>
                             </div>
                         </form>
                     </div>

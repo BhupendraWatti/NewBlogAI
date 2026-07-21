@@ -29,11 +29,11 @@
                             <div class="space-y-3">
                                 <div>
                                     <label class="block text-xs font-mono text-muted mb-1">WEBSITE DOMAIN</label>
-                                    <input id="wizard-site-domain" class="w-full bg-[#071018] border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent" type="text" placeholder="https://example.com"/>
+                                    <input id="wizard-site-domain" class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent" type="text" placeholder="https://example.com"/>
                                 </div>
                                 <div>
                                     <label class="block text-xs font-mono text-muted mb-1">ADMINISTRATOR EMAIL</label>
-                                    <input id="wizard-site-email" class="w-full bg-[#071018] border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent" type="email" placeholder="admin@example.com"/>
+                                    <input id="wizard-site-email" class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent" type="email" placeholder="admin@example.com"/>
                                 </div>
                             </div>
                         </div>
@@ -44,7 +44,7 @@
                             <div class="space-y-3">
                                 <div>
                                     <label class="block text-xs font-mono text-muted mb-1">SYNC FREQUENCY</label>
-                                    <select id="wizard-site-frequency" class="w-full bg-[#071018] border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent">
+                                    <select id="wizard-site-frequency" class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent">
                                         <option value="Hourly">Hourly</option>
                                         <option value="Daily">Daily</option>
                                         <option value="Weekly">Weekly</option>

@@ -173,7 +173,7 @@ Schedule::call(function () {
             }
         }
 
-        // ── 3c. Expire overdue paid subscriptions ──────────────────────────
+        // ── 3c. Expire/Renew overdue paid subscriptions ──────────────────────────
         $overdueActive = Subscription::with(['plan', 'customer'])
             ->where('status', 'active')
             ->whereNotNull('ends_at')
@@ -182,6 +182,70 @@ Schedule::call(function () {
 
         foreach ($overdueActive as $subscription) {
             try {
+                $plan = $subscription->plan;
+                $customer = $subscription->customer;
+                $price = $subscription->billing_period === 'yearly' ? (float) $plan->yearly_price : (float) $plan->monthly_price;
+
+                try {
+                    $gateway = app(\App\Modules\SubscriptionManager\Contracts\PaymentGatewayInterface::class);
+                    $chargeResult = $gateway->charge($customer->email, $price);
+                    $gatewayTxId = $chargeResult['transaction_id'] ?? null;
+
+                    DB::transaction(function () use ($subscription, $plan, $price, $gatewayTxId, $now) {
+                        $subscription->update([
+                            'starts_at' => $now,
+                            'ends_at' => $subscription->billing_period === 'yearly' ? $now->copy()->addYear() : $now->copy()->addMonth(),
+                        ]);
+
+                        $invoiceNumber = 'INV-' . $now->format('Ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
+                        $invoice = \App\Modules\SubscriptionManager\Models\Invoice::create([
+                            'customer_id' => $subscription->customer_id,
+                            'subscription_id' => $subscription->id,
+                            'invoice_number' => $invoiceNumber,
+                            'subtotal' => $price,
+                            'discount' => 0.00,
+                            'total' => $price,
+                            'currency' => 'INR',
+                            'status' => 'paid',
+                            'due_at' => $now,
+                            'paid_at' => $now,
+                            'billing_reason' => 'subscription_cycle',
+                            'gateway_invoice_id' => $gatewayTxId,
+                        ]);
+
+                        \App\Modules\SubscriptionManager\Models\Transaction::create([
+                            'customer_id' => $subscription->customer_id,
+                            'invoice_id' => $invoice->id,
+                            'gateway' => config('services.payment_gateway', 'stub'),
+                            'gateway_transaction_id' => $gatewayTxId,
+                            'amount' => $price,
+                            'currency' => 'INR',
+                            'type' => 'charge',
+                            'status' => 'succeeded',
+                        ]);
+
+                        SubscriptionHistory::create([
+                            'customer_id'    => $subscription->customer_id,
+                            'plan_id'        => $subscription->plan_id,
+                            'event_type'     => 'renewed',
+                            'billing_period' => $subscription->billing_period,
+                            'amount_paid'    => $price,
+                        ]);
+
+                        CustomerActivity::create([
+                            'customer_id' => $subscription->customer_id,
+                            'event_type'  => 'subscription_renewed',
+                            'description' => "Subscription automatically renewed for plan '{$plan->name}'.",
+                            'properties'  => ['subscription_id' => $subscription->id, 'price' => $price],
+                        ]);
+                    });
+
+                    continue; // Renewed successfully
+                } catch (Throwable $chargeException) {
+                    Log::warning("Subscription auto-renewal failed for customer {$customer->id}, charging error: " . $chargeException->getMessage());
+                }
+
+                // If charge failed, expire subscription
                 DB::transaction(function () use ($subscription, $now) {
                     $subscription->update(['status' => 'expired']);
 

@@ -4,10 +4,8 @@
     if (auth()->check()) {
         $roleNames = [
             1 => 'Super Admin',
-            2 => 'Admin',
-            3 => 'Editor',
-            4 => 'SEO Specialist',
-            5 => 'Support'
+            2 => 'Customer',
+            3 => 'Employee',
         ];
         $displayRole = $roleNames[auth()->user()->role] ?? 'Operator';
     }
@@ -78,9 +76,8 @@
                                 <div class="grid grid-cols-2 gap-4">
                                     <div class="space-y-1">
                                         <label class="text-[10px] text-muted uppercase">Primary Model Routing</label>
-                                        <select @if(!$canManageSettings) disabled @endif class="w-full bg-[#071018] border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent">
-                                            <option>OpenAI GPT-4o</option>
-                                            <option>Anthropic Claude 3.5 Sonnet</option>
+                                        <select id="setting-primary-model" @if(!$canManageSettings) disabled @endif class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent">
+                                            <option value="">— Loading providers... —</option>
                                         </select>
                                     </div>
                                     <div class="space-y-1">
@@ -104,7 +101,7 @@
                                 <div class="grid grid-cols-2 gap-4">
                                     <div class="space-y-1">
                                         <label class="text-[10px] text-muted uppercase">Image Generator Driver</label>
-                                        <select id="setting-img-driver" onchange="toggleImageDriverKeyField()" @if(!$canManageSettings) disabled @endif class="w-full bg-[#071018] border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent">
+                                        <select id="setting-img-driver" onchange="toggleImageDriverKeyField()" @if(!$canManageSettings) disabled @endif class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent">
                                             <option value="pollinations">Pollinations (Free / No Key)</option>
                                             <option value="unsplash">Unsplash API</option>
                                             <option value="dalle">OpenAI DALL-E</option>
@@ -134,7 +131,7 @@
                                 <div class="grid grid-cols-2 gap-4">
                                     <div class="space-y-1">
                                         <label class="text-[10px] text-muted uppercase">Default Post Format</label>
-                                        <select @if(!$canManageSettings) disabled @endif class="w-full bg-[#071018] border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent">
+                                        <select @if(!$canManageSettings) disabled @endif class="w-full bg-background border border-border rounded-xl p-2 text-xs text-text focus:outline-none focus:border-accent">
                                             <option>Standard Format</option>
                                             <option>Summary Bulletin</option>
                                         </select>

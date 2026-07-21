@@ -12,7 +12,7 @@ class CustomerRepository
      */
     public function getPaginated(int $limit = 15, ?string $search = null, ?string $status = null): LengthAwarePaginator
     {
-        $query = Customer::query()->latest();
+        $query = Customer::query()->with('subscription.plan')->latest();
 
         if ($search) {
             $query->where(function ($q) use ($search) {

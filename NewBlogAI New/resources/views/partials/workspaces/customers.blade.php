@@ -40,44 +40,43 @@
                     </div>
                 </div>
 
-                <!-- Add/Edit Customer Modal -->
                 <div class="modal-overlay" id="customer-modal">
                     <div class="modal-container">
-                        <div class="flex justify-between items-center mb-6 border-b border-outline-variant pb-3">
-                            <h3 class="text-lg font-semibold font-headline-md text-primary" id="customer-modal-title">Register Customer</h3>
-                            <button class="text-outline hover:text-on-surface text-xl" onclick="closeCustomerModal()">&times;</button>
+                        <div class="flex justify-between items-center mb-6 border-b border-border pb-3">
+                            <h3 class="text-base font-bold font-display text-text" id="customer-modal-title">Register Customer</h3>
+                            <button class="text-muted hover:text-text text-xl transition" onclick="closeCustomerModal()">&times;</button>
                         </div>
                         <form id="customer-form" onsubmit="saveCustomer(event)">
                             <input type="hidden" id="customer-id">
                             
                             <div class="mb-4">
-                                <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="customer-company">Company Name</label>
-                                <input type="text" id="customer-company" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="e.g. Acme Corporation" required>
+                                <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="customer-company">Company Name</label>
+                                <input type="text" id="customer-company" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" placeholder="e.g. Tata Consultancy Services" required>
                             </div>
 
                             <div class="grid grid-cols-2 gap-4 mb-4">
                                 <div>
-                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="customer-owner">Owner Name</label>
-                                    <input type="text" id="customer-owner" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="e.g. John Doe" required>
+                                    <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="customer-owner">Owner Name</label>
+                                    <input type="text" id="customer-owner" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" placeholder="e.g. Rajesh Kumar" required>
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="customer-email">Email Address</label>
-                                    <input type="email" id="customer-email" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="e.g. john@acme.com" required>
+                                    <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="customer-email">Email Address</label>
+                                    <input type="email" id="customer-email" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" placeholder="e.g. rajesh@tata.com" required>
                                 </div>
                             </div>
 
                             <div class="grid grid-cols-3 gap-4 mb-4">
                                 <div>
-                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="customer-phone">Phone Number</label>
-                                    <input type="text" id="customer-phone" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="e.g. +1-555-0199">
+                                    <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="customer-phone">Phone Number</label>
+                                    <input type="text" id="customer-phone" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" placeholder="e.g. +91-9876543210">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="customer-country">Country</label>
-                                    <input type="text" id="customer-country" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary" placeholder="e.g. United States">
+                                    <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="customer-country">Country</label>
+                                    <input type="text" id="customer-country" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent" placeholder="e.g. India">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-semibold text-outline uppercase tracking-wider mb-2" for="customer-status">Status</label>
-                                    <select id="customer-status" class="w-full bg-[#071018] border border-outline-variant rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-primary">
+                                    <label class="block text-[10px] font-mono font-bold text-muted uppercase tracking-widest mb-1.5" for="customer-status">Status</label>
+                                    <select id="customer-status" class="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-text focus:outline-none focus:border-accent">
                                         <option value="trial" selected>Trial</option>
                                         <option value="active">Active</option>
                                         <option value="suspended">Suspended</option>
@@ -86,9 +85,9 @@
                                 </div>
                             </div>
 
-                            <div class="flex justify-end gap-3 mt-6 border-t border-outline-variant pt-4">
-                                <button type="button" class="border border-outline-variant text-outline hover:text-on-surface hover:bg-surface-container-high px-4 py-2.5 rounded-lg font-medium" onclick="closeCustomerModal()">Cancel</button>
-                                <button type="submit" class="bg-primary text-on-primary hover:bg-primary-fixed px-5 py-2.5 rounded-lg font-semibold transition-colors">Save Customer</button>
+                            <div class="flex justify-end gap-3 mt-6 border-t border-border pt-4">
+                                <button type="button" class="border border-border text-muted hover:text-text hover:bg-white/5 px-4 py-2.5 rounded-xl font-medium transition" onclick="closeCustomerModal()">Cancel</button>
+                                <button type="submit" class="bg-accent hover:bg-accent/80 text-background px-5 py-2.5 rounded-xl font-semibold transition">Save Customer</button>
                             </div>
                         </form>
                     </div>

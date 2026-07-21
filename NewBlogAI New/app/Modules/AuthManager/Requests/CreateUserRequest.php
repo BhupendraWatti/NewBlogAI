@@ -18,7 +18,7 @@ class CreateUserRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8'],
-            'role' => ['required', 'integer', 'in:1,2,3,4'], // SuperAdmin=1, Admin=2, Support=3, User=4
+            'role' => ['required', 'integer', 'in:1,2,3'], // SuperAdmin=1, Customer=2, Employee=3
             'customer_id' => ['nullable', 'uuid', 'exists:customers,id'],
         ];
     }

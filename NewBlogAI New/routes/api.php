@@ -18,6 +18,7 @@ use App\Modules\SiteManager\Controllers\SiteController;
 use App\Modules\SiteManager\Controllers\WPPluginAPIController;
 use App\Modules\SubscriptionManager\Controllers\PlanController;
 use App\Modules\SubscriptionManager\Controllers\SubscriptionController;
+use App\Modules\SubscriptionManager\Controllers\InvoiceController;
 use App\Modules\SystemSettings\Controllers\SystemSettingsController;
 use App\Modules\TopicManager\Controllers\TopicController;
 use Illuminate\Http\Request;
@@ -159,6 +160,10 @@ Route::prefix('v1')->group(function () {
 
                 // Subscription & Plan Management Module
                 Route::apiResource('plans', PlanController::class);
+                Route::get('subscriptions', [SubscriptionController::class, 'index']);
+                Route::get('invoices', [InvoiceController::class, 'index']);
+                Route::get('customers/{id}/invoices', [InvoiceController::class, 'customerInvoices']);
+                Route::get('invoices/{id}', [InvoiceController::class, 'show']);
                 Route::get('customers/{id}/subscription', [SubscriptionController::class, 'show']);
                 Route::post('customers/{id}/subscription', [SubscriptionController::class, 'store']);
                 Route::post('customers/{id}/subscription/upgrade', [SubscriptionController::class, 'upgrade']);

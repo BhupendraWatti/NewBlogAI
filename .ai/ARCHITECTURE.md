@@ -305,6 +305,10 @@ Phase 3 introduces advanced, provider-independent services integrated sequential
 * **Classes**: [WorkspaceController.php](file:///d:/Company%20Work/Company%20projects/NewBlogAI/NewBlogAI%20New/app/Modules/CustomerManager/Controllers/WorkspaceController.php) & Models/Resources under `app/Modules/CustomerManager/`
 * **Responsibilities**: Exposes workspace CRUD and team member setup endpoints with strict tenant (Customer) isolation. Ensures owners cannot delete themselves, verifies workspace update permission rules, and handles workspace limits.
 
+### L. Billing, Invoices & Coupons
+* **Classes**: [InvoiceController.php](file:///d:/Company%20Work/Company%20projects/NewBlogAI/NewBlogAI%20New/app/Modules/SubscriptionManager/Controllers/InvoiceController.php), [CouponService.php](file:///d:/Company%20Work/Company%20projects/NewBlogAI/NewBlogAI%20New/app/Modules/SubscriptionManager/Services/CouponService.php), and models under `app/Modules/SubscriptionManager/Models/`
+* **Responsibilities**: Manages billing ledgers (invoices, transactions, coupons) with secure UUIDv7 primary keys. Computes fixed/percentage discount redemptions, and dynamically charges cards/renews subscriptions in background daily schedules.
+
 ---
 
 ## 5. Key Implementation Discrepancies

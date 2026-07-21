@@ -105,7 +105,7 @@ class BusinessLicensingTest extends TestCase
                 'name' => 'Dwight Schrute',
                 'email' => 'dwight@dundermifflin.com',
                 'password' => 'assistant-regional-manager',
-                'role' => 4, // User
+                'role' => 3, // Employee
             ]);
 
         $response->assertStatus(201);

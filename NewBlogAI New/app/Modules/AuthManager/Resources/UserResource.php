@@ -13,12 +13,12 @@ class UserResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'email' => $this->email,
-            'role' => $this->role, // 1 = Super Admin, 2 = Admin, 3 = Support / Partner
+            'role' => $this->role, // 1 = Super Admin, 2 = Customer, 3 = Employee
             'customer_id' => $this->customer_id,
             'role_label' => match ((int) $this->role) {
                 1 => 'Super Admin',
-                2 => 'Admin',
-                3 => 'Support / Partner',
+                2 => 'Customer',
+                3 => 'Employee',
                 default => 'Unknown'
             },
             'created_at' => $this->created_at,
