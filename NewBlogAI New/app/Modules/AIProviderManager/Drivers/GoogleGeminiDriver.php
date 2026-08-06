@@ -62,6 +62,12 @@ class GoogleGeminiDriver implements AIProviderClientInterface
                 ],
             ];
 
+            if (array_key_exists('thinking_budget', $opts) && $opts['thinking_budget'] !== null) {
+                $payload['generationConfig']['thinkingConfig'] = [
+                    'thinkingBudget' => (int) $opts['thinking_budget'],
+                ];
+            }
+
             // ── Structured Output: JSON Mode ──────────────────────────────────
             // When either json_mode or json_schema is requested, set the MIME
             // type so Gemini guarantees a well-formed JSON response every time.

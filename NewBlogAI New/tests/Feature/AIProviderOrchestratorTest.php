@@ -5,10 +5,10 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Modules\AIProviderManager\Models\AIProvider;
 use App\Modules\ContentGeneration\Services\ContentGenerationService;
+use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
-use Exception;
 
 class AIProviderOrchestratorTest extends TestCase
 {
@@ -148,6 +148,24 @@ class AIProviderOrchestratorTest extends TestCase
         $this->assertTrue($provider->is_enabled); // remains enabled for future try
         $this->assertNotNull($provider->cooldown_until);
         $this->assertTrue($provider->cooldown_until->isFuture());
+    }
+
+    public function test_gemini_rate_limit_without_reset_hint_uses_short_cooldown(): void
+    {
+        $provider = AIProvider::create([
+            'provider_key' => 'gemini',
+            'name' => 'Gemini Free Cooldown',
+            'api_key' => 'key-temp',
+            'priority' => 1,
+            'status' => 'healthy',
+            'is_enabled' => true,
+        ]);
+
+        $provider->handleFailure(new Exception('Gemini API error: Status 429 - RESOURCE_EXHAUSTED'));
+
+        $provider->refresh();
+        $this->assertEquals('cooldown', $provider->status);
+        $this->assertTrue($provider->cooldown_until->lessThanOrEqualTo(now()->addSeconds(120)));
     }
 
     /**

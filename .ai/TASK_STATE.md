@@ -1,3 +1,15 @@
+# Sprint Progress: Phase 10: Capability-Aware AI Provider Routing & Authentic Newsroom Pipeline Fixes
+
+## Current Sprint Objectives (Phase 10)
+- [x] **Task 1: Capability-Aware AI Router Foundation** (Added `supportsGrounding()` helper method to `AIProvider` model to classify models with native Google Search Grounding capabilities).
+- [x] **Task 2: Grounded Newsroom Candidate Discovery Routing** (Updated `NewsDiscoveryService::getAvailableProviders()` to restrict discovery failover list strictly to grounded search models [Gemini Free → Gemini Paid], bypassing non-grounded models like Groq to prevent fake candidate filter rejections).
+- [x] **Task 3: Driver JSON Mode Enforcement** (Injected `'json_mode' => true` into driver generation options in `NewsDiscoveryService.php`, ensuring `GoogleGeminiDriver` sends `responseMimeType = application/json` to force valid JSON output every time).
+- [x] **Task 4: Grounding Citation Sanitization & Parsing Resilience** (Updated `parseCandidates()` in `NewsDiscoveryService.php` to sanitize web search grounding inline citations `[1]`, `[2]` and reliably locate candidate JSON array boundaries, eliminating `JSON could not be parsed: No error` crashes).
+- [x] **Task 5: Downstream Article Drafting Failover Optimization** (Audited `ContentGenerationService.php` to confirm that Stage 3 article drafting allows failover to ultra-fast Groq Free Llama 3 when Gemini Free hits 429 rate limits, with Gemini Paid as the ultimate backup).
+- [x] **Task 6: Verification & Test Suite Pass** (Ran `CoverageNewsroomWorkflowTest` test suite; verified 7/7 tests pass cleanly).
+
+---
+
 # Sprint Progress: Phase 9: Billing & Subscription System Implementation
 
 ## Current Sprint Objectives (Phase 9)

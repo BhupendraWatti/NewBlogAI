@@ -58,28 +58,27 @@ class LLMCandidateRefinementService
     /**
      * Token budget for the refinement call.
      * ~9 candidates x ~200 tokens each = ~1 800 input tokens.
-     * 4 096 output tokens gives generous headroom for the cleaned JSON.
+     * 2 048 output tokens is enough for the keep/drop map without doubling
+     * discovery's free-tier token pressure.
      */
-    private const REFINEMENT_MAX_TOKENS = 4096;
+    private const REFINEMENT_MAX_TOKENS = 2048;
 
     /**
      * Provider preference order for refinement (cheap + fast models first).
      * Only providers that are enabled and have an API key are actually used.
      */
-    private const PREFERRED_PROVIDERS = ['gemini', 'groq', 'openai', 'claude', 'openrouter'];
+    private const PREFERRED_PROVIDERS = ['groq', 'openai', 'claude', 'openrouter'];
 
     /**
      * Preferred model per provider for the refinement task.
      * Falls back to the provider's configured default_model when null.
      */
     private const PROVIDER_MODELS = [
-        'gemini'     => 'gemini-2.5-flash',
-        'groq'       => 'llama-3.1-8b-instant',
-        'openai'     => 'gpt-4o-mini',
-        'claude'     => 'claude-haiku-4-5',
+        'groq' => 'llama-3.1-8b-instant',
+        'openai' => 'gpt-4o-mini',
+        'claude' => 'claude-haiku-4-5',
         'openrouter' => null,
     ];
-
 
     /**
      * JSON Schema for the structured output response.
@@ -96,29 +95,29 @@ class LLMCandidateRefinementService
      *                    geo_city, geo_state, source_references } ] }
      */
     private const REFINEMENT_SCHEMA = [
-        'name'   => 'candidate_refinement',
+        'name' => 'candidate_refinement',
         'strict' => true,
         'schema' => [
-            'type'                 => 'object',
-            'required'             => ['results'],
+            'type' => 'object',
+            'required' => ['results'],
             'additionalProperties' => false,
-            'properties'           => [
+            'properties' => [
                 'results' => [
-                    'type'  => 'array',
+                    'type' => 'array',
                     'items' => [
-                        'type'                 => 'object',
-                        'required'             => ['_idx', 'keep'],
+                        'type' => 'object',
+                        'required' => ['_idx', 'keep'],
                         'additionalProperties' => false,
-                        'properties'           => [
-                            '_idx'              => ['type' => 'integer'],
-                            'keep'              => ['type' => 'boolean'],
-                            'drop_reason'       => ['type' => ['string', 'null']],
-                            'title'             => ['type' => ['string', 'null']],
-                            'summary'           => ['type' => ['string', 'null']],
-                            'geo_city'          => ['type' => ['string', 'null']],
-                            'geo_state'         => ['type' => ['string', 'null']],
+                        'properties' => [
+                            '_idx' => ['type' => 'integer'],
+                            'keep' => ['type' => 'boolean'],
+                            'drop_reason' => ['type' => ['string', 'null']],
+                            'title' => ['type' => ['string', 'null']],
+                            'summary' => ['type' => ['string', 'null']],
+                            'geo_city' => ['type' => ['string', 'null']],
+                            'geo_state' => ['type' => ['string', 'null']],
                             'source_references' => [
-                                'type'  => ['array', 'null'],
+                                'type' => ['array', 'null'],
                                 'items' => ['type' => 'object'],
                             ],
                         ],
@@ -139,9 +138,9 @@ class LLMCandidateRefinementService
      * zero token cost so the discovery pipeline never fails on this step.
      *
      * @param  array<int, array>  $rawCandidates
-     * @param  AIProvider         $preferredProvider  Already-resolved provider from the caller
-     * @param  string             $category           e.g. "local", "politics", "sports"
-     * @param  string|null        $country            e.g. "India" — used for geo-diversity rules
+     * @param  AIProvider  $preferredProvider  Already-resolved provider from the caller
+     * @param  string  $category  e.g. "local", "politics", "sports"
+     * @param  string|null  $country  e.g. "India" — used for geo-diversity rules
      * @return array{candidates: array, dropped_count: int, drop_reasons: array,
      *               prompt_tokens: int, completion_tokens: int,
      *               total_tokens: int, estimated_cost: float}
@@ -153,13 +152,13 @@ class LLMCandidateRefinementService
         ?string $country = null,
     ): array {
         $passthrough = [
-            'candidates'        => $rawCandidates,
-            'dropped_count'     => 0,
-            'drop_reasons'      => [],
-            'prompt_tokens'     => 0,
+            'candidates' => $rawCandidates,
+            'dropped_count' => 0,
+            'drop_reasons' => [],
+            'prompt_tokens' => 0,
             'completion_tokens' => 0,
-            'total_tokens'      => 0,
-            'estimated_cost'    => 0.0,
+            'total_tokens' => 0,
+            'estimated_cost' => 0.0,
         ];
 
         if (empty($rawCandidates)) {
@@ -171,6 +170,7 @@ class LLMCandidateRefinementService
 
             if ($provider === null) {
                 Log::warning('LLMCandidateRefinementService: no usable provider found, skipping refinement.');
+
                 return $passthrough;
             }
 
@@ -182,26 +182,26 @@ class LLMCandidateRefinementService
                 $prompt,
                 $model,
                 [
-                    'max_tokens'  => self::REFINEMENT_MAX_TOKENS,
+                    'max_tokens' => self::REFINEMENT_MAX_TOKENS,
                     'temperature' => 0.1,   // near-deterministic for editorial judgment
-                    'timeout'     => 90,
-                    'task'        => 'candidate_refinement',
+                    'timeout' => 90,
+                    'task' => 'candidate_refinement',
                     // Enforce structured output natively in every driver:
                     // Gemini → responseMimeType + responseSchema
                     // OpenAI / Groq / OpenRouter → response_format
                     // Claude → tool-use with input_schema
-                    'json_mode'   => true,
+                    'json_mode' => true,
                     'json_schema' => self::REFINEMENT_SCHEMA,
                 ]
             );
 
             Log::info('LLMCandidateRefinementService: LLM call completed.', [
-                'provider'          => $provider->provider_key,
-                'model'             => $model,
-                'prompt_tokens'     => $result['prompt_tokens'] ?? 0,
+                'provider' => $provider->provider_key,
+                'model' => $model,
+                'prompt_tokens' => $result['prompt_tokens'] ?? 0,
                 'completion_tokens' => $result['completion_tokens'] ?? 0,
-                'estimated_cost'    => $result['estimated_cost'] ?? 0.0,
-                'raw_candidates'    => count($rawCandidates),
+                'estimated_cost' => $result['estimated_cost'] ?? 0.0,
+                'raw_candidates' => count($rawCandidates),
             ]);
 
             $refined = $this->parseRefinedCandidates((string) ($result['text'] ?? ''), $rawCandidates);
@@ -209,13 +209,13 @@ class LLMCandidateRefinementService
             $droppedCount = max(0, count($rawCandidates) - count($refined['candidates']));
 
             return [
-                'candidates'        => $refined['candidates'],
-                'dropped_count'     => $droppedCount,
-                'drop_reasons'      => $refined['drop_reasons'],
-                'prompt_tokens'     => (int) ($result['prompt_tokens'] ?? 0),
+                'candidates' => $refined['candidates'],
+                'dropped_count' => $droppedCount,
+                'drop_reasons' => $refined['drop_reasons'],
+                'prompt_tokens' => (int) ($result['prompt_tokens'] ?? 0),
                 'completion_tokens' => (int) ($result['completion_tokens'] ?? 0),
-                'total_tokens'      => (int) ($result['total_tokens'] ?? 0),
-                'estimated_cost'    => (float) ($result['estimated_cost'] ?? 0.0),
+                'total_tokens' => (int) ($result['total_tokens'] ?? 0),
+                'estimated_cost' => (float) ($result['estimated_cost'] ?? 0.0),
             ];
 
         } catch (\Throwable $e) {
@@ -223,6 +223,7 @@ class LLMCandidateRefinementService
             Log::warning('LLMCandidateRefinementService: refinement failed, returning raw candidates unchanged.', [
                 'error' => $e->getMessage(),
             ]);
+
             return $passthrough;
         }
     }
@@ -234,8 +235,9 @@ class LLMCandidateRefinementService
     /**
      * Resolve which provider + model to use for the refinement call.
      *
-     * Tries cheap/fast providers first. Falls back to the caller's already-
-     * resolved provider as a last resort so we never give up silently.
+     * Tries cheap/fast non-grounded providers first. Discovery already spent
+     * the grounded Gemini call, so refinement deliberately avoids reusing
+     * Gemini and fails open when no cheap refinement provider is configured.
      *
      * @return array{0: AIProvider|null, 1: string|null}
      */
@@ -254,11 +256,16 @@ class LLMCandidateRefinementService
                     continue;
                 }
                 $model = self::PROVIDER_MODELS[$key] ?? $provider->default_model;
+
                 return [$provider, $model];
             }
         }
 
-        if ($preferredProvider->is_enabled && ! empty($preferredProvider->api_key)) {
+        if (
+            strtolower($preferredProvider->provider_key) !== 'gemini'
+            && $preferredProvider->is_enabled
+            && ! empty($preferredProvider->api_key)
+        ) {
             return [$preferredProvider, $preferredProvider->default_model];
         }
 
@@ -277,7 +284,7 @@ class LLMCandidateRefinementService
         string $category,
         ?string $country
     ): string {
-        $today         = now()->format('F j, Y');
+        $today = now()->format('F j, Y');
         $regionContext = $country ? " Coverage region: {$country}." : '';
 
         // Tag each candidate with its index so we can map results back
@@ -344,10 +351,10 @@ PROMPT;
         // Fallback path: provider does not support structured output (e.g. Ollama),
         // or returned markdown fences around the JSON. Attempt manual extraction.
         if (! is_array($decoded)) {
-            $text    = preg_replace('/^```(?:json)?\s*/m', '', $text) ?? $text;
-            $text    = preg_replace('/^```\s*$/m',          '', $text) ?? $text;
-            $start   = strpos($text, '{');
-            $end     = strrpos($text, '}');
+            $text = preg_replace('/^```(?:json)?\s*/m', '', $text) ?? $text;
+            $text = preg_replace('/^```\s*$/m', '', $text) ?? $text;
+            $start = strpos($text, '{');
+            $end = strrpos($text, '}');
             $decoded = ($start !== false && $end !== false && $end > $start)
                 ? json_decode(substr($text, $start, $end - $start + 1), true)
                 : null;
@@ -356,8 +363,9 @@ PROMPT;
         if (! is_array($decoded) || ! isset($decoded['results']) || ! is_array($decoded['results'])) {
             Log::warning('LLMCandidateRefinementService: could not parse JSON response, using raw candidates.', [
                 'json_error' => json_last_error_msg(),
-                'preview'    => mb_substr($text, 0, 300),
+                'preview' => mb_substr($text, 0, 300),
             ]);
+
             return $fallback;
         }
 
@@ -369,7 +377,7 @@ PROMPT;
             }
         }
 
-        $kept        = [];
+        $kept = [];
         $dropReasons = [];
         foreach ($originalCandidates as $idx => $candidate) {
             $llmResult = $resultMap[$idx] ?? null;
@@ -380,17 +388,19 @@ PROMPT;
                     'idx' => $idx,
                 ]);
                 $kept[] = $candidate;
+
                 continue;
             }
 
             if (($llmResult['keep'] ?? true) === false) {
-                $reason        = (string) ($llmResult['drop_reason'] ?? 'dropped by editorial AI');
-                $dropReasons[] = "[{$idx}] " . mb_substr($reason, 0, 120);
+                $reason = (string) ($llmResult['drop_reason'] ?? 'dropped by editorial AI');
+                $dropReasons[] = "[{$idx}] ".mb_substr($reason, 0, 120);
                 Log::info('LLMCandidateRefinementService: candidate dropped by LLM.', [
-                    'idx'    => $idx,
-                    'title'  => mb_substr((string) ($candidate['title'] ?? ''), 0, 80),
+                    'idx' => $idx,
+                    'title' => mb_substr((string) ($candidate['title'] ?? ''), 0, 80),
                     'reason' => $reason,
                 ]);
+
                 continue;
             }
 
@@ -423,7 +433,7 @@ PROMPT;
             // Bug Fix #3: SORT_REGULAR compares arrays by value, not by URL uniqueness.
             // Deduplicate by URL key so fabricated/duplicate source entries cannot accumulate.
             if (! empty($llmResult['source_references']) && is_array($llmResult['source_references'])) {
-                $existing  = (array) ($merged['source_references'] ?? []);
+                $existing = (array) ($merged['source_references'] ?? []);
                 $allSources = array_merge($existing, $llmResult['source_references']);
                 $byUrl = [];
                 foreach ($allSources as $src) {
@@ -443,8 +453,8 @@ PROMPT;
         }
 
         Log::info('LLMCandidateRefinementService: parsing complete.', [
-            'input_count'   => count($originalCandidates),
-            'kept_count'    => count($kept),
+            'input_count' => count($originalCandidates),
+            'kept_count' => count($kept),
             'dropped_count' => count($dropReasons),
         ]);
 

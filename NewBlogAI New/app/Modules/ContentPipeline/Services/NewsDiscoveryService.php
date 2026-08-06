@@ -9,7 +9,9 @@ use App\Modules\AIProviderManager\Services\AIProviderService;
 use App\Modules\AIProviderManager\Support\ProviderErrorClassifier;
 use App\Modules\ContentPipeline\Models\NewsCandidate;
 use App\Modules\ContentPipeline\Models\PipelineRun;
+use App\Modules\ContentPipeline\Support\PipelineErrorFormatter;
 use App\Modules\SubscriptionManager\Services\EntitlementService;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -35,15 +37,17 @@ class NewsDiscoveryService
      */
     public const OVERGENERATION_COUNT = 9;
 
-    /** Total generation attempts (initial + one retry) before hard failure. */
-    public const MAX_ATTEMPTS = 2;
+    /** Total generation attempts before hard failure. */
+    public const MAX_ATTEMPTS = 3;
+
+    /** Keep each grounded response small enough to avoid early JSON truncation. */
+    public const DISCOVERY_BATCH_SIZE = 4;
 
     /**
-     * Token budget for the discovery generate call.
-     * 9 JSON objects with titles, summaries, sources etc. easily need 4-6 k tokens;
-     * 8192 gives comfortable headroom while staying within Gemini free-tier limits.
+     * Token budget for the grounded discovery call. Keep this bounded so one
+     * free-tier Gemini request cannot reserve most of the per-minute quota.
      */
-    private const DISCOVERY_MAX_TOKENS = 8192;
+    public const DISCOVERY_MAX_TOKENS = 4096;
 
     /**
      * Attempts per provider during failover (with exponential back-off).
@@ -88,27 +92,27 @@ class NewsDiscoveryService
         }
 
         $pipeline = $run->pipeline;
-        $site     = $pipeline?->site;
-        $prompt   = $pipeline?->prompt;
+        $site = $pipeline?->site;
+        $prompt = $pipeline?->prompt;
 
         if (! $pipeline || ! $site || ! $prompt) {
             throw new RuntimeException('Discovery run has incomplete pipeline dependencies.');
         }
 
         // ── Resolve the preferred provider from run properties ──────────────
-        $discoveryProviderId  = $run->properties['discovery_provider_id'] ?? null;
-        $preferredProvider    = $discoveryProviderId
+        $discoveryProviderId = $run->properties['discovery_provider_id'] ?? null;
+        $preferredProvider = $discoveryProviderId
             ? AIProvider::find($discoveryProviderId)
             : $pipeline->provider;
 
         // Auto-override: News discovery needs real-time search grounding to prevent hallucinations.
         // If preferred provider is not Gemini, but Gemini is enabled with an API key, we use Gemini for discovery.
         if ($preferredProvider && strtolower($preferredProvider->provider_key) !== 'gemini') {
-            $geminiProvider = \App\Modules\AIProviderManager\Models\AIProvider::where('provider_key', 'gemini')
+            $geminiProvider = AIProvider::where('provider_key', 'gemini')
                 ->where('is_enabled', true)
                 ->whereNotNull('api_key')
                 ->get()
-                ->first(fn($p) => !empty($p->api_key));
+                ->first(fn ($p) => ! empty($p->api_key));
             if ($geminiProvider) {
                 Log::info("NewsDiscoveryService: Overriding preferred provider '{$preferredProvider->provider_key}' with 'gemini' to utilize search grounding.");
                 $preferredProvider = $geminiProvider;
@@ -127,7 +131,7 @@ class NewsDiscoveryService
         }
 
         $reservation = null;
-        $startTime   = microtime(true);
+        $startTime = microtime(true);
 
         try {
             $run->update(['status' => 'processing', 'started_at' => now()]);
@@ -147,7 +151,7 @@ class NewsDiscoveryService
             );
 
             $site->loadMissing('customer');
-            $country  = $pipeline->target_country ?: ($site->customer?->country ?? null);
+            $country = $pipeline->target_country ?: ($site->customer?->country ?? null);
             $category = $pipeline->news_category ?? 'global';
             $language = $pipeline->language ?: 'en';
 
@@ -164,24 +168,24 @@ class NewsDiscoveryService
             DB::transaction(function () use ($run, $unique) {
                 foreach ($unique as $index => $candidate) {
                     NewsCandidate::create([
-                        'pipeline_run_id'   => $run->id,
-                        'position'          => $index + 1,
-                        'title'             => mb_substr(trim((string) $candidate['title']), 0, 500),
-                        'summary'           => $candidate['summary'] ?? null,
+                        'pipeline_run_id' => $run->id,
+                        'position' => $index + 1,
+                        'title' => mb_substr(trim((string) $candidate['title']), 0, 500),
+                        'summary' => $candidate['summary'] ?? null,
                         'source_references' => $candidate['source_references'] ?? [],
-                        'keywords'          => $candidate['keywords'] ?? [],
-                        'trend_score'       => $this->clampScore($candidate['trend_score'] ?? 0),
-                        'freshness_score'   => $this->clampScore($candidate['freshness_score'] ?? 0),
-                        'uniqueness_hash'   => NewsCandidate::hashTitle((string) $candidate['title']),
-                        'metadata'          => [
-                            'event_date'            => $candidate['event_date'] ?? null,
+                        'keywords' => $candidate['keywords'] ?? [],
+                        'trend_score' => $this->clampScore($candidate['trend_score'] ?? 0),
+                        'freshness_score' => $this->clampScore($candidate['freshness_score'] ?? 0),
+                        'uniqueness_hash' => NewsCandidate::hashTitle((string) $candidate['title']),
+                        'metadata' => [
+                            'event_date' => $candidate['event_date'] ?? null,
                             'published_at_relative' => $candidate['published_at_relative'] ?? null,
                         ],
                         // Persist geo and quality score fields alongside candidate data.
-                        'geo_city'          => $candidate['geo_city'] ?? null,
-                        'geo_state'         => $candidate['geo_state'] ?? null,
-                        'quality_score'     => isset($candidate['quality_score']) ? $this->clampScore($candidate['quality_score']) : null,
-                        'status'            => NewsCandidate::STATUS_CANDIDATE,
+                        'geo_city' => $candidate['geo_city'] ?? null,
+                        'geo_state' => $candidate['geo_state'] ?? null,
+                        'quality_score' => isset($candidate['quality_score']) ? $this->clampScore($candidate['quality_score']) : null,
+                        'status' => NewsCandidate::STATUS_CANDIDATE,
                     ]);
                 }
 
@@ -189,36 +193,36 @@ class NewsDiscoveryService
             });
 
             $reservation?->update([
-                'prompt_tokens'     => $totalTokens['prompt'] ?: null,
+                'prompt_tokens' => $totalTokens['prompt'] ?: null,
                 'completion_tokens' => $totalTokens['completion'] ?: null,
-                'total_tokens'      => $totalTokens['total'] ?: null,
-                'estimated_cost'    => $totalCost,
+                'total_tokens' => $totalTokens['total'] ?: null,
+                'estimated_cost' => $totalCost,
                 'execution_time_ms' => (int) ((microtime(true) - $startTime) * 1000),
-                'status'            => 'success',
+                'status' => 'success',
                 'response_metadata' => [
-                    'run_type'          => PipelineRun::TYPE_DISCOVERY,
-                    'run_id'            => $run->id,
-                    'provider_used'     => $usedProviderKey,
+                    'run_type' => PipelineRun::TYPE_DISCOVERY,
+                    'run_id' => $run->id,
+                    'provider_used' => $usedProviderKey,
                 ],
             ]);
 
             Log::info('NewsDiscoveryService: discovery run ready for employee selection.', [
-                'run_id'          => $run->id,
-                'candidates'      => self::CANDIDATE_TARGET,
-                'provider_used'   => $usedProviderKey,
+                'run_id' => $run->id,
+                'candidates' => self::CANDIDATE_TARGET,
+                'provider_used' => $usedProviderKey,
             ]);
         } catch (\Exception $e) {
             $reservation?->update([
-                'status'            => 'failed',
-                'error_log'         => $e->getMessage(),
+                'status' => 'failed',
+                'error_log' => $e->getMessage(),
                 'execution_time_ms' => (int) ((microtime(true) - $startTime) * 1000),
                 'response_metadata' => ['run_type' => PipelineRun::TYPE_DISCOVERY, 'run_id' => $run->id],
             ]);
 
             $run->update([
-                'status'        => 'failed',
+                'status' => 'failed',
                 'error_message' => $e->getMessage(),
-                'completed_at'  => now(),
+                'completed_at' => now(),
             ]);
 
             throw $e;
@@ -249,12 +253,21 @@ class NewsDiscoveryService
         // Cooldown check / Auto-recovery
         $healthy = $allEnabled->filter(function (AIProvider $p) {
             $p->checkRecovery();
+
             return $p->status === 'healthy';
         });
 
+        // Rule 21 & Grounded Search Router: Newsroom Candidate Discovery requires real-time
+        // search grounding. Filter available discovery providers to those that support grounding.
+        $grounded = $healthy->filter(fn (AIProvider $p) => $p->supportsGrounding());
+
+        // Fallback to healthy if no grounded provider is configured (will throw clear runtime error downstream)
+        $candidates = $grounded->isNotEmpty() ? $grounded : $healthy;
+
         // Sort by priority ascending, then preferred first
-        $sorted = $healthy->sortBy(function (AIProvider $p) use ($preferred) {
+        $sorted = $candidates->sortBy(function (AIProvider $p) use ($preferred) {
             $isPreferred = ($preferred && $p->id === $preferred->id) ? 0 : 1;
+
             return [$p->priority, $isPreferred, $p->id];
         })->values();
 
@@ -271,7 +284,7 @@ class NewsDiscoveryService
      *
      * @param  Collection<int, AIProvider>  $providers
      * @return array{0: array, 1: array{prompt:int,completion:int,total:int}, 2: float, 3: string}
-     *         [candidates, tokenTotals, totalCost, usedProviderKey]
+     *                                                                                             [candidates, tokenTotals, totalCost, usedProviderKey]
      *
      * @throws RuntimeException when ALL providers fail
      */
@@ -290,9 +303,9 @@ class NewsDiscoveryService
             for ($attempt = 1; $attempt <= self::FAILOVER_MAX_ATTEMPTS; $attempt++) {
                 try {
                     Log::info('NewsDiscoveryService: Trying provider.', [
-                        'run_id'       => $run->id,
-                        'provider'     => $providerKey,
-                        'attempt'      => $attempt,
+                        'run_id' => $run->id,
+                        'provider' => $providerKey,
+                        'attempt' => $attempt,
                         'max_attempts' => self::FAILOVER_MAX_ATTEMPTS,
                     ]);
 
@@ -305,9 +318,9 @@ class NewsDiscoveryService
                     );
 
                     Log::info('NewsDiscoveryService: Provider succeeded.', [
-                        'run_id'   => $run->id,
+                        'run_id' => $run->id,
                         'provider' => $providerKey,
-                        'attempt'  => $attempt,
+                        'attempt' => $attempt,
                     ]);
 
                     return array_merge($result, [$providerKey]);
@@ -319,10 +332,10 @@ class NewsDiscoveryService
                     $provider->handleFailure($e);
 
                     Log::warning('NewsDiscoveryService: Provider attempt failed.', [
-                        'run_id'   => $run->id,
+                        'run_id' => $run->id,
                         'provider' => $providerKey,
-                        'attempt'  => $attempt,
-                        'error'    => $errorMsg,
+                        'attempt' => $attempt,
+                        'error' => $errorMsg,
                     ]);
 
                     // Permanent failures (bad key, connection refused, bad
@@ -334,9 +347,9 @@ class NewsDiscoveryService
                     // within our budget, so move straight to the next one.
                     if (! ProviderErrorClassifier::shouldRetrySameProvider($e)) {
                         Log::info('NewsDiscoveryService: Not retrying this provider, moving to next.', [
-                            'run_id'   => $run->id,
+                            'run_id' => $run->id,
                             'provider' => $providerKey,
-                            'reason'   => ProviderErrorClassifier::reason($e),
+                            'reason' => ProviderErrorClassifier::reason($e),
                         ]);
                         break;
                     }
@@ -351,15 +364,15 @@ class NewsDiscoveryService
             }
 
             Log::warning('NewsDiscoveryService: All attempts failed for provider, moving to next.', [
-                'run_id'   => $run->id,
+                'run_id' => $run->id,
                 'provider' => $providerKey,
-                'errors'   => $allErrors[$providerKey] ?? [],
+                'errors' => $allErrors[$providerKey] ?? [],
             ]);
         }
 
         // Every provider failed — build a descriptive exception message
         throw new RuntimeException(
-            \App\Modules\ContentPipeline\Support\PipelineErrorFormatter::format($allErrors, 'Discovery')
+            PipelineErrorFormatter::format($allErrors, 'Discovery')
         );
     }
 
@@ -371,7 +384,7 @@ class NewsDiscoveryService
      * collected unique candidates once CANDIDATE_TARGET is reached.
      *
      * @return array{0: array, 1: array{prompt:int,completion:int,total:int}, 2: float}
-     *         [candidates, tokenTotals, totalCost]
+     *                                                                                  [candidates, tokenTotals, totalCost]
      *
      * @throws RuntimeException if this provider cannot produce enough unique candidates
      */
@@ -383,14 +396,14 @@ class NewsDiscoveryService
         ?string $country = null,
     ): array {
         $excludedTitles = [];
-        $unique         = [];
-        $totalTokens    = ['prompt' => 0, 'completion' => 0, 'total' => 0];
-        $totalCost      = 0.0;
+        $unique = [];
+        $totalTokens = ['prompt' => 0, 'completion' => 0, 'total' => 0];
+        $totalCost = 0.0;
 
         $site = $run->pipeline->site;
 
         for ($attempt = 1; $attempt <= self::MAX_ATTEMPTS && count($unique) < self::CANDIDATE_TARGET; $attempt++) {
-            $needed     = self::OVERGENERATION_COUNT - count($unique);
+            $needed = min(self::DISCOVERY_BATCH_SIZE, self::CANDIDATE_TARGET - count($unique));
             $promptText = $this->buildDiscoveryPrompt(
                 $category,
                 $language,
@@ -418,15 +431,23 @@ class NewsDiscoveryService
                 $promptText,
                 $provider->default_model,
                 [
-                    'max_tokens'  => self::DISCOVERY_MAX_TOKENS,
+                    'max_tokens' => self::DISCOVERY_MAX_TOKENS,
                     'temperature' => 0.2,
-                    'timeout'     => 150,
-                    'tools'       => $tools,
+                    'timeout' => 300,
+                    'tools' => $tools,
+                    // Gemini 2.5 Flash defaults to dynamic thinking. For a
+                    // grounded JSON extraction call, hidden reasoning can
+                    // consume the output budget and leave a partial array.
+                    'thinking_budget' => strtolower($provider->provider_key) === 'gemini' ? 0 : null,
+                    // NOTE: json_mode (responseMimeType: application/json) MUST NOT be set
+                    // when googleSearch grounding tools are active. Gemini returns HTTP 400
+                    // INVALID_ARGUMENT: "Tool use with a response mime type: 'application/json'
+                    // is unsupported". parseCandidates() extracts JSON from free-text safely.
                 ]
             );
 
             // Update rate limits in database
-            if (!empty($result['rate_limits'])) {
+            if (! empty($result['rate_limits'])) {
                 $limits = $result['rate_limits'];
                 $provider->updateRateLimits(
                     isset($limits['limit']) ? intval($limits['limit']) : null,
@@ -435,12 +456,33 @@ class NewsDiscoveryService
                 );
             }
 
-            $totalTokens['prompt']     += (int) ($result['prompt_tokens'] ?? 0);
+            $totalTokens['prompt'] += (int) ($result['prompt_tokens'] ?? 0);
             $totalTokens['completion'] += (int) ($result['completion_tokens'] ?? 0);
-            $totalTokens['total']      += (int) ($result['total_tokens'] ?? 0);
-            $totalCost                 += (float) ($result['estimated_cost'] ?? 0.0);
+            $totalTokens['total'] += (int) ($result['total_tokens'] ?? 0);
+            $totalCost += (float) ($result['estimated_cost'] ?? 0.0);
 
-            $parsed   = $this->parseCandidates((string) ($result['text'] ?? ''));
+            try {
+                $parsed = $this->parseCandidates((string) ($result['text'] ?? ''));
+            } catch (RuntimeException $e) {
+                Log::warning('NewsDiscoveryService: discovery JSON parse failed; retrying with a fresh smaller batch if possible.', [
+                    'run_id' => $run->id,
+                    'provider' => $provider->provider_key,
+                    'attempt' => $attempt,
+                    'error' => $e->getMessage(),
+                    'response_finish_reason' => $result['raw_response']['candidates'][0]['finishReason'] ?? null,
+                    'response_preview' => mb_substr((string) ($result['text'] ?? ''), 0, 500),
+                ]);
+
+                if (count($unique) >= 1) {
+                    break;
+                }
+
+                if ($attempt >= self::MAX_ATTEMPTS) {
+                    throw $e;
+                }
+
+                continue;
+            }
 
             // LLM editorial refinement gate: intercepts the raw parsed batch
             // BEFORE deduplication and DB persistence. A cheap, fast LLM deduplicates
@@ -448,45 +490,45 @@ class NewsDiscoveryService
             // fills in missing geo fields in one pass. Fail-open: on any LLM error,
             // $parsed is returned unchanged.
             $refinementResult = $this->llmRefiner->refine($parsed, $provider, $category, $country);
-            $parsed           = $refinementResult['candidates'];
+            $parsed = $refinementResult['candidates'];
 
             // Accumulate LLM refinement token costs into the run totals
-            $totalTokens['prompt']     += (int) ($refinementResult['prompt_tokens'] ?? 0);
+            $totalTokens['prompt'] += (int) ($refinementResult['prompt_tokens'] ?? 0);
             $totalTokens['completion'] += (int) ($refinementResult['completion_tokens'] ?? 0);
-            $totalTokens['total']      += (int) ($refinementResult['total_tokens'] ?? 0);
-            $totalCost                 += (float) ($refinementResult['estimated_cost'] ?? 0.0);
+            $totalTokens['total'] += (int) ($refinementResult['total_tokens'] ?? 0);
+            $totalCost += (float) ($refinementResult['estimated_cost'] ?? 0.0);
 
             $filtered = $this->duplicates->filterUnique(array_merge($unique, $parsed), $site->id);
 
             // Quality filter: drop candidates that fail editorial standards.
-            $qualityResult  = $this->qualityFilter->filter($filtered['unique']);
-            $qualityPassed  = $qualityResult['passed'];
+            $qualityResult = $this->qualityFilter->filter($filtered['unique']);
+            $qualityPassed = $qualityResult['passed'];
             $qualityDropped = count($qualityResult['rejected']);
 
             // Geographic diversity enforcer: limit over-represented regions.
-            $geoResult  = $this->geoEnforcer->filter($qualityPassed);
+            $geoResult = $this->geoEnforcer->filter($qualityPassed);
             $geoAllowed = $geoResult['passed'];
             $geoBlocked = count($geoResult['blocked']);
 
-            $unique         = array_slice($geoAllowed, 0, self::CANDIDATE_TARGET + 3);
+            $unique = array_slice($geoAllowed, 0, self::CANDIDATE_TARGET + 3);
             $excludedTitles = array_merge($excludedTitles, array_column($filtered['duplicates'], 'title'));
 
             Log::info('NewsDiscoveryService: attempt completed.', [
-                'run_id'              => $run->id,
-                'provider'            => $provider->provider_key,
-                'attempt'             => $attempt,
-                'unique_count'        => count($unique),
-                'duplicates_dropped'  => count($filtered['duplicates']),
+                'run_id' => $run->id,
+                'provider' => $provider->provider_key,
+                'attempt' => $attempt,
+                'unique_count' => count($unique),
+                'duplicates_dropped' => count($filtered['duplicates']),
                 'llm_refined_dropped' => $refinementResult['dropped_count'] ?? 0,
-                'quality_dropped'     => $qualityDropped,
-                'geo_blocked'         => $geoBlocked,
+                'quality_dropped' => $qualityDropped,
+                'geo_blocked' => $geoBlocked,
             ]);
         }
 
         // Relax shortfall constraint: accept whatever unique candidates are generated (even 1, 2, or 3)
         // to support niche regional/filtered runs. Throw only if count is below 1.
         if (count($unique) < 1) {
-            throw new RuntimeException("Could not generate enough unique candidates. Please broaden keywords.");
+            throw new RuntimeException('Could not generate enough unique candidates. Please broaden keywords.');
         }
 
         return [
@@ -498,11 +540,11 @@ class NewsDiscoveryService
 
     protected function buildDiscoveryPrompt(string $category, string $language, int $count, array $excludedTitles, ?string $country = null): string
     {
-        $today       = now()->format('F j, Y');
-        $todayIso    = now()->format('Y-m-d');
+        $today = now()->format('F j, Y');
+        $todayIso = now()->format('Y-m-d');
         $yesterdayIso = now()->subDay()->format('Y-m-d');
         $currentTime = now()->format('H:i:s');
-        $exclusions  = '';
+        $exclusions = '';
 
         if (! empty($excludedTitles)) {
             $exclusions = "\nDo NOT include any event that overlaps with these already-covered headlines:\n- "
@@ -510,7 +552,7 @@ class NewsDiscoveryService
         }
 
         $predefined = ['global', 'trending', 'local', 'technology', 'business', 'politics', 'sports', 'health', 'science', 'entertainment'];
-        $isCustomTopic = !in_array(strtolower($category), $predefined, true);
+        $isCustomTopic = ! in_array(strtolower($category), $predefined, true);
 
         $topicConstraint = $isCustomTopic
             ? " focusing specifically on the topic or keyword '{$category}'"
@@ -529,36 +571,24 @@ class NewsDiscoveryService
             ? "- If the region is {$country}: spread stories across different states/regions — do NOT cluster multiple stories in the same city."
             : '- Spread stories across different cities and regions globally.';
 
-        // Resolve current year for prompt context
-        $currentYear = now()->format('Y');
-
         // Embed explicit date range operators so Gemini Search grounding
         // anchors its retrieval to the last 48 hours rather than returning
         // evergreen top-ranked articles. The "after:" / "before:" syntax is
         // recognised by Google Search and biases the grounding toward fresh results.
+        $officialDesignationGuidance = $this->shouldVerifyOfficialDesignations($category)
+            ? "\nOFFICIAL DESIGNATION CHECK: Use search grounding to verify current titles for any political leaders, ministers, government departments, courts, police, or public officials mentioned in selected stories. Do not rely on stored model knowledge for office holders.\n"
+            : '';
+
         return <<<PROMPT
 You are a JSON-only news data API. Today is {$today} ({$todayIso}), current time is {$currentTime}.
-
-GOVERNMENT & POLITICAL CONTEXT (Verify all official designations strictly):
-- Current Year: {$currentYear}
-- India Active Council of Ministers:
-  * Prime Minister: Narendra Modi
-  * President: Droupadi Murmu
-  * Minister of Home Affairs: Amit Shah
-  * Minister of External Affairs: S. Jaishankar
-  * Minister of Finance: Nirmala Sitharaman
-  * Chief Minister of Madhya Pradesh: Mohan Yadav (Note: Shivraj Singh Chouhan is no longer the CM of MP; Mohan Yadav is the current CM)
-- United States: President Joe Biden
-- United Kingdom: Prime Minister Keir Starmer
-
-VERIFY OFFICIAL DESIGNATIONS: You MUST perform web search grounding to verify the current active official designations of any political leaders, government ministers, or officials mentioned in the news. Do NOT reference former officials as currently active. Ensure all titles are 100% accurate as of {$todayIso}.
+{$officialDesignationGuidance}
 
 SEARCH CONTEXT — USE THIS DATE RANGE FOR ALL QUERIES:
   after:{$yesterdayIso} before:{$todayIso}
   Restrict ALL search retrievals to articles published in the last 48 hours ONLY.
   Do NOT surface articles older than {$yesterdayIso}.
 
-TASK: Return exactly {$count} current, extremely fresh real-world news events{$topicConstraint} published after:{$yesterdayIso}{$regionContext}.
+TASK: Return exactly {$count} current, fresh real-world news events{$topicConstraint} published after:{$yesterdayIso}{$regionContext}.
 Do NOT return news older than 48 hours. Prioritize breaking news and trending events that happened within the last 30 minutes, 1 hour, 4 hours, or up to 24 hours.
 
 GEOGRAPHIC DIVERSITY RULES (strictly enforced):
@@ -598,7 +628,7 @@ Return exactly this JSON structure (no extra fields, no missing fields):
 [
   {
     "title": "concise headline max 120 chars",
-    "summary": "2-3 sentence factual summary of the real event. You MUST include specific news details: the exact city location, the exact time, the named officials or organizations involved, casualty counts or cost figures if applicable, and the specific occasion (e.g. Shravan Monday, VIP visit, festival name). Avoid vague placeholders or generic sentences.",
+    "summary": "1 concise factual sentence with the key city, event, official body/person if known, and current status. Do not exceed 220 characters.",
     "source_references": [{"name": "Outlet Name", "url": "https://real-url.com"}],
     "keywords": ["keyword1", "keyword2", "keyword3"],
     "trend_score": 85,
@@ -613,82 +643,121 @@ Return exactly this JSON structure (no extra fields, no missing fields):
 PROMPT;
     }
 
-
     /**
      * Parse the AI response into candidate arrays.
      *
      * Handles:
      *  - Markdown code fences (```json … ```)
      *  - Gemini 2.5 "thinking" preamble text before the JSON array
+     *  - Citation markers [1],[2] in preamble only (not inside JSON body)
      *  - Partial/truncated arrays (keeps whatever objects are fully closed)
      *
      * @return array<int, array>
      */
     protected function parseCandidates(string $text): array
     {
+        $original = $text;
         $text = trim($text);
 
-        // Strip markdown code fences (```json … ``` or ``` … ```)
+        // ── Step 1: Strip markdown code fences ──────────────────────────────
         $text = preg_replace('/^```(?:json)?\s*/m', '', $text) ?? $text;
         $text = preg_replace('/^```\s*$/m', '', $text) ?? $text;
+        $text = trim($text);
 
-        // Find the FIRST '[' (start of JSON array) — any thinking-model preamble
-        // text appears before the array and is safely skipped this way.
-        $start = strpos($text, '[');
-        if ($start === false) {
+        // ── Step 2: Find the outermost JSON array boundaries ─────────────────
+        // Use the FIRST '[' that is followed by whitespace and '{' (array of objects).
+        // This skips any preamble text Gemini may prepend before the JSON array.
+        $start = null;
+        if (preg_match('/\[\s*\{/s', $text, $m, PREG_OFFSET_CAPTURE)) {
+            $start = $m[0][1];
+        } else {
+            // Fallback: first '[' in the response
+            $pos = strpos($text, '[');
+            if ($pos !== false) {
+                $start = $pos;
+            }
+        }
+
+        if ($start === null) {
             Log::error('NewsDiscoveryService: No JSON array found in discovery response.', [
-                'response_preview' => mb_substr($text, 0, 500),
+                'response_preview' => mb_substr($text, 0, 800),
             ]);
             throw new RuntimeException('Discovery response did not contain a JSON array.');
         }
 
-        // Find the LAST ']' — this handles truncated responses by closing the array
-        // at whatever the last complete object boundary is.
+        // ── Step 3: Strip Gemini grounding citation markers ONLY from preamble
+        // (the text BEFORE the JSON array start). Never touch the JSON body itself —
+        // the old approach of stripping [1],[2] globally corrupted source_references
+        // array brackets like [{"name":"BBC",...}].
+        if ($start > 0) {
+            $preamble = substr($text, 0, $start);
+            $preamble = preg_replace('/\[\d+\]/', '', $preamble) ?? $preamble;
+            $text = $preamble.substr($text, $start);
+            // Recalculate start since preamble length may have changed
+            if (preg_match('/\[\s*\{/s', $text, $m, PREG_OFFSET_CAPTURE)) {
+                $start = $m[0][1];
+            }
+        }
+
+        // ── Step 4: Find the last ']' for the array close ───────────────────
         $end = strrpos($text, ']');
         if ($end === false || $end <= $start) {
-            // Response was truncated before any closing bracket — try to recover
-            // by finding the last fully-closed object and appending "]}" manually.
+            // Truncated response — close array at the last complete object
             $lastClose = strrpos($text, '}');
             if ($lastClose !== false && $lastClose > $start) {
-                $text = substr($text, $start, $lastClose - $start + 1) . ']';
-                $end   = strlen($text) - 1;
+                $text = substr($text, $start, $lastClose - $start + 1).']';
+                $end = strlen($text) - 1;
                 $start = 0;
                 Log::warning('NewsDiscoveryService: Truncated JSON array — recovered by closing at last "}".');
             } else {
+                Log::error('NewsDiscoveryService: JSON array malformed, no closing bracket or object found.', [
+                    'response_preview' => mb_substr($text, 0, 800),
+                ]);
                 throw new RuntimeException('Discovery response JSON array was malformed or empty.');
             }
         }
 
         $jsonSlice = substr($text, $start, $end - $start + 1);
-        $decoded   = json_decode($jsonSlice, true);
 
-        // If strict parse fails, attempt a robust recovery for truncated JSON arrays:
-        // Locate the last fully-closed candidate object (indented by 2 spaces: "\n  }")
-        // and safely close the array there.
+        // ── Step 5: First-pass strict decode ────────────────────────────────
+        $decoded = json_decode($jsonSlice, true);
+        $strictJsonError = json_last_error();
+        $strictJsonErrorMessage = json_last_error_msg();
+
+        // ── Step 6: Recovery for truncated arrays ────────────────────────────
+        // If decode fails, truncate at the last fully-closed object ("}") and close.
         if (! is_array($decoded)) {
             $lastClose = strrpos($jsonSlice, "\n  }");
             if ($lastClose === false) {
                 $lastClose = strrpos($jsonSlice, "\r\n  }");
             }
+            if ($lastClose === false) {
+                $lastClose = strrpos($jsonSlice, '}');
+            }
             if ($lastClose !== false) {
-                $recovered = substr($jsonSlice, 0, $lastClose + strlen(str_contains($jsonSlice, "\r\n") ? "\r\n  }" : "\n  }")) . "\n]";
-                $decoded   = json_decode($recovered, true);
+                $eol = str_contains($jsonSlice, "\r\n") ? "\r\n" : "\n";
+                $recovered = substr($jsonSlice, 0, $lastClose + 1).$eol.']';
+                $decoded = json_decode($recovered, true);
                 if (is_array($decoded)) {
-                    Log::warning('NewsDiscoveryService: Truncated discovery JSON recovered by closing at last complete candidate object.', [
-                        'original_length'  => strlen($jsonSlice),
+                    Log::warning('NewsDiscoveryService: Truncated discovery JSON recovered at last complete object.', [
+                        'original_length' => strlen($jsonSlice),
                         'recovered_length' => strlen($recovered),
-                        'parsed_count'     => count($decoded),
+                        'parsed_count' => count($decoded),
                     ]);
+                    $jsonSlice = $recovered;
                 }
             }
         }
 
+        // ── Step 7: Final decode failure — log full detail and throw ─────────
         if (! is_array($decoded)) {
-            Log::error('NewsDiscoveryService: JSON decode failed after recovery attempts.', [
-                'json_error'       => json_last_error_msg(),
-                'response_preview' => mb_substr($jsonSlice, 0, 500),
+            Log::error('NewsDiscoveryService: JSON decode failed after all recovery attempts.', [
+                'json_error' => $strictJsonErrorMessage,
+                'json_error_code' => $strictJsonError,
+                'slice_length' => strlen($jsonSlice),
+                'response_preview' => mb_substr($jsonSlice, 0, 800),
             ]);
-            throw new RuntimeException('Discovery response JSON could not be parsed: '.json_last_error_msg());
+            throw new RuntimeException('Discovery response JSON could not be parsed: '.$strictJsonErrorMessage);
         }
 
         $candidates = [];
@@ -697,8 +766,8 @@ PROMPT;
                 continue;
             }
             $rawFreshness = (int) ($item['freshness_score'] ?? 0);
-            $sourceRefs   = is_array($item['source_references'] ?? null) ? $item['source_references'] : [];
-            $sourceCount  = count($sourceRefs);
+            $sourceRefs = is_array($item['source_references'] ?? null) ? $item['source_references'] : [];
+            $sourceCount = count($sourceRefs);
             $keywordCount = is_array($item['keywords'] ?? null) ? count($item['keywords']) : 0;
 
             // Mathematical Trending Score: coverage volume (sources) + keyword velocity
@@ -706,28 +775,28 @@ PROMPT;
             // so scores are dynamically scattered (e.g. 84%, 77%, 91%) and never locked/clustered.
             $baseVelocity = 45 + ($keywordCount * 6);
             $coverageBonus = $sourceCount * 18;
-            $positionVariance = ($index * 7) % 19; 
-            $dynamicTrend  = (int) min(98, max(45, $baseVelocity + $coverageBonus - $positionVariance));
+            $positionVariance = ($index * 7) % 19;
+            $dynamicTrend = (int) min(98, max(45, $baseVelocity + $coverageBonus - $positionVariance));
 
             // Bug Fix #1: If the AI claims freshness > 80 but provides NO source reference URL,
             // cap it at 60 — we cannot verify the recency without a source, so treat as unverifiable.
-            $hasVerifiableSource = collect($sourceRefs)->contains(fn ($s) => !empty($s['url']) && str_starts_with((string) $s['url'], 'http'));
-            if ($rawFreshness > 80 && !$hasVerifiableSource) {
+            $hasVerifiableSource = collect($sourceRefs)->contains(fn ($s) => ! empty($s['url']) && str_starts_with((string) $s['url'], 'http'));
+            if ($rawFreshness > 80 && ! $hasVerifiableSource) {
                 $rawFreshness = 60;
             }
 
             $candidates[] = [
-                'title'             => mb_substr(trim((string) $item['title']), 0, 200),
-                'summary'           => isset($item['summary']) ? trim((string) $item['summary']) : null,
+                'title' => mb_substr(trim((string) $item['title']), 0, 200),
+                'summary' => isset($item['summary']) ? trim((string) $item['summary']) : null,
                 'source_references' => $sourceRefs,
-                'keywords'          => is_array($item['keywords'] ?? null) ? array_values($item['keywords']) : [],
-                'trend_score'       => $dynamicTrend,
-                'freshness_score'   => $rawFreshness,
-                'event_date'        => $item['event_date'] ?? null,
+                'keywords' => is_array($item['keywords'] ?? null) ? array_values($item['keywords']) : [],
+                'trend_score' => $dynamicTrend,
+                'freshness_score' => $rawFreshness,
+                'event_date' => $item['event_date'] ?? null,
                 'published_at_relative' => $item['published_at_relative'] ?? null,
                 // Geographic fields
-                'geo_city'          => isset($item['geo_city']) && is_string($item['geo_city']) ? mb_substr(trim($item['geo_city']), 0, 100) : null,
-                'geo_state'         => isset($item['geo_state']) && is_string($item['geo_state']) ? mb_substr(trim($item['geo_state']), 0, 100) : null,
+                'geo_city' => isset($item['geo_city']) && is_string($item['geo_city']) ? mb_substr(trim($item['geo_city']), 0, 100) : null,
+                'geo_state' => isset($item['geo_state']) && is_string($item['geo_state']) ? mb_substr(trim($item['geo_state']), 0, 100) : null,
             ];
         }
 
@@ -749,6 +818,17 @@ PROMPT;
     protected function clampScore(mixed $value): int
     {
         return max(0, min(100, (int) $value));
+    }
+
+    private function shouldVerifyOfficialDesignations(string $category): bool
+    {
+        $category = strtolower($category);
+
+        return str_contains($category, 'politic')
+            || str_contains($category, 'government')
+            || str_contains($category, 'election')
+            || str_contains($category, 'court')
+            || str_contains($category, 'crime');
     }
 
     /**
@@ -780,25 +860,25 @@ PROMPT;
         $today = now()->startOfDay();
 
         foreach ($candidates as &$candidate) {
-            $originalScore      = (int) ($candidate['freshness_score'] ?? 0);
-            $eventDateStr       = $candidate['event_date'] ?? null;
-            $relativeStr        = $candidate['published_at_relative'] ?? null;
-            $capFromDate        = null;
-            $capFromRelative    = null;
+            $originalScore = (int) ($candidate['freshness_score'] ?? 0);
+            $eventDateStr = $candidate['event_date'] ?? null;
+            $relativeStr = $candidate['published_at_relative'] ?? null;
+            $capFromDate = null;
+            $capFromRelative = null;
 
             // ── Cap from event_date ────────────────────────────────────────────
             if (! empty($eventDateStr)) {
                 try {
-                    $eventDate = \Carbon\Carbon::parse((string) $eventDateStr)->startOfDay();
+                    $eventDate = Carbon::parse((string) $eventDateStr)->startOfDay();
 
                     if ($eventDate->gt($today)) {
                         // FUTURE event — anticipation spike, not live news
                         $capFromDate = 35;
                         $candidate['freshness_penalty_reason'] = 'future_event';
                         Log::warning('NewsDiscoveryService: Future event detected — penalizing freshness.', [
-                            'title'      => mb_substr($candidate['title'], 0, 80),
+                            'title' => mb_substr($candidate['title'], 0, 80),
                             'event_date' => $eventDateStr,
-                            'original'   => $originalScore,
+                            'original' => $originalScore,
                         ]);
                     } else {
                         // Past event — compute how many days old.
@@ -827,11 +907,11 @@ PROMPT;
 
                         if ($capFromDate !== null) {
                             Log::info('NewsDiscoveryService: Past event freshness cap applied.', [
-                                'title'      => mb_substr($candidate['title'], 0, 80),
+                                'title' => mb_substr($candidate['title'], 0, 80),
                                 'event_date' => $eventDateStr,
-                                'days_old'   => $daysOld,
-                                'cap'        => $capFromDate,
-                                'original'   => $originalScore,
+                                'days_old' => $daysOld,
+                                'cap' => $capFromDate,
+                                'original' => $originalScore,
                             ]);
                         }
                     }
@@ -867,11 +947,11 @@ PROMPT;
                 if ($corrected < $originalScore) {
                     $candidate['freshness_score'] = $corrected;
                     Log::info('NewsDiscoveryService: Freshness score corrected.', [
-                        'title'     => mb_substr($candidate['title'], 0, 80),
-                        'original'  => $originalScore,
+                        'title' => mb_substr($candidate['title'], 0, 80),
+                        'original' => $originalScore,
                         'corrected' => $corrected,
-                        'cap'       => $effectiveCap,
-                        'reason'    => $candidate['freshness_penalty_reason'] ?? 'cap_applied',
+                        'cap' => $effectiveCap,
+                        'reason' => $candidate['freshness_penalty_reason'] ?? 'cap_applied',
                     ]);
                 }
             }
@@ -893,15 +973,15 @@ PROMPT;
         // Match patterns like "30 mins ago", "2 hours ago", "3 days ago", "1 week ago"
         if (preg_match('/(\d+)\s*(min|minute|hour|hr|day|week|month)/i', $relative, $m)) {
             $value = (int) $m[1];
-            $unit  = strtolower($m[2]);
+            $unit = strtolower($m[2]);
 
             $ageInHours = match (true) {
                 str_starts_with($unit, 'min') => $value / 60,
-                str_starts_with($unit, 'h')   => $value,
-                str_starts_with($unit, 'd')   => $value * 24,
-                str_starts_with($unit, 'w')   => $value * 24 * 7,
-                str_starts_with($unit, 'm')   => $value * 24 * 30, // month
-                default                        => null,
+                str_starts_with($unit, 'h') => $value,
+                str_starts_with($unit, 'd') => $value * 24,
+                str_starts_with($unit, 'w') => $value * 24 * 7,
+                str_starts_with($unit, 'm') => $value * 24 * 30, // month
+                default => null,
             };
 
             if ($ageInHours === null) {
@@ -920,6 +1000,7 @@ PROMPT;
             //   24h  → 38   |   48h  → 15   |   72h  → 6 (clamped to 10)
             $decayRate = 0.04;
             $decayedScore = 100 * exp(-$decayRate * $ageInHours);
+
             return (int) max(10, min(100, round($decayedScore)));
         }
 

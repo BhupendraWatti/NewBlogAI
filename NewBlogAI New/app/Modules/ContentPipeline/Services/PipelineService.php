@@ -218,7 +218,7 @@ class PipelineService
                     'user_id'     => auth()->id(),
                 ]);
 
-                GenerateNewsCandidatesJob::dispatch($run->id);
+                GenerateNewsCandidatesJob::dispatch($run->id)->afterResponse();
 
                 return $run;
             });
@@ -253,7 +253,7 @@ class PipelineService
                 ]);
 
                 if ($newRun->isDiscovery()) {
-                    GenerateNewsCandidatesJob::dispatch($newRun->id);
+                    GenerateNewsCandidatesJob::dispatch($newRun->id)->afterResponse();
                 } else {
                     // Preserve coverage lineage: the selected candidate must
                     // always point at the latest full generation run so that

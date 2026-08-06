@@ -125,3 +125,7 @@ System authorization roles are restricted to exactly three tiers: Super Admin (1
 Rule 30
 
 The system operates strictly under Indian Rupees (INR) for all financial ledgers, invoicing calculations, transactions, and settings. Front-end pricing details and dashboard invoices display the Rupee symbol (₹).
+
+Rule 31
+
+The AI Provider Manager operates a Capability-Aware Router. Stage 1 Live Newsroom Discovery requires real-time Google Search Grounding and routes exclusively through grounded search models (Gemini Free → Gemini Paid), bypassing non-grounded models (Groq) during candidate discovery to prevent fake/stale news filter rejections. Stage 2 Refinement and Stage 3 Article Drafting utilize Groq Free (Llama 3) as a $0 cost high-speed failover when research context is supplied in the prompt.

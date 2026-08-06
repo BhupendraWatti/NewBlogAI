@@ -36,3 +36,9 @@
 ## 5. Use the skills if it mentioned in the Prompt. 
  If any of the skills mentions like Systematic debugging skills, Frontend Design skills or more (take the skills  from this folder C:\Users\bhupe\.gemini\antigravity-cli\skills ) open the skills folder and use these skills to solve the current issues that user is defining as well as skills like these Stochastic Multi-Agent Consensus and Video-to-Action via Gemini Passthrough present at the .ai/ folder. Use these skills as well. 
 
+## 6. Capability-Aware AI Provider Router
+* Candidate discovery strictly routes through grounded search models (`supportsGrounding() => true`: Gemini Free → Gemini Paid), avoiding non-grounded models (Groq) during Stage 1 discovery to prevent hallucinated candidate filter rejections.
+* Driver calls for candidate discovery pass `'json_mode' => true` to guarantee valid JSON formatting.
+* In line grounding citation markers (`[1]`, `[2]`) are stripped before parsing candidate arrays.
+* Downstream article drafting uses Groq Free (Llama 3) as a $0 cost high-speed failover when research context is supplied in the prompt.
+

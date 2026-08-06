@@ -105,7 +105,7 @@ class AppServiceProvider extends ServiceProvider
 
         // Queue Event Listeners for Operational Monitoring
         Queue::before(function (JobProcessing $event) {
-            $jobId = $event->job->getJobId() ?: $event->job->resolveName().':'.$event->job->getQueue();
+            $jobId = $event->job->getJobId() ?: ($event->job->resolveName().':'.sha1($event->job->getRawBody()));
             JobLog::updateOrCreate(
                 ['job_id' => $jobId],
                 [
@@ -119,7 +119,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Queue::after(function (JobProcessed $event) {
-            $jobId = $event->job->getJobId() ?: $event->job->resolveName().':'.$event->job->getQueue();
+            $jobId = $event->job->getJobId() ?: ($event->job->resolveName().':'.sha1($event->job->getRawBody()));
             JobLog::updateOrCreate(
                 ['job_id' => $jobId],
                 [
@@ -130,7 +130,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Queue::failing(function (JobFailed $event) {
-            $jobId = $event->job->getJobId() ?: $event->job->resolveName().':'.$event->job->getQueue();
+            $jobId = $event->job->getJobId() ?: ($event->job->resolveName().':'.sha1($event->job->getRawBody()));
             JobLog::updateOrCreate(
                 ['job_id' => $jobId],
                 [

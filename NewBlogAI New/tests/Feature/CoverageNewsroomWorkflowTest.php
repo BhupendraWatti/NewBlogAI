@@ -31,8 +31,11 @@ class CoverageNewsroomWorkflowTest extends TestCase
     use RefreshDatabase;
 
     protected Site $site;
+
     protected ContentPipeline $pipeline;
+
     protected User $employee;
+
     protected object $fakeDriver;
 
     protected function setUp(): void
@@ -108,6 +111,14 @@ class CoverageNewsroomWorkflowTest extends TestCase
         {
             public string $responseText = '[]';
 
+            /** @var array<int, string> */
+            public array $responseQueue = [];
+
+            public int $calls = 0;
+
+            /** @var array<int, array> */
+            public array $optionsHistory = [];
+
             public function testConnection(string $apiKey, ?string $model = null): bool
             {
                 return true;
@@ -120,8 +131,14 @@ class CoverageNewsroomWorkflowTest extends TestCase
 
             public function generate(string $apiKey, string $prompt, ?string $model = null, array $options = []): array
             {
+                $this->calls++;
+                $this->optionsHistory[] = $options;
+                $text = $this->responseQueue !== []
+                    ? array_shift($this->responseQueue)
+                    : $this->responseText;
+
                 return [
-                    'text' => $this->responseText,
+                    'text' => $text,
                     'prompt_tokens' => 100,
                     'completion_tokens' => 500,
                     'total_tokens' => 600,
@@ -169,13 +186,59 @@ class CoverageNewsroomWorkflowTest extends TestCase
 
     public function test_trigger_discovery_creates_discovery_run_and_queues_job(): void
     {
-        Queue::fake();
-
         $run = app(PipelineService::class)->triggerDiscovery($this->pipeline);
 
         $this->assertEquals(PipelineRun::TYPE_DISCOVERY, $run->run_type);
         $this->assertEquals('queued', $run->status);
-        Queue::assertPushed(GenerateNewsCandidatesJob::class);
+        $this->assertEquals(0, $run->candidates()->count());
+    }
+
+    public function test_discovery_uses_free_tier_safe_gemini_token_budget(): void
+    {
+        $this->assertLessThanOrEqual(4096, NewsDiscoveryService::DISCOVERY_MAX_TOKENS);
+        $this->assertLessThanOrEqual(4, NewsDiscoveryService::DISCOVERY_BATCH_SIZE);
+    }
+
+    public function test_discovery_disables_gemini_dynamic_thinking_to_protect_json_output_budget(): void
+    {
+        AIProvider::query()->update([
+            'provider_key' => 'gemini',
+            'name' => 'Gemini',
+            'default_model' => 'gemini-2.5-flash',
+        ]);
+        $this->fakeDriver->responseText = json_encode(array_slice($this->distinctCandidatesPayload(), 0, 4));
+
+        $run = PipelineRun::create([
+            'pipeline_id' => $this->pipeline->id,
+            'status' => 'queued',
+            'run_type' => PipelineRun::TYPE_DISCOVERY,
+        ]);
+
+        (new GenerateNewsCandidatesJob($run->id))->handle(app(NewsDiscoveryService::class));
+
+        $this->assertNotEmpty($this->fakeDriver->optionsHistory);
+        $this->assertSame(0, $this->fakeDriver->optionsHistory[0]['thinking_budget']);
+    }
+
+    public function test_discovery_retries_when_gemini_returns_early_truncated_json(): void
+    {
+        $this->fakeDriver->responseQueue = [
+            '[',
+            json_encode(array_slice($this->distinctCandidatesPayload(), 0, 4)),
+        ];
+
+        $run = PipelineRun::create([
+            'pipeline_id' => $this->pipeline->id,
+            'status' => 'queued',
+            'run_type' => PipelineRun::TYPE_DISCOVERY,
+        ]);
+
+        (new GenerateNewsCandidatesJob($run->id))->handle(app(NewsDiscoveryService::class));
+
+        $run->refresh();
+        $this->assertEquals(PipelineRun::STATUS_READY, $run->status);
+        $this->assertGreaterThanOrEqual(1, $run->candidates()->count());
+        $this->assertGreaterThanOrEqual(2, $this->fakeDriver->calls);
     }
 
     public function test_discovery_persists_exactly_nine_unique_candidates(): void

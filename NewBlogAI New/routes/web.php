@@ -31,7 +31,7 @@ foreach ($workspaces as $workspace) {
     $path = $workspace === 'dashboard' ? '/' : "/{$workspace}";
     Route::get($path, function () use ($workspace) {
         if (app()->environment() !== 'testing' && ! auth()->check()) {
-            abort(401);
+            return redirect()->route('login');
         }
 
         return view('dashboard', ['activeView' => $workspace]);

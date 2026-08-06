@@ -148,6 +148,31 @@
         return null;
     };
 
+    window.readApiJson = async function (response, fallbackMessage = 'Request failed.') {
+        if (!response || response.status === 204) {
+            return null;
+        }
+
+        const text = await response.text();
+        const contentType = response.headers.get('content-type') || '';
+
+        if (!text) {
+            return null;
+        }
+
+        if (contentType.includes('text/html') || text.trim().startsWith('<')) {
+            const status = response.status ? `HTTP ${response.status}` : 'HTTP error';
+            throw new Error(`${fallbackMessage} The server returned an HTML error page (${status}). Please check Laravel logs or refresh your login session.`);
+        }
+
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            console.error('Invalid API JSON response:', text.slice(0, 500));
+            throw new Error(`${fallbackMessage} The server returned invalid JSON.`);
+        }
+    };
+
     window.openModal = function (id) {
         const modal = document.getElementById(id);
         if (modal) modal.classList.add('active');
@@ -4542,10 +4567,10 @@
                 body: JSON.stringify(pipelinePayload)
             });
             if (!createRes.ok) {
-                const errData = await createRes.json();
+                const errData = await readApiJson(createRes, 'Failed to create pipeline.');
                 throw new Error(errData.message || 'Failed to create pipeline.');
             }
-            const newPipe = await createRes.json();
+            const newPipe = await readApiJson(createRes, 'Failed to create pipeline.');
             currentPipelineId = newPipe.data?.id ?? newPipe.id;
 
             // Run discovery (use Groq for fast, free discovery)
@@ -4556,15 +4581,17 @@
                 body: JSON.stringify({ discovery_provider: discoveryProvider })
             });
             if (!discoverRes.ok) {
-                const errData = await discoverRes.json();
+                const errData = await readApiJson(discoverRes, 'Discovery failed.');
                 throw new Error(errData.message || 'Discovery failed.');
             }
-            const discoverData = await discoverRes.json();
+            const discoverData = await readApiJson(discoverRes, 'Discovery failed.');
             currentRunId = discoverData.data?.id ?? discoverData.data?.run_id ?? discoverData.run_id ?? null;
 
-            // If run_id returned, fetch candidates; otherwise poll
+            // The discovery job may run after the HTTP response when the queue
+            // driver is sync, so always poll the returned run until it is ready.
             if (currentRunId) {
-                await loadCandidates(currentRunId);
+                if (btn) btn.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">autorenew</span> AI is searching the web...';
+                await pollRunForCandidates(currentRunId);
             } else {
                 // Poll for run completion
                 if (btn) btn.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">autorenew</span> AI is searching the web...';
@@ -4583,7 +4610,7 @@
             try {
                 const runsRes = await apiFetch(`/api/v1/pipelines/${pipelineId}/runs`);
                 if (runsRes.ok) {
-                    const runsData = await runsRes.json();
+                    const runsData = await readApiJson(runsRes, 'Could not load discovery run status.');
                     const runs = runsData.data ?? runsData;
                     const ready = Array.isArray(runs) ? runs.find(r => r.status === 'ready' || r.status === 'completed') : null;
                     if (ready) {
@@ -4601,17 +4628,48 @@
         throw new Error('Discovery timed out. Check AI provider configuration.');
     }
 
-    async function loadCandidates(runId) {
+    async function pollRunForCandidates(runId, maxAttempts = 30, intervalMs = 3000) {
+        for (let i = 0; i < maxAttempts; i++) {
+            const loaded = await loadCandidates(runId, false);
+            if (loaded) return;
+            await new Promise(r => setTimeout(r, intervalMs));
+        }
+
+        throw new Error('Discovery timed out. Check AI provider configuration.');
+    }
+
+    async function loadCandidates(runId, throwWhenPending = true) {
         const res = await apiFetch(`/api/v1/pipelines/runs/${runId}/candidates`);
-        if (!res.ok) throw new Error('Could not load news candidates.');
-        const data = await res.json();
+        if (!res.ok) {
+            const errData = await readApiJson(res, 'Could not load news candidates.');
+            throw new Error(errData?.message || 'Could not load news candidates.');
+        }
+        const data = await readApiJson(res, 'Could not load news candidates.');
+        const run = data.data?.run ?? null;
         const candidates = data.data?.candidates ?? data.data ?? data;
 
+        if (run?.status === 'failed') {
+            throw new Error(run.error_message || 'Discovery run failed.');
+        }
+
+        if (run && !['ready', 'completed'].includes(run.status)) {
+            if (throwWhenPending) {
+                throw new Error('Discovery is still running. Please wait.');
+            }
+
+            return false;
+        }
+
         if (!Array.isArray(candidates) || candidates.length === 0) {
-            throw new Error('No news candidates returned. Try a different topic or check provider.');
+            if (throwWhenPending) {
+                throw new Error('No news candidates returned. Try a different topic or check provider.');
+            }
+
+            return false;
         }
 
         renderCandidates(candidates);
+        return true;
     }
 
     function renderCandidates(candidates) {

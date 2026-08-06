@@ -2,10 +2,9 @@
 
 namespace App\Modules\AIProviderManager\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use App\Modules\AIProviderManager\Support\ProviderErrorClassifier;
 use Carbon\Carbon;
-
+use Illuminate\Database\Eloquent\Model;
 
 class AIProvider extends Model
 {
@@ -56,6 +55,15 @@ class AIProvider extends Model
     }
 
     /**
+     * Check if the AI provider supports native web search grounding.
+     * Currently Google Gemini is the only provider with native Google Search Grounding.
+     */
+    public function supportsGrounding(): bool
+    {
+        return strtolower($this->provider_key) === 'gemini';
+    }
+
+    /**
      * Get the masked representation of the API key.
      */
     public function getMaskedApiKey(): ?string
@@ -84,13 +92,15 @@ class AIProvider extends Model
     public function getLastErrorAttribute(?string $value): ?string
     {
         if ($value && $this->attributes['reset_at'] ?? null) {
-            $resetAt = \Carbon\Carbon::parse($this->attributes['reset_at']);
+            $resetAt = Carbon::parse($this->attributes['reset_at']);
             if ($resetAt->isPast()) {
                 // Quietly wipe the stale error from the DB so it doesn't keep coming back
                 $this->withoutEvents(fn () => $this->updateQuietly(['last_error' => null]));
+
                 return null;
             }
         }
+
         return $value;
     }
 
@@ -125,7 +135,7 @@ class AIProvider extends Model
             $update['reset_at'] = $seconds > 0 ? now()->addSeconds(intval(ceil($seconds))) : null;
         }
 
-        if (!empty($update)) {
+        if (! empty($update)) {
             $this->update($update);
         }
     }
@@ -184,9 +194,16 @@ class AIProvider extends Model
                 }
             }
 
-            // If we couldn't parse seconds, default to 5 hours cooldown (18000s)
+            // If we could not parse a reset hint, use a short provider-specific
+            // cooldown. Gemini free-tier 429s are commonly minute-scale; a
+            // 5-hour fallback unnecessarily takes the only grounded provider
+            // out of discovery rotation.
             if ($seconds <= 0) {
-                $seconds = 18000; 
+                $seconds = match (true) {
+                    ProviderErrorClassifier::isRateLimit($e) && strtolower($this->provider_key) === 'gemini' => 90,
+                    ProviderErrorClassifier::isRateLimit($e) => 300,
+                    default => 120,
+                };
             }
 
             $this->cooldown_until = now()->addSeconds($seconds);
@@ -200,12 +217,12 @@ class AIProvider extends Model
 
             if (preg_match('/Status\s+(401|402|403)/', $message, $m)) {
                 $this->last_error = match ((int) $m[1]) {
-                    402     => 'Disabled: Payment Required / Out of Credits',
-                    403     => 'Disabled: Forbidden (check key permissions)',
+                    402 => 'Disabled: Payment Required / Out of Credits',
+                    403 => 'Disabled: Forbidden (check key permissions)',
                     default => 'Disabled: Invalid API Key',
                 };
             } else {
-                $this->last_error = 'Disabled: ' . substr($message, 0, 200);
+                $this->last_error = 'Disabled: '.substr($message, 0, 200);
             }
         }
 
