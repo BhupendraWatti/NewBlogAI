@@ -193,11 +193,26 @@ class CoverageNewsroomWorkflowTest extends TestCase
         $this->assertEquals(0, $run->candidates()->count());
     }
 
-    public function test_discovery_uses_free_tier_safe_gemini_token_budget(): void
+    /**
+     * Verify the discovery token budget is bounded.
+     *
+     * DISCOVERY_MAX_TOKENS was raised from 4096 → 8192 (Phase 11, 2026-08-07)
+     * because grounded search responses with rich source URLs were exceeding
+     * 4096 output tokens, causing mid-array JSON truncation and the misleading
+     * 'No error' parse failure. 8192 is still within Gemini 2.5 Flash's output
+     * budget and prevents free-tier quota exhaustion per minute.
+     *
+     * DISCOVERY_BATCH_SIZE remains ≤ 4 to keep each grounded call small.
+     */
+    public function test_discovery_uses_safe_gemini_token_budget(): void
     {
-        $this->assertLessThanOrEqual(4096, NewsDiscoveryService::DISCOVERY_MAX_TOKENS);
+        $this->assertLessThanOrEqual(8192, NewsDiscoveryService::DISCOVERY_MAX_TOKENS);
+        $this->assertGreaterThan(4096, NewsDiscoveryService::DISCOVERY_MAX_TOKENS,
+            'DISCOVERY_MAX_TOKENS should be > 4096 to prevent JSON truncation on grounded responses.'
+        );
         $this->assertLessThanOrEqual(4, NewsDiscoveryService::DISCOVERY_BATCH_SIZE);
     }
+
 
     public function test_discovery_disables_gemini_dynamic_thinking_to_protect_json_output_budget(): void
     {

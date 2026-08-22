@@ -108,7 +108,20 @@ class GroqDriver implements AIProviderClientInterface
                 $completionTokens = $usage['completion_tokens'] ?? 0;
                 $totalTokens = $usage['total_tokens'] ?? 0;
 
-                $cost = (($promptTokens * 0.00059) + ($completionTokens * 0.00079)) / 1000;
+                // Groq Pricing estimation per 1,000 tokens
+                if (str_contains($model, '8b')) {
+                    $promptRate     = 0.00005; // $0.05 / 1M input
+                    $completionRate = 0.00008; // $0.08 / 1M output
+                } elseif (str_contains($model, 'mixtral')) {
+                    $promptRate     = 0.00024; // $0.24 / 1M input
+                    $completionRate = 0.00024; // $0.24 / 1M output
+                } else {
+                    // llama-3.3-70b-versatile default
+                    $promptRate     = 0.00059; // $0.59 / 1M input
+                    $completionRate = 0.00079; // $0.79 / 1M output
+                }
+                $cost = (($promptTokens / 1000.0) * $promptRate) + (($completionTokens / 1000.0) * $completionRate);
+
 
                 $limit     = $response->header('x-ratelimit-limit-tokens') ?: ($response->header('x-ratelimit-limit-requests') ?: null);
                 $remaining = $response->header('x-ratelimit-remaining-tokens') ?: ($response->header('x-ratelimit-remaining-requests') ?: null);

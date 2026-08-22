@@ -209,6 +209,15 @@ class AIProvider extends Model
             $this->cooldown_until = now()->addSeconds($seconds);
             $this->reset_at = $this->cooldown_until;
         } else {
+            // Check if this is a pipeline/topic domain exception (e.g. content shortfall) vs an actual provider API failure.
+            // Topic candidate shortfall means no news was found for the given keywords today — it is NOT an API key or provider crash!
+            if (str_contains($message, 'broaden keywords') || str_contains($message, 'minimum 4 required') || str_contains($message, 'unique candidates')) {
+                $this->status = 'healthy';
+                $this->last_error = $message;
+                $this->save();
+                return;
+            }
+
             // 401 Unauthorized or 403 Forbidden → bad/expired key → disable immediately
             // 402 Payment Required → out of credits → disable immediately
             $this->status = 'disabled';
@@ -228,4 +237,5 @@ class AIProvider extends Model
 
         $this->save();
     }
+
 }

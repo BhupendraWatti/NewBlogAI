@@ -162,6 +162,31 @@ class GoogleGeminiDriver implements AIProviderClientInterface
                     throw new \RuntimeException("Gemini API error: Status {$response->status()} - " . $response->body());
                 }
 
+                // ── HTML body guard ──────────────────────────────────────────
+                // When Google Search grounding hits a CDN/quota error, Gemini
+                // occasionally returns HTTP 200 with an HTML error document as
+                // the response body instead of JSON. The successful() check
+                // above only validates the HTTP status code, so we must also
+                // sniff the body and Content-Type header before attempting to
+                // decode. An HTML body flowing into parseCandidates() produces:
+                //   "Unexpected token '<', '<html><h…' is not valid JSON"
+                $contentType = $response->header('Content-Type') ?? '';
+                $bodyPreview = substr($response->body(), 0, 5);
+                if (
+                    str_contains($contentType, 'text/html')
+                    || $bodyPreview === '<html'
+                    || $bodyPreview === '<!DOC'
+                    || ltrim($response->body()) === ''
+                ) {
+                    throw new \RuntimeException(
+                        'Gemini returned an HTML error body instead of JSON (grounding quota/CDN error). '
+                        . 'Status: ' . $response->status() . '. '
+                        . 'Content-Type: ' . $contentType . '. '
+                        . 'Preview: ' . mb_substr($response->body(), 0, 120)
+                    );
+                }
+                // ── End HTML body guard ───────────────────────────────────────
+
                 $data = $response->json();
                 $candidate = $data['candidates'][0] ?? [];
                 $finishReason = $candidate['finishReason'] ?? 'STOP';
@@ -180,10 +205,16 @@ class GoogleGeminiDriver implements AIProviderClientInterface
                 $completionTokens = $usage['candidatesTokenCount'] ?? 0;
                 $totalTokens = $usage['totalTokenCount'] ?? 0;
 
-                $isPro = str_contains($model, 'pro');
-                $promptRate = $isPro ? 0.00125 : 0.000125;
-                $completionRate = $isPro ? 0.00375 : 0.000375;
-                $cost = (($promptTokens * $promptRate) + ($completionTokens * $completionRate)) / 1000;
+                if (str_contains($model, 'pro')) {
+                    $promptRate     = 0.00125;  // $1.25 / 1M input
+                    $completionRate = 0.00500;  // $5.00 / 1M output
+                } else {
+                    // gemini-2.5-flash / gemini-1.5-flash
+                    $promptRate     = 0.000075; // $0.075 / 1M input
+                    $completionRate = 0.000300; // $0.300 / 1M output
+                }
+                $cost = (($promptTokens / 1000.0) * $promptRate) + (($completionTokens / 1000.0) * $completionRate);
+
 
                 $limit     = $response->header('x-ratelimit-limit-requests') ?: $response->header('x-ratelimit-limit-tokens');
                 $remaining = $response->header('x-ratelimit-remaining-requests') ?: $response->header('x-ratelimit-remaining-tokens');

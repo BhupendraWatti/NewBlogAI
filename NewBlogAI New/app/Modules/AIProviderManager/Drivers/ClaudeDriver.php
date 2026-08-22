@@ -118,8 +118,17 @@ class ClaudeDriver implements AIProviderClientInterface
             $completionTokens = $usage['output_tokens'] ?? 0;
             $totalTokens = $promptTokens + $completionTokens;
 
-            // Claude Pricing estimation (Sonnet 3.5 defaults)
-            $cost = (($promptTokens * 0.003) + ($completionTokens * 0.015)) / 1000;
+            // Claude Pricing estimation per 1,000 tokens
+            if (str_contains($model, 'haiku')) {
+                $promptRate     = 0.0008; // $0.80 / 1M input
+                $completionRate = 0.0040; // $4.00 / 1M output
+            } else {
+                // Sonnet / Opus
+                $promptRate     = 0.0030; // $3.00 / 1M input
+                $completionRate = 0.0150; // $15.00 / 1M output
+            }
+            $cost = (($promptTokens / 1000.0) * $promptRate) + (($completionTokens / 1000.0) * $completionRate);
+
 
             $limit     = $response->header('anthropic-ratelimit-tokens-limit') ?: ($response->header('anthropic-ratelimit-requests-limit') ?: null);
             $remaining = $response->header('anthropic-ratelimit-tokens-remaining') ?: ($response->header('anthropic-ratelimit-requests-remaining') ?: null);

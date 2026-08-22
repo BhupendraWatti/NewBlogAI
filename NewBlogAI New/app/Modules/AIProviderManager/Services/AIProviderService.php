@@ -73,6 +73,11 @@ class AIProviderService
                         ->update(['is_default' => false]);
                 }
 
+                if (! empty($data['is_enabled'])) {
+                    $data['status'] = 'healthy';
+                    $data['last_error'] = null;
+                }
+
                 $provider->update($data);
 
                 return $provider;

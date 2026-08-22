@@ -99,11 +99,25 @@ class OpenAIDriver implements AIProviderClientInterface
             $completionTokens = $usage['completion_tokens'] ?? 0;
             $totalTokens = $usage['total_tokens'] ?? 0;
 
-            // Simple OpenAI Pricing estimation
-            $isGpt4 = str_contains($model, 'gpt-4');
-            $promptRate = $isGpt4 ? 0.005 : 0.0005; // per 1k tokens
-            $completionRate = $isGpt4 ? 0.015 : 0.0015; // per 1k tokens
-            $cost = (($promptTokens * $promptRate) + ($completionTokens * $completionRate)) / 1000;
+            // Accurate OpenAI Pricing estimation (per 1,000 tokens)
+            if (str_contains($model, 'gpt-4o-mini')) {
+                $promptRate     = 0.00015;  // $0.15 / 1M input
+                $completionRate = 0.00060;  // $0.60 / 1M output
+            } elseif (str_contains($model, 'gpt-4o')) {
+                $promptRate     = 0.00250;  // $2.50 / 1M input
+                $completionRate = 0.01000;  // $10.00 / 1M output
+            } elseif (str_contains($model, 'o3-mini') || str_contains($model, 'o1-mini')) {
+                $promptRate     = 0.00110;  // $1.10 / 1M input
+                $completionRate = 0.00440;  // $4.40 / 1M output
+            } elseif (str_contains($model, 'gpt-4')) {
+                $promptRate     = 0.01000;  // $10.00 / 1M input
+                $completionRate = 0.03000;  // $30.00 / 1M output
+            } else {
+                $promptRate     = 0.00050;  // gpt-3.5-turbo default ($0.50 / 1M)
+                $completionRate = 0.00150;  // $1.50 / 1M
+            }
+            $cost = (($promptTokens / 1000.0) * $promptRate) + (($completionTokens / 1000.0) * $completionRate);
+
 
             $limit     = $response->header('x-ratelimit-limit-tokens') ?: ($response->header('x-ratelimit-limit-requests') ?: null);
             $remaining = $response->header('x-ratelimit-remaining-tokens') ?: ($response->header('x-ratelimit-remaining-requests') ?: null);

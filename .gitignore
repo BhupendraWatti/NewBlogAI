@@ -10,3 +10,13 @@ prompt.md
 SAAS_ARCHITECTURE_SPEC.md
 AI_TEST.md
 prompt.md
+
+
+
+use the [gemini.md](file;file:///d%3A/Company%20Work/Company%20projects/NewBlogAI/.ai/gemini.md) file and all the markdown files realted to the projects from the .ai folder and docs folder. 
+second is the user this [graph.html](file;file:///d%3A/Company%20Work/Company%20projects/NewBlogAI/graphify-out/graph.html) code to fix the these three issues first what i know is 
+1. Json Array malformed, because in the some part it "Breaking the system rules or json rules by API". 
+2. Json array parsed, Data broke the strict syntax rules of the Json Specification. 
+
+take the help of the [graph.html](file;file:///d%3A/Company%20Work/Company%20projects/NewBlogAI/graphify-out/graph.html) to visualize the notes of  AI Provider manager, content pipeline, content generation, publishing, site manager, topic manager, prompt manager, schedule manager, customer manager. in these issues and check it should be the authentic news and genenue not the 2 days old news or 10 days old news. verification or news generations are too old it not generating the latest news. 
+.gstack

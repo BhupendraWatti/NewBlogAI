@@ -96,9 +96,19 @@ class SourceCollectionService implements SourceCollectorInterface
                 'clusters_found' => count($clusters)
             ]);
         } catch (\Exception $e) {
-            Log::error('SourceCollectionService failed: ' . $e->getMessage(), [
-                'exception' => $e
-            ]);
+            // Log at critical level when the exception originates from the fabrication-prevention
+            // gate (non-Gemini provider in production) so it is distinguishable from ordinary
+            // pipeline failures in log dashboards and alerting rules.
+            $isFabricationGate = str_contains($e->getMessage(), 'Real-time news search is only supported via Gemini');
+            if ($isFabricationGate) {
+                Log::critical('SourceCollectionService: Fabrication-prevention gate activated — non-grounded provider blocked.', [
+                    'message' => $e->getMessage(),
+                ]);
+            } else {
+                Log::error('SourceCollectionService failed: ' . $e->getMessage(), [
+                    'exception' => $e
+                ]);
+            }
             $context->addError('source_collector', $e->getMessage());
         }
 

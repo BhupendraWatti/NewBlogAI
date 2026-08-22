@@ -93,8 +93,15 @@ class OpenRouterDriver implements AIProviderClientInterface
             $completionTokens = $usage['completion_tokens'] ?? 0;
             $totalTokens = $usage['total_tokens'] ?? 0;
 
-            // OpenRouter pricing estimation
-            $cost = (($promptTokens * 0.0005) + ($completionTokens * 0.0015)) / 1000;
+            // OpenRouter natively returns usage.cost in USD when available
+            if (isset($usage['cost']) && is_numeric($usage['cost'])) {
+                $cost = (float) $usage['cost'];
+            } else {
+                $promptRate     = 0.00050; // $0.50 / 1M input default
+                $completionRate = 0.00150; // $1.50 / 1M output default
+                $cost = (($promptTokens / 1000.0) * $promptRate) + (($completionTokens / 1000.0) * $completionRate);
+            }
+
 
             $limit     = $response->header('x-ratelimit-limit-tokens') ?: ($response->header('x-ratelimit-limit-requests') ?: null);
             $remaining = $response->header('x-ratelimit-remaining-tokens') ?: ($response->header('x-ratelimit-remaining-requests') ?: null);

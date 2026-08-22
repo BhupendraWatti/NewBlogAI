@@ -47,7 +47,13 @@ class NewsDiscoveryService
      * Token budget for the grounded discovery call. Keep this bounded so one
      * free-tier Gemini request cannot reserve most of the per-minute quota.
      */
-    public const DISCOVERY_MAX_TOKENS = 4096;
+    /**
+     * Token budget for the grounded discovery call.
+     * Set to 8192 to prevent mid-array JSON truncation when grounded search
+     * returns rich responses with long source URLs and summaries.
+     * (Raised from 4096 — that was too low and caused the 'No error' parse failures.)
+     */
+    public const DISCOVERY_MAX_TOKENS = 8192;
 
     /**
      * Attempts per provider during failover (with exponential back-off).
@@ -525,10 +531,12 @@ class NewsDiscoveryService
             ]);
         }
 
-        // Relax shortfall constraint: accept whatever unique candidates are generated (even 1, 2, or 3)
-        // to support niche regional/filtered runs. Throw only if count is below 1.
-        if (count($unique) < 1) {
-            throw new RuntimeException('Could not generate enough unique candidates. Please broaden keywords.');
+        // Relax shortfall constraint: accept runs with fewer than the target 9 candidates
+        // to support niche regional/filtered topics. Throw only if fewer than 4 unique
+        // candidates were collected — below this the Newsroom UI renders poorly.
+        // (Documented minimum: 4. See current_issues.md Issue 5.)
+        if (count($unique) < 4) {
+            throw new RuntimeException('Could not generate enough unique candidates (minimum 4 required). Please broaden keywords or topic.');
         }
 
         return [
@@ -579,6 +587,11 @@ class NewsDiscoveryService
             ? "\nOFFICIAL DESIGNATION CHECK: Use search grounding to verify current titles for any political leaders, ministers, government departments, courts, police, or public officials mentioned in selected stories. Do not rely on stored model knowledge for office holders.\n"
             : '';
 
+        // NOTE: All line endings in this heredoc are deliberately normalized to
+        // LF (\n). Mixed CRLF/LF in grounding prompts can cause Google Search
+        // to truncate the after:/before: date-range operators mid-line, causing
+        // the grounding engine to ignore the 48-hour temporal filter and return
+        // stale/evergreen articles.
         return <<<PROMPT
 You are a JSON-only news data API. Today is {$today} ({$todayIso}), current time is {$currentTime}.
 {$officialDesignationGuidance}
@@ -610,7 +623,7 @@ CRITICAL TEMPORAL RULES (must be strictly followed):
 - The "event_date" MUST be {$todayIso} or {$yesterdayIso}. Any earlier date is a red flag of stale content — reject it.
 - If a topic is trending because people are searching for an UPCOMING event (e.g. a festival weeks away), do NOT include it — it has no live news value yet.
 - Only include events where something has ALREADY HAPPENED and been reported by a news outlet.
-- For truly live/breaking events set freshness_score 80–99. For events from yesterday use 50–79. For events 2–3 days old use 20–49.
+- For truly live/breaking events set freshness_score 80-99. For events from yesterday use 50-79. For events 2-3 days old use 20-49.
 
 STRICT URL RULES (strictly enforced):
 - For "source_references", you MUST output the clean, direct publisher URL (e.g. "https://www.thehindu.com/news/national/article123.ece" or "https://timesofindia.indiatimes.com/articleshow/456.cms").
@@ -618,6 +631,7 @@ STRICT URL RULES (strictly enforced):
 
 STRICT OUTPUT RULES — VIOLATIONS WILL BREAK THE PARSER:
 - Your ENTIRE response must be a single valid JSON array starting with [ and ending with ]
+- Do NOT wrap the array in any object like {"candidates":[...]} or {"results":[...]}
 - Do NOT write any text, explanation, or commentary before or after the JSON array
 - Do NOT use markdown code fences (no ```)
 - Each event must be a DISTINCT real-world story — no duplicates
@@ -724,9 +738,39 @@ PROMPT;
         $strictJsonError = json_last_error();
         $strictJsonErrorMessage = json_last_error_msg();
 
+        // ── Step 5b: Unwrap JSON object wrappers ─────────────────────────────
+        // Gemini occasionally returns the candidate array wrapped in an object:
+        //   {"candidates": [...]} or {"results": [...]} or {"data": [...]}
+        // json_decode() succeeds (no error), but returns a PHP associative array
+        // (not a list), causing !is_array($decoded) to pass and the error message
+        // to be the misleading 'Discovery response JSON could not be parsed: No error'.
+        // We detect this case and unwrap the inner array before any recovery attempt.
+        if (is_array($decoded) && ! array_is_list($decoded)) {
+            $wrapperKeys = ['candidates', 'results', 'data', 'items', 'news', 'articles', 'events'];
+            $unwrapped = null;
+            foreach ($wrapperKeys as $key) {
+                if (isset($decoded[$key]) && is_array($decoded[$key]) && array_is_list($decoded[$key])) {
+                    $unwrapped = $decoded[$key];
+                    Log::info('NewsDiscoveryService: Unwrapped JSON object wrapper.', [
+                        'wrapper_key' => $key,
+                        'inner_count' => count($unwrapped),
+                    ]);
+                    break;
+                }
+            }
+            // If no recognised wrapper key, fall through to recovery below
+            if ($unwrapped !== null) {
+                $decoded = $unwrapped;
+            } else {
+                // Force recovery by setting decoded to null
+                $decoded = null;
+            }
+        }
+
         // ── Step 6: Recovery for truncated arrays ────────────────────────────
-        // If decode fails, truncate at the last fully-closed object ("}") and close.
-        if (! is_array($decoded)) {
+        // If decode fails or returns a non-list, truncate at the last fully-closed
+        // object ("}") and close the array bracket to salvage partial responses.
+        if (! is_array($decoded) || ! array_is_list($decoded)) {
             $lastClose = strrpos($jsonSlice, "\n  }");
             if ($lastClose === false) {
                 $lastClose = strrpos($jsonSlice, "\r\n  }");
@@ -735,10 +779,10 @@ PROMPT;
                 $lastClose = strrpos($jsonSlice, '}');
             }
             if ($lastClose !== false) {
-                $eol = str_contains($jsonSlice, "\r\n") ? "\r\n" : "\n";
-                $recovered = substr($jsonSlice, 0, $lastClose + 1).$eol.']';
-                $decoded = json_decode($recovered, true);
-                if (is_array($decoded)) {
+                $recovered = substr($jsonSlice, 0, $lastClose + 1)."\n]";
+                $recoveredDecoded = json_decode($recovered, true);
+                if (is_array($recoveredDecoded) && array_is_list($recoveredDecoded)) {
+                    $decoded = $recoveredDecoded;
                     Log::warning('NewsDiscoveryService: Truncated discovery JSON recovered at last complete object.', [
                         'original_length' => strlen($jsonSlice),
                         'recovered_length' => strlen($recovered),
@@ -750,14 +794,19 @@ PROMPT;
         }
 
         // ── Step 7: Final decode failure — log full detail and throw ─────────
-        if (! is_array($decoded)) {
+        if (! is_array($decoded) || ! array_is_list($decoded)) {
             Log::error('NewsDiscoveryService: JSON decode failed after all recovery attempts.', [
                 'json_error' => $strictJsonErrorMessage,
                 'json_error_code' => $strictJsonError,
+                'is_array' => is_array($decoded),
+                'is_list' => is_array($decoded) && array_is_list($decoded),
                 'slice_length' => strlen($jsonSlice),
                 'response_preview' => mb_substr($jsonSlice, 0, 800),
             ]);
-            throw new RuntimeException('Discovery response JSON could not be parsed: '.$strictJsonErrorMessage);
+            $parseDetail = ($strictJsonError === JSON_ERROR_NONE && is_array($decoded))
+                ? 'Response was a JSON object, not an array — unknown wrapper structure.'
+                : 'JSON parse error: ' . $strictJsonErrorMessage;
+            throw new RuntimeException('Discovery response JSON could not be parsed: ' . $parseDetail);
         }
 
         $candidates = [];

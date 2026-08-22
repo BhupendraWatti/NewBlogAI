@@ -264,7 +264,7 @@ class ContentGenerationService
      * pipeline's configured provider, keeping the pipeline model untouched.
      *
      * @param  Collection<int, AIProvider>  $providers
-     * @return array{0: GeneratedContent, 1: string}  [content, usedProviderKey]
+     * @return array{0: GeneratedContent, 1: AIProvider}  [content, usedProvider (the AIProvider object that succeeded)]
      *
      * @throws \RuntimeException when ALL providers fail
      */
