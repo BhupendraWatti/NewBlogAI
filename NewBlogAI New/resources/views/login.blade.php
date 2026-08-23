@@ -11,8 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
     
-    <!-- SweetAlert2 -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    @vite(['resources/js/app.js'])
     
     <style>
         :root {
@@ -293,7 +292,7 @@
             <div class="form-group">
                 <label class="form-label" for="email">Email Address</label>
                 <div class="input-wrapper">
-                    <input class="form-input" type="email" id="email" required placeholder="admin@newsblogify.com" value="admin@newsblogify.com">
+                    <input class="form-input" type="email" id="email" required autocomplete="username" placeholder="you@example.com">
                     <span class="material-symbols-outlined input-icon">mail</span>
                 </div>
             </div>
@@ -301,7 +300,7 @@
             <div class="form-group">
                 <label class="form-label" for="password">Password</label>
                 <div class="input-wrapper">
-                    <input class="form-input" type="password" id="password" required placeholder="••••••••" value="admin123">
+                    <input class="form-input" type="password" id="password" required autocomplete="current-password" placeholder="••••••••">
                     <span class="material-symbols-outlined input-icon">lock</span>
                     <span class="material-symbols-outlined password-toggle" id="passwordToggle" onclick="togglePasswordVisibility()">visibility</span>
                 </div>

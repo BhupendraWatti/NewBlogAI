@@ -16,9 +16,9 @@
                     </div>
 
                     <!-- STEP 1: Configuration Form -->
-                    <div id="newsroom-step-1" class="grid grid-cols-12 gap-6">
+                    <div id="newsroom-step-1" class="grid grid-cols-1 gap-6 lg:grid-cols-12">
                         <!-- Left: Settings -->
-                        <div class="col-span-5 space-y-4">
+                        <div class="space-y-4 lg:col-span-5">
                             <div class="glass-surface rounded-2xl p-5 space-y-4">
                                 <h4 class="text-xs font-mono uppercase tracking-widest text-muted">Generation Settings</h4>
 
@@ -88,7 +88,7 @@
                         </div>
 
                         <!-- Right: Info / Instructions -->
-                        <div class="col-span-7 space-y-4">
+                        <div class="space-y-4 lg:col-span-7">
                             <div class="glass-surface rounded-2xl p-6 space-y-4 border border-accent/20">
                                 <div class="flex items-center gap-3">
                                     <span class="material-symbols-outlined text-accent text-2xl">newspaper</span>
@@ -157,7 +157,7 @@
                                 New Discovery
                             </button>
                         </div>
-                        <div id="candidates-grid" class="grid grid-cols-3 gap-4">
+                        <div id="candidates-grid" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                             <!-- Candidate cards injected here by JS -->
                         </div>
                     </div>
@@ -181,8 +181,8 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-12 gap-6">
-                            <div class="col-span-8">
+                        <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
+                            <div class="lg:col-span-8">
                                 <div class="glass-surface rounded-2xl p-5 space-y-3">
                                     <div class="flex items-center justify-between">
                                         <h4 class="text-xs font-mono uppercase tracking-widest text-muted">Article Preview</h4>
@@ -196,7 +196,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-span-4 space-y-4">
+                            <div class="space-y-4 lg:col-span-4">
                                 <!-- Article Metadata -->
                                 <div class="glass-surface rounded-2xl p-4 space-y-3">
                                     <h4 class="text-xs font-mono uppercase tracking-widest text-muted">Article Info</h4>

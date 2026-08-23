@@ -1,6 +1,8 @@
 @include('partials.head')
 <body class="font-sans antialiased overflow-hidden min-h-screen flex h-screen w-full select-none bg-background text-text">
 
+    <button id="sidebar-overlay" type="button" onclick="closeMobileSidebar()" class="fixed inset-0 z-40 hidden bg-slate-950/60 backdrop-blur-sm md:hidden" aria-label="Close navigation menu"></button>
+
     @include('partials.sidebar')
 
     <!-- CORE WORKSPACE CONTAINER -->
@@ -14,7 +16,7 @@
         <div class="flex-1 flex overflow-hidden relative">
 
             <!-- CENTRAL WORKSPACE SPACE -->
-            <div class="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6" id="workspace-content">
+            <div class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-6" id="workspace-content">
 
                 @include('partials.workspaces.dashboard')
                 @include('partials.workspaces.customers')

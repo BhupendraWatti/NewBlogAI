@@ -13,87 +13,54 @@
             document.documentElement.classList.remove('dark');
         }
     </script>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-    <script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        background: "var(--color-background)",
-                        surface: "var(--color-surface)",
-                        workspace: "var(--color-workspace)",
-                        sidebar: "var(--color-sidebar)",
-                        accent: "var(--color-accent)",
-                        secondary: "var(--color-secondary)",
-                        highlight: "var(--color-highlight)",
-                        success: "var(--color-success)",
-                        warning: "var(--color-warning)",
-                        danger: "var(--color-danger)",
-                        text: "var(--color-text)",
-                        muted: "var(--color-muted)",
-                        border: "var(--color-border)"
-                    },
-                    borderRadius: {
-                        "2xl": "24px"
-                    },
-                    fontFamily: {
-                        sans: ["Inter", "sans-serif"],
-                        display: ["Outfit", "sans-serif"],
-                        mono: ["JetBrains Mono", "monospace"]
-                    }
-                }
-            }
-        }
-    </script>
     <style>
         :root {
-            --color-background: #F8FAFC;
-            --color-surface: #FFFFFF;
-            --color-surface-rgb: 255, 255, 255;
-            --color-workspace: #F1F5F9;
-            --color-sidebar: #E2E8F0;
-            --color-accent: #059669;
-            --color-secondary: #0891B2;
-            --color-highlight: #0D9488;
-            --color-success: #16A34A;
-            --color-warning: #D97706;
-            --color-danger: #DC2626;
-            --color-text: #0F172A;
-            --color-muted: #475569;
-            --color-border: rgba(0, 0, 0, 0.08);
+            --app-background: #F8FAFC;
+            --app-surface: #FFFFFF;
+            --app-surface-rgb: 255, 255, 255;
+            --app-workspace: #F1F5F9;
+            --app-sidebar: #E2E8F0;
+            --app-accent: #059669;
+            --app-secondary: #0891B2;
+            --app-highlight: #0D9488;
+            --app-success: #16A34A;
+            --app-warning: #D97706;
+            --app-danger: #DC2626;
+            --app-text: #0F172A;
+            --app-muted: #475569;
+            --app-border: rgba(0, 0, 0, 0.08);
         }
 
         .dark {
-            --color-background: #071018;
-            --color-surface: #0F172A;
-            --color-surface-rgb: 15, 23, 42;
-            --color-workspace: #111827;
-            --color-sidebar: #0B1323;
-            --color-accent: #00C896;
-            --color-secondary: #22D3EE;
-            --color-highlight: #2DD4BF;
-            --color-success: #22C55E;
-            --color-warning: #F59E0B;
-            --color-danger: #EF4444;
-            --color-text: #F8FAFC;
-            --color-muted: #94A3B8;
-            --color-border: rgba(255, 255, 255, 0.08);
+            --app-background: #071018;
+            --app-surface: #0F172A;
+            --app-surface-rgb: 15, 23, 42;
+            --app-workspace: #111827;
+            --app-sidebar: #0B1323;
+            --app-accent: #00C896;
+            --app-secondary: #22D3EE;
+            --app-highlight: #2DD4BF;
+            --app-success: #22C55E;
+            --app-warning: #F59E0B;
+            --app-danger: #EF4444;
+            --app-text: #F8FAFC;
+            --app-muted: #94A3B8;
+            --app-border: rgba(255, 255, 255, 0.08);
         }
 
         body {
-            background-color: var(--color-background);
-            color: var(--color-text);
+            background-color: var(--app-background);
+            color: var(--app-text);
             transition: background-color 0.3s ease, color 0.3s ease;
         }
         .glass-surface {
-            background: rgba(var(--color-surface-rgb), 0.65);
+            background: rgba(var(--app-surface-rgb), 0.65);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            border: 1px solid var(--color-border);
+            border: 1px solid var(--app-border);
             transition: background-color 0.3s ease, border-color 0.3s ease;
         }
         .cyber-glow-emerald {
@@ -160,7 +127,7 @@
         :root:not(.dark) select:focus,
         :root:not(.dark) textarea:focus {
             outline: none;
-            border-color: var(--color-accent);
+            border-color: var(--app-accent);
             box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
         }
 
@@ -193,7 +160,7 @@
            accent-color, ensuring the checked fill colour is the brand accent green. */
         :root:not(.dark) input[type="checkbox"],
         :root:not(.dark) input[type="radio"] {
-            accent-color: var(--color-accent, #059669);
+            accent-color: var(--app-accent, #059669);
             border-color: rgba(0, 0, 0, 0.3);
             width: 1rem;
             height: 1rem;
@@ -251,8 +218,8 @@
             pointer-events: auto;
         }
         .modal-container {
-            background: var(--color-surface);
-            border: 1px solid var(--color-border);
+            background: var(--app-surface);
+            border: 1px solid var(--app-border);
             width: 550px;
             max-width: 90%;
             max-height: 90vh;
@@ -292,8 +259,8 @@
             pointer-events: auto;
         }
         .sheet-container {
-            background: var(--color-surface);
-            border-left: 1px solid var(--color-border);
+            background: var(--app-surface);
+            border-left: 1px solid var(--app-border);
             width: 640px;
             max-width: 100%;
             height: 100vh;

@@ -1,5 +1,5 @@
     <!-- PERSISTENT LEFT SIDEBAR NAVIGATION -->
-    <aside class="w-64 bg-sidebar border-r border-border flex flex-col py-6 px-4 shrink-0 z-40 h-full overflow-hidden">
+    <aside id="app-sidebar" class="fixed inset-y-0 left-0 z-50 flex h-full w-64 shrink-0 -translate-x-full flex-col overflow-hidden border-r border-border bg-sidebar px-4 py-6 shadow-2xl transition-transform duration-200 ease-out md:relative md:z-40 md:translate-x-0 md:shadow-none" aria-label="Primary navigation">
 
         <!-- Brand Identity - always visible at top -->
         <div class="flex items-center gap-3 px-2 shrink-0">
@@ -10,6 +10,9 @@
                 <h1 class="font-display font-bold text-lg leading-tight tracking-tight">Automation OS</h1>
                 <p class="text-[11px] text-muted tracking-widest uppercase font-semibold">NewsBlogify AI</p>
             </div>
+            <button type="button" onclick="closeMobileSidebar()" class="ml-auto rounded-lg p-1 text-muted hover:bg-white/5 hover:text-text md:hidden" aria-label="Close navigation menu">
+                <span class="material-symbols-outlined">close</span>
+            </button>
         </div>
 
         <!-- Navigation Links - scrollable, fills remaining height -->

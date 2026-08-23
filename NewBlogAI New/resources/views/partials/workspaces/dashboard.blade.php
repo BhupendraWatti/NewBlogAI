@@ -33,7 +33,7 @@
                     </div>
 
                     <!-- KPI Cards — show dashes until real data loads -->
-                    <div class="grid grid-cols-4 gap-4">
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <div class="glass-surface rounded-2xl p-5 relative overflow-hidden group transition hover:border-accent">
                             <p class="text-[10px] font-mono text-muted uppercase tracking-widest mb-1">Connected Sites</p>
                             <h3 class="text-3xl font-display font-bold text-muted" id="stats-fleet">—</h3>
@@ -63,9 +63,9 @@
                     </div>
 
                     <!-- Quick Access Modules -->
-                    <div class="grid grid-cols-3 gap-6">
+                    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
                         <!-- Recent Activity -->
-                        <div class="col-span-2 glass-surface rounded-2xl p-5 space-y-4">
+                        <div class="glass-surface rounded-2xl p-5 space-y-4 lg:col-span-2">
                             <div class="flex justify-between items-center">
                                 <h4 class="text-xs font-mono uppercase tracking-widest text-muted font-bold">Recent Activity</h4>
                                 <button onclick="switchWorkspace('audit')" class="text-[10px] font-mono text-secondary hover:underline">View all logs →</button>

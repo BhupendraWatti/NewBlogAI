@@ -604,6 +604,32 @@
     });
 
     // Workspace Node Router
+    function openMobileSidebar() {
+        const sidebar = document.getElementById('app-sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        const trigger = document.getElementById('mobile-menu-button');
+        sidebar?.classList.remove('-translate-x-full');
+        overlay?.classList.remove('hidden');
+        trigger?.setAttribute('aria-expanded', 'true');
+    }
+
+    function closeMobileSidebar() {
+        const sidebar = document.getElementById('app-sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        const trigger = document.getElementById('mobile-menu-button');
+        if (window.matchMedia('(max-width: 767px)').matches) {
+            sidebar?.classList.add('-translate-x-full');
+        }
+        overlay?.classList.add('hidden');
+        trigger?.setAttribute('aria-expanded', 'false');
+    }
+
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            closeMobileSidebar();
+        }
+    });
+
     function switchWorkspace(node) {
         currentWorkspace = node;
 
@@ -688,6 +714,7 @@
 
         // Close context inspector upon navigation
         closeInspector();
+        closeMobileSidebar();
     }
 
     // Fleet Telemetry functions

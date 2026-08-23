@@ -1,7 +1,10 @@
         <!-- HEADER PANEL -->
-        <header class="h-14 border-b border-border px-6 flex justify-between items-center shrink-0">
+        <header class="h-14 border-b border-border px-3 md:px-6 flex justify-between items-center shrink-0">
             <!-- Breadcrumbs -->
             <div class="flex items-center gap-2 text-xs font-mono text-muted">
+                <button id="mobile-menu-button" type="button" onclick="openMobileSidebar()" class="mr-1 rounded-xl border border-border bg-surface p-2 text-muted hover:text-text md:hidden" aria-label="Open navigation menu" aria-controls="app-sidebar" aria-expanded="false">
+                    <span class="material-symbols-outlined text-lg">menu</span>
+                </button>
                 <span class="hover:text-text cursor-pointer">Automation OS</span>
                 <span class="material-symbols-outlined text-xs">chevron_right</span>
                 <span id="breadcrumb-active" class="text-secondary font-medium">Overview</span>
@@ -10,7 +13,7 @@
             <!-- Quick Controls -->
             <div class="flex items-center gap-4">
                 <!-- Search & Command Palette Hook -->
-                <div class="relative w-72 focus-within:w-80 transition-all duration-300">
+                <div class="relative hidden w-72 transition-all duration-300 focus-within:w-80 sm:block">
                     <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-muted text-lg">search</span>
                     <input id="global-search" onkeydown="handleSearchShortcut(event)" class="w-full bg-surface border border-border rounded-xl py-1.5 pl-10 pr-8 text-xs font-mono text-text placeholder-muted focus:outline-none focus:border-accent focus:ring-0" placeholder="Search commands... (Ctrl+K)" type="text"/>
                     <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-mono text-muted border border-border px-1 rounded">⌘K</span>
