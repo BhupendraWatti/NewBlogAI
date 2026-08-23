@@ -9,7 +9,7 @@ use NewsBlogify\REST_Controller;
  * Plugin Name:       NewsBlogify Client
  * Plugin URI:        https://newsblogify.com
  * Description:       Lightweight WordPress execution agent for the NewsBlogify SaaS platform.
- * Version:           2.0.0
+ * Version:           2.1.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            NewsBlogify Team
@@ -30,7 +30,7 @@ if (! defined('ABSPATH')) {
 // ---------------------------------------------------------------------------
 
 if (! defined('NEWSBLOGIFY_VERSION')) {
-    define('NEWSBLOGIFY_VERSION', '2.0.0');
+    define('NEWSBLOGIFY_VERSION', '2.1.0');
 }
 
 if (! defined('NEWSBLOGIFY_PATH')) {

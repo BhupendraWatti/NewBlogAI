@@ -34,7 +34,7 @@ class API_Client
             return true;
         }
         $is_local = in_array($host, ['127.0.0.1', 'localhost'], true) ||
-                    str_ends_with($host, '.local') ||
+                    substr($host, -6) === '.local' ||
                     strpos($host, '.') === false;
 
         return ! $is_local;
@@ -48,7 +48,7 @@ class API_Client
         $backend_url = rtrim(Config::get('backend_url', 'http://127.0.0.1:8000'), '/');
         $api_token = Config::get('plugin_token', '');
 
-        $url = $backend_url.'/api/plugin/'.ltrim($endpoint, '/');
+        $url = $backend_url.'/api/v1/plugin/'.ltrim($endpoint, '/');
 
         $headers = [
             'Accept' => 'application/json',
@@ -70,7 +70,7 @@ class API_Client
         ]);
 
         if ($body !== null) {
-            $request_args['body'] = json_encode($body);
+            $request_args['body'] = wp_json_encode($body);
         }
 
         Logger::get_instance()->log('debug', sprintf('Sending %s request to %s', $method, $url));
@@ -104,7 +104,7 @@ class API_Client
      */
     public function connect_account($backend_url, $email, $password)
     {
-        $url = rtrim($backend_url, '/').'/api/plugin/login';
+        $url = rtrim($backend_url, '/').'/api/v1/plugin/login';
 
         $payload = [
             'email' => $email,
@@ -116,7 +116,7 @@ class API_Client
                 'Accept' => 'application/json',
                 'Content-Type' => 'application/json',
             ],
-            'body' => json_encode($payload),
+            'body' => wp_json_encode($payload),
             'sslverify' => $this->should_verify_ssl($url),
             'timeout' => 20,
         ]);
@@ -143,7 +143,7 @@ class API_Client
      */
     public function register_site($backend_url, $api_token, $site_name, $site_url, $wp_app_pwd)
     {
-        $url = rtrim($backend_url, '/').'/api/plugin/register-website';
+        $url = rtrim($backend_url, '/').'/api/v1/plugin/register-website';
 
         $payload = [
             'domain_url' => $site_url,
@@ -158,7 +158,7 @@ class API_Client
                 'Content-Type' => 'application/json',
                 'Authorization' => 'Bearer '.$api_token,
             ],
-            'body' => json_encode($payload),
+            'body' => wp_json_encode($payload),
             'sslverify' => $this->should_verify_ssl($url),
             'timeout' => 20,
         ]);

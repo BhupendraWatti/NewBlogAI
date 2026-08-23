@@ -43,15 +43,8 @@ class Cron
      */
     public function clear_events()
     {
-        $timestamp_heartbeat = wp_next_scheduled('newsblogify_heartbeat_cron');
-        if ($timestamp_heartbeat) {
-            wp_unschedule_event($timestamp_heartbeat, 'newsblogify_heartbeat_cron');
-        }
-
-        $timestamp_sync = wp_next_scheduled('newsblogify_sync_cron');
-        if ($timestamp_sync) {
-            wp_unschedule_event($timestamp_sync, 'newsblogify_sync_cron');
-        }
+        wp_clear_scheduled_hook('newsblogify_heartbeat_cron');
+        wp_clear_scheduled_hook('newsblogify_sync_cron');
     }
 
     /**

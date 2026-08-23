@@ -12,7 +12,6 @@ class REST_Controller
     {
         $instance = new self;
         add_action('rest_api_init', [$instance, 'register_routes']);
-        add_filter('determine_current_user', [$instance, 'authenticate_bearer_token'], 15);
     }
 
     /**
@@ -58,11 +57,23 @@ class REST_Controller
         $stored_token = Config::get('plugin_token', '');
 
         if (empty($stored_token)) {
-            return false;
+            return new \WP_Error(
+                'newsblogify_not_configured',
+                __('NewsBlogify authentication is not configured.', 'newsblogify-client'),
+                ['status' => 401]
+            );
         }
 
         if (empty($token) || hash_equals($stored_token, $token) === false) {
-            return current_user_can('manage_options');
+            if (current_user_can('manage_options')) {
+                return true;
+            }
+
+            return new \WP_Error(
+                'newsblogify_invalid_token',
+                __('Invalid NewsBlogify authentication token.', 'newsblogify-client'),
+                ['status' => 401]
+            );
         }
 
         return true;
@@ -88,14 +99,27 @@ class REST_Controller
     public function handle_sync(\WP_REST_Request $request)
     {
         $params = $request->get_json_params();
+        $params = is_array($params) ? $params : [];
         Logger::get_instance()->log('info', 'Received synchronization data payload from Laravel.');
 
-        $selected_topics = isset($params['selected_topics']) ? $params['selected_topics'] : [];
-        $slot = isset($params['slot']) ? $params['slot'] : 'Daily';
+        $selected_topics = $params['selected_topics'] ?? $params['selected_categories'] ?? [];
+        $selected_topics = is_array($selected_topics)
+            ? array_values(array_filter(array_map(
+                'sanitize_text_field',
+                array_filter($selected_topics, 'is_scalar')
+            )))
+            : [];
+        $slot = isset($params['slot']) && is_scalar($params['slot'])
+            ? sanitize_text_field((string) $params['slot'])
+            : 'Daily';
 
-        Config::update('selected_topics', $selected_topics);
-        Config::update('posting_slot', $slot);
-        Config::update('last_sync_time', current_time('mysql'));
+        Config::update_many([
+            'selected_topics' => $selected_topics,
+            'synced_topics' => $selected_topics,
+            'posting_slot' => $slot,
+            'publishing_mode' => $slot,
+            'last_sync_time' => current_time('mysql'),
+        ]);
 
         Logger::get_instance()->log('info', sprintf('Sync success: configured slot %s with %d topic clusters.', $slot, count($selected_topics)));
 
@@ -111,20 +135,40 @@ class REST_Controller
     public function handle_publish(\WP_REST_Request $request)
     {
         $params = $request->get_json_params();
-        if (empty($params)) {
+        if (! is_array($params) || empty($params)) {
             $params = $request->get_params();
         }
+        $params = is_array($params) ? $params : [];
 
-        $publishing_log_id = isset($params['publishing_log_id']) ? $params['publishing_log_id'] : null;
-        $title             = isset($params['title']) ? $params['title'] : '';
-        $content           = isset($params['content']) ? $params['content'] : '';
-        $status            = isset($params['status']) ? $params['status'] : 'draft';
-        $categories        = isset($params['categories']) ? $params['categories'] : [];
-        $tags              = isset($params['tags']) ? $params['tags'] : [];
-        $featured_image_url = isset($params['featured_image_url']) ? $params['featured_image_url'] : null;
-        $meta              = isset($params['meta']) ? $params['meta'] : [];
-        $slug              = isset($params['slug']) ? $params['slug'] : '';
-        $scheduled_at      = isset($params['scheduled_at']) ? $params['scheduled_at'] : null;
+        $publishing_log_id = isset($params['publishing_log_id']) ? absint($params['publishing_log_id']) : null;
+        $title = sanitize_text_field((string) ($params['title'] ?? ''));
+        $content = wp_kses_post((string) ($params['content'] ?? ''));
+        $status = sanitize_key((string) ($params['status'] ?? 'draft'));
+        $categories = is_array($params['categories'] ?? null) ? $params['categories'] : [];
+        $tags = is_array($params['tags'] ?? null)
+            ? array_values(array_filter(array_map(
+                'sanitize_text_field',
+                array_filter($params['tags'], 'is_scalar')
+            )))
+            : [];
+        $featured_image_url = esc_url_raw((string) ($params['featured_image_url'] ?? ''));
+        $meta = is_array($params['meta'] ?? null) ? $params['meta'] : [];
+        $slug = sanitize_title((string) ($params['slug'] ?? ''));
+        $scheduled_at = sanitize_text_field((string) ($params['scheduled_at'] ?? ''));
+
+        if ($title === '' || $content === '') {
+            return new \WP_REST_Response([
+                'status' => 'error',
+                'message' => 'A non-empty title and content body are required.',
+            ], 422);
+        }
+
+        if (! in_array($status, ['draft', 'pending', 'publish', 'future'], true)) {
+            return new \WP_REST_Response([
+                'status' => 'error',
+                'message' => 'Unsupported post status.',
+            ], 422);
+        }
 
         Logger::get_instance()->log('info', 'Received publish request for log ID: ' . $publishing_log_id);
 
@@ -160,13 +204,23 @@ class REST_Controller
         ];
 
         // If status is future and scheduled_at is provided, set post_date to scheduled_at (formatted as Y-m-d H:i:s in WordPress site timezone).
-        if ($status === 'future' && ! empty($scheduled_at)) {
+        if ($status === 'future') {
             $timestamp = strtotime($scheduled_at);
-            if ($timestamp) {
-                $gmt_date = gmdate('Y-m-d H:i:s', $timestamp);
-                $post_data['post_date'] = get_date_from_gmt($gmt_date, 'Y-m-d H:i:s');
-                $post_data['post_date_gmt'] = $gmt_date;
+            if (! $timestamp) {
+                return new \WP_REST_Response([
+                    'status' => 'error',
+                    'message' => 'A valid scheduled_at value is required for future posts.',
+                ], 422);
             }
+
+            $gmt_date = gmdate('Y-m-d H:i:s', $timestamp);
+            $post_data['post_date'] = get_date_from_gmt($gmt_date, 'Y-m-d H:i:s');
+            $post_data['post_date_gmt'] = $gmt_date;
+        }
+
+        $mapped_user_id = absint(Config::get('wp_user_id', 0));
+        if ($mapped_user_id > 0 && get_user_by('id', $mapped_user_id)) {
+            $post_data['post_author'] = $mapped_user_id;
         }
 
         $post_id = wp_insert_post($post_data, true);
@@ -213,7 +267,7 @@ class REST_Controller
         }
 
         // Featured Image Sideloading:
-        if (! empty($featured_image_url)) {
+        if (! empty($featured_image_url) && wp_http_validate_url($featured_image_url)) {
             require_once(ABSPATH . 'wp-admin/includes/image.php');
             require_once(ABSPATH . 'wp-admin/includes/file.php');
             require_once(ABSPATH . 'wp-admin/includes/media.php');
@@ -230,9 +284,19 @@ class REST_Controller
         }
 
         // SEO & Meta:
-        if (! empty($meta) && is_array($meta)) {
+        $allowed_meta_keys = [
+            '_yoast_wpseo_title',
+            '_yoast_wpseo_metadesc',
+            '_yoast_wpseo_focuskw',
+            'rank_math_title',
+            'rank_math_description',
+            'rank_math_focus_keyword',
+        ];
+        if (! empty($meta)) {
             foreach ($meta as $key => $value) {
-                update_post_meta($post_id, $key, $value);
+                if (in_array($key, $allowed_meta_keys, true) && is_scalar($value)) {
+                    update_post_meta($post_id, $key, sanitize_text_field((string) $value));
+                }
             }
         }
 
@@ -243,61 +307,5 @@ class REST_Controller
             'wp_post_id' => $post_id,
             'post_url'   => get_permalink($post_id),
         ], 200);
-    }
-
-    /**
-     * Authenticate incoming REST API requests using the Bearer token.
-     *
-     * @param  int|false  $user_id  Current user ID resolved by WordPress.
-     * @return int|false Authenticated user ID, or false if not matched.
-     */
-    public function authenticate_bearer_token($user_id)
-    {
-        if (! empty($user_id)) {
-            return $user_id;
-        }
-
-        $auth_header = '';
-        if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-            $auth_header = $_SERVER['HTTP_AUTHORIZATION'];
-        } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
-            $auth_header = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
-        } elseif (function_exists('apache_request_headers')) {
-            $headers = apache_request_headers();
-            if (isset($headers['Authorization'])) {
-                $auth_header = $headers['Authorization'];
-            }
-        }
-
-        $token = '';
-        if (! empty($auth_header) && preg_match('/Bearer\s+(.*)$/i', $auth_header, $matches)) {
-            $token = trim($matches[1]);
-        }
-
-        if (empty($token) && isset($_REQUEST['api_key'])) {
-            $token = sanitize_text_field($_REQUEST['api_key']);
-        }
-
-        if (empty($token)) {
-            return $user_id;
-        }
-
-        $stored_app_pwd = Config::get('wp_app_pwd', '');
-        $stored_api_token = Config::get('plugin_token', '');
-        $mapped_user_id = Config::get('wp_user_id', 0);
-
-        if (empty($mapped_user_id)) {
-            return $user_id;
-        }
-
-        if ((! empty($stored_app_pwd) && hash_equals($stored_app_pwd, hash('sha256', $token))) ||
-             (! empty($stored_api_token) && hash_equals($stored_api_token, $token))) {
-
-            Logger::get_instance()->log('debug', 'Request successfully authenticated via Bearer token.');
-
-            return (int) $mapped_user_id;
-        }
-
-        return $user_id;
     }
 }

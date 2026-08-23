@@ -81,13 +81,6 @@ class Admin
         }
 
         if (! $validated) {
-            if (wp_check_password($password, $user->user_pass, $user->ID)) {
-                $validated = true;
-                Logger::get_instance()->log('info', 'Validation succeeded using main WordPress login credentials.');
-            }
-        }
-
-        if (! $validated) {
             return new \WP_Error('invalid_app_password', __('WordPress validation failed. Please check your username and password.', 'newsblogify-client'));
         }
 
@@ -165,8 +158,21 @@ class Admin
             Config::update('wp_username', $wp_username);
             Config::update('wp_app_pwd', hash('sha256', $wp_app_pwd));
             Config::update('wp_user_id', get_current_user_id());
-            Config::update('posting_slot', isset($config['slot']) ? $config['slot'] : 'Daily');
-            Config::update('selected_topics', isset($config['selected_topics']) ? $config['selected_topics'] : []);
+            $posting_slot = isset($config['slot']) && is_scalar($config['slot'])
+                ? sanitize_text_field((string) $config['slot'])
+                : 'Daily';
+            $selected_topics = isset($config['selected_topics']) && is_array($config['selected_topics'])
+                ? array_values(array_filter(array_map(
+                    'sanitize_text_field',
+                    array_filter($config['selected_topics'], 'is_scalar')
+                )))
+                : [];
+            Config::update_many([
+                'posting_slot' => $posting_slot,
+                'publishing_mode' => $posting_slot,
+                'selected_topics' => $selected_topics,
+                'synced_topics' => $selected_topics,
+            ]);
             Config::update('connection_status', 'connected');
             Config::update('last_sync_time', current_time('mysql'));
             Config::update('wizard_step', 'completed');
