@@ -1,59 +1,69 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# NewsBlogify AI
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+NewsBlogify AI is a Laravel 12 newsroom automation platform for discovering current stories, generating source-grounded articles, managing prompts and AI providers, and publishing to connected WordPress sites.
 
-## About Laravel
+## Requirements
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- PHP 8.2 or newer with PDO, SQLite or MySQL, cURL, DOM, and mbstring
+- Composer 2
+- Node.js 22 or newer and npm
+- A queue worker and scheduler runner for automated production workflows
+- At least one configured AI provider for content generation
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Local setup
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+```bash
+composer install
+copy .env.example .env
+php artisan key:generate
+php artisan migrate --seed
+npm ci
+npm run build
+php artisan serve
+```
 
-## Learning Laravel
+On macOS or Linux, replace `copy` with `cp`. The default example configuration uses `database/database.sqlite`; create that empty file first if it is not present.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+Open `http://127.0.0.1:8000`. Never use demo or shared credentials outside a disposable local environment. Create the first administrator through a controlled provisioning process or a local database seeder.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+For a development session with the web server, queue listener, logs, and Vite running together:
 
-## Laravel Sponsors
+```bash
+composer run dev
+```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## Quality checks
 
-### Premium Partners
+```bash
+composer test -- --compact
+npm run build
+vendor/bin/pint --test
+```
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+The application includes a health endpoint at `/up`. Browser smoke testing should cover login, Prompt Library, Newsroom Pipeline, Websites, AI Providers, and Publishing Queue at desktop and mobile widths.
 
-## Contributing
+## Universal news prompt
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+The production prompt is versioned in `app/Modules/PromptManager/Support/UniversalNewsPrompt.php`. It is installed or upgraded through the database migrations and supports these runtime variables:
 
-## Code of Conduct
+`topic`, `headline`, `summary`, `category`, `language`, `website`, `tone`, `keywords`, `sources`, `date`, and `research_context`.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+The prompt is designed to keep every mutable claim inside retrieved evidence, apply inverted-pyramid reporting, distinguish current news from historical background, and produce search-friendly reporting without clickbait or keyword stuffing.
 
-## Security Vulnerabilities
+## Production deployment
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Follow [PRODUCTION.md](PRODUCTION.md) before exposing the application publicly. Production requires HTTPS, `APP_DEBUG=false`, durable database backups, supervised queue workers, the scheduler, built frontend assets, and a post-deploy health check.
 
-## License
+## Important directories
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- `app/Modules/ContentPipeline` — discovery, evidence collection, generation, quality, and publishing pipeline
+- `app/Modules/PromptManager` — prompt library and universal prompt definition
+- `app/Modules/AIProviderManager` — provider drivers and credential routing
+- `app/Modules/SiteManager` — WordPress connectivity and synchronization
+- `wordpress-plugin` — companion WordPress integration
+- `tests/Feature` — end-to-end backend behavior and regression coverage
+- `graphify-out` — generated architecture graph and audit report
+
+## Security
+
+Do not commit `.env`, API keys, WordPress credentials, database dumps, or generated authentication tokens. Report vulnerabilities privately to the project owner; do not open a public issue containing exploit details or secrets.

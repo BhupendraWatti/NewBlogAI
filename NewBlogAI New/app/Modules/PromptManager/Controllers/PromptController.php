@@ -3,6 +3,9 @@
 namespace App\Modules\PromptManager\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\AIProviderManager\Models\AIProvider;
+use App\Modules\AIProviderManager\Services\AIProviderService;
+use App\Modules\ContentPipeline\Services\PromptEngine;
 use App\Modules\PromptManager\Models\Prompt;
 use App\Modules\PromptManager\Requests\StorePromptRequest;
 use App\Modules\PromptManager\Requests\UpdatePromptRequest;
@@ -111,9 +114,9 @@ class PromptController extends Controller
 
         // Retrieve default provider or the one passed in variables
         $providerId = $request->input('ai_provider_id');
-        $provider = $providerId ? \App\Modules\AIProviderManager\Models\AIProvider::find($providerId) : \App\Modules\AIProviderManager\Models\AIProvider::where('is_default', true)->first();
+        $provider = $providerId ? AIProvider::find($providerId) : AIProvider::where('is_default', true)->first();
 
-        if (!$provider || !$provider->is_enabled || empty($provider->api_key)) {
+        if (! $provider || ! $provider->is_enabled || empty($provider->api_key)) {
             return response()->json([
                 'message' => 'No active AI Provider with API key configured.',
             ], 422);
@@ -131,27 +134,28 @@ class PromptController extends Controller
             'headline' => 'AI Revolutionizes Modern Workflows',
             'summary' => 'Artificial intelligence tools are drastically transforming productivity and software development across sectors.',
             'sources' => 'https://techcrunch.com',
+            'research_context' => 'A verified source reports that organizations are evaluating AI tools for productivity and software workflows. No additional figures or quotations were supplied.',
         ], $variables);
 
         // Compile prompt
-        $promptEngine = app(\App\Modules\ContentPipeline\Services\PromptEngine::class);
+        $promptEngine = app(PromptEngine::class);
         $compiledPrompt = $promptEngine->compileUserPrompt($prompt->prompt, $mockVars);
 
         try {
-            $driver = app(\App\Modules\AIProviderManager\Services\AIProviderService::class)->getDriver($provider->provider_key);
-            
+            $driver = app(AIProviderService::class)->getDriver($provider->provider_key);
+
             // Limit output to avoid excessive costs during testing
             $result = $driver->generate($provider->api_key, $compiledPrompt, $provider->default_model, [
-                'max_tokens' => 500
+                'max_tokens' => 500,
             ]);
 
             return response()->json([
                 'text' => $result['text'] ?? '',
-                'compiled_prompt' => $compiledPrompt
+                'compiled_prompt' => $compiledPrompt,
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'AI generation failed: ' . $e->getMessage()
+                'message' => 'AI generation failed: '.$e->getMessage(),
             ], 502);
         }
     }
