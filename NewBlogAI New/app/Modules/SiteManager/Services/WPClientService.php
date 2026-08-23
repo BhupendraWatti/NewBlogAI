@@ -6,6 +6,8 @@ use App\Models\Key;
 use App\Modules\SiteManager\Events\SiteSyncCompleted;
 use App\Modules\SiteManager\Events\SiteSyncFailed;
 use App\Modules\SiteManager\Models\Site;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -54,9 +56,8 @@ class WPClientService
             try {
                 Log::info("WP sync attempt {$attempt}/{$maxRetries} for site {$site->id}");
 
-                $response = Http::timeout(60) // Increased from 15s to 60s
+                $response = $this->request(60) // Increased from 15s to 60s
                     ->connectTimeout(30)
-                    ->withoutVerifying()
                     ->withHeaders([
                         'Authorization' => 'Bearer '.$apiKey,
                     ])
@@ -88,14 +89,14 @@ class WPClientService
 
                 event(new SiteSyncFailed($site, $error));
                 throw new \RuntimeException($error);
-
-            } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            } catch (ConnectionException $e) {
                 $lastException = $e;
                 Log::warning("WP sync timeout on attempt {$attempt}/{$maxRetries} for site {$site->id}: ".$e->getMessage());
 
                 if ($attempt < $maxRetries) {
                     sleep($retryDelay);
                     $retryDelay *= 2; // Exponential backoff
+
                     continue;
                 }
 
@@ -107,7 +108,6 @@ class WPClientService
                 ]);
                 event(new SiteSyncFailed($site, $error));
                 throw new \RuntimeException($error, 0, $e);
-
             } catch (\Exception $e) {
                 $error = 'Sync exception: '.$e->getMessage();
 
@@ -142,8 +142,7 @@ class WPClientService
         $wpUrl = $domain.'/wp-json/newsblogify/v1/ping';
 
         try {
-            $response = Http::timeout(10)
-                ->withoutVerifying()
+            $response = $this->request(10)
                 ->withHeaders([
                     'Authorization' => 'Bearer '.$apiKey,
                 ])
@@ -232,8 +231,7 @@ class WPClientService
         }
 
         try {
-            $pluginResponse = Http::timeout(20)
-                ->withoutVerifying()
+            $pluginResponse = $this->request(20)
                 ->withHeaders(['Authorization' => 'Bearer '.$apiKey])
                 ->post($pluginPublishUrl, $pluginPayload);
 
@@ -282,8 +280,7 @@ class WPClientService
             $payload['slug'] = $slug;
         }
 
-        $response = Http::timeout(20)
-            ->withoutVerifying()
+        $response = $this->request(20)
             ->withHeaders(['Authorization' => 'Bearer '.$apiKey])
             ->post($endpoint, $payload);
 
@@ -306,8 +303,7 @@ class WPClientService
         $endpoint = "{$domain}/wp-json/wp/v2/posts/{$wpPostId}";
 
         try {
-            $response = Http::timeout(10)
-                ->withoutVerifying()
+            $response = $this->request(10)
                 ->withHeaders([
                     'Authorization' => 'Bearer '.$apiKey,
                 ])
@@ -331,6 +327,15 @@ class WPClientService
 
             return null;
         }
+    }
+
+    private function request(int $timeout): PendingRequest
+    {
+        $request = Http::timeout($timeout);
+
+        return config('services.wordpress.verify_tls', true)
+            ? $request
+            : $request->withoutVerifying();
     }
 
     /**

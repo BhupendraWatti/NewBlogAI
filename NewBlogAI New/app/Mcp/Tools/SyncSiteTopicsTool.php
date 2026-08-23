@@ -5,6 +5,7 @@ namespace App\Mcp\Tools;
 use App\Models\Key;
 use App\Modules\SiteManager\Models\Site;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Laravel\Mcp\Request;
@@ -37,18 +38,31 @@ class SyncSiteTopicsTool extends Tool
         if (is_numeric($apiKey)) {
             $keyRecord = Key::find((int) $apiKey);
             if ($keyRecord) {
-                $apiKey = $keyRecord->key;
+                try {
+                    $apiKey = Crypt::decryptString($keyRecord->key);
+                } catch (\Throwable) {
+                    $apiKey = $keyRecord->key;
+                }
             }
+        }
+
+        if (empty($apiKey)) {
+            return Response::error("Authorization token missing for site ID {$siteId}.");
         }
 
         // Prepare topics format
         $topics = $site->selected_topics ?? [];
 
-        $wpUrl = $domain.'/wp-json/ai-news/v1/sync-data';
+        $wpUrl = $domain.'/wp-json/newsblogify/v1/sync-data';
 
         try {
-            $response = Http::timeout(15)
-                ->withoutVerifying()
+            $pendingRequest = Http::timeout(15);
+            if (! config('services.wordpress.verify_tls', true)) {
+                $pendingRequest = $pendingRequest->withoutVerifying();
+            }
+
+            $response = $pendingRequest
+                ->withToken($apiKey)
                 ->post($wpUrl, [
                     'selected_topics' => $topics,
                     'slot' => $site->slot ?? '12:00',

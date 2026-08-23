@@ -50,4 +50,12 @@ return [
         'merchant_id' => env('PHONEPE_MERCHANT_ID', 'MID_MOCK'),
     ],
 
+    'ollama' => [
+        'base_url' => env('OLLAMA_BASE_URL', 'http://localhost:11434'),
+    ],
+
+    'wordpress' => [
+        'verify_tls' => env('WORDPRESS_VERIFY_TLS', true),
+    ],
+
 ];

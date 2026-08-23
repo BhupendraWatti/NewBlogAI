@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Modules\AIProviderManager\Drivers\OllamaDriver;
 use App\Modules\AIProviderManager\Models\AIProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -130,5 +131,24 @@ class AIProvidersTest extends TestCase
             $this->assertStringContainsString('timeout', $content);
             $this->assertStringContainsString('90', $content);
         }
+    }
+
+    public function test_ollama_driver_uses_the_configured_base_url(): void
+    {
+        config(['services.ollama.base_url' => 'http://ollama.internal:11434/']);
+        Http::fake([
+            'http://ollama.internal:11434/api/generate' => Http::response([
+                'response' => 'pong',
+                'prompt_eval_count' => 1,
+                'eval_count' => 1,
+            ]),
+        ]);
+
+        $driver = new OllamaDriver;
+        $result = $driver->generate('', 'ping');
+
+        $this->assertSame('pong', $result['text']);
+        $this->assertSame('http://ollama.internal:11434', $driver->getConfig()['base_url']);
+        Http::assertSent(fn ($request) => $request->url() === 'http://ollama.internal:11434/api/generate');
     }
 }

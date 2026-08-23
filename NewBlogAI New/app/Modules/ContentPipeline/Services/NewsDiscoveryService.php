@@ -805,8 +805,8 @@ PROMPT;
             ]);
             $parseDetail = ($strictJsonError === JSON_ERROR_NONE && is_array($decoded))
                 ? 'Response was a JSON object, not an array — unknown wrapper structure.'
-                : 'JSON parse error: ' . $strictJsonErrorMessage;
-            throw new RuntimeException('Discovery response JSON could not be parsed: ' . $parseDetail);
+                : 'JSON parse error: '.$strictJsonErrorMessage;
+            throw new RuntimeException('Discovery response JSON could not be parsed: '.$parseDetail);
         }
 
         $candidates = [];
@@ -853,8 +853,8 @@ PROMPT;
             throw new RuntimeException('Discovery response contained no usable candidates.');
         }
 
-        // Temporal freshness validation: penalize freshness scores for future events
-        // (anticipation spikes) and for news that is older than 7 days.
+        // Correct claimed scores. Eligibility is enforced by the editorial
+        // quality gate below so all rejection policy has one locality.
         $candidates = $this->validateAndCorrectFreshness($candidates);
 
         Log::info('NewsDiscoveryService: parseCandidates succeeded.', [
@@ -1017,25 +1017,8 @@ PROMPT;
      */
     private function capFromRelativeString(string $relative): ?int
     {
-        $relative = strtolower(trim($relative));
-
-        // Match patterns like "30 mins ago", "2 hours ago", "3 days ago", "1 week ago"
-        if (preg_match('/(\d+)\s*(min|minute|hour|hr|day|week|month)/i', $relative, $m)) {
-            $value = (int) $m[1];
-            $unit = strtolower($m[2]);
-
-            $ageInHours = match (true) {
-                str_starts_with($unit, 'min') => $value / 60,
-                str_starts_with($unit, 'h') => $value,
-                str_starts_with($unit, 'd') => $value * 24,
-                str_starts_with($unit, 'w') => $value * 24 * 7,
-                str_starts_with($unit, 'm') => $value * 24 * 30, // month
-                default => null,
-            };
-
-            if ($ageInHours === null) {
-                return null;
-            }
+        $ageInHours = $this->relativeAgeInHours($relative);
+        if ($ageInHours !== null) {
 
             // Stories under 24 hours old: no freshness cap — they are live/fresh news.
             // The AI's own freshness_score is trusted in this window (Bug Fix #1 above
@@ -1054,5 +1037,24 @@ PROMPT;
         }
 
         return null;
+    }
+
+    private function relativeAgeInHours(string $relative): ?float
+    {
+        if (! preg_match('/(\d+)\s*(min|minute|hour|hr|day|week|month)/i', strtolower(trim($relative)), $matches)) {
+            return null;
+        }
+
+        $value = (int) $matches[1];
+        $unit = strtolower($matches[2]);
+
+        return match (true) {
+            str_starts_with($unit, 'min') => $value / 60,
+            str_starts_with($unit, 'h') => (float) $value,
+            str_starts_with($unit, 'd') => (float) ($value * 24),
+            str_starts_with($unit, 'w') => (float) ($value * 24 * 7),
+            str_starts_with($unit, 'm') => (float) ($value * 24 * 30),
+            default => null,
+        };
     }
 }

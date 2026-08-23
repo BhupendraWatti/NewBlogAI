@@ -26,6 +26,47 @@ use Illuminate\Support\Facades\Queue;
 use Mockery;
 use Tests\TestCase;
 
+final class CoverageNewsroomFakeDriver implements AIProviderClientInterface
+{
+    public string $responseText = '[]';
+
+    /** @var array<int, string> */
+    public array $responseQueue = [];
+
+    public int $calls = 0;
+
+    /** @var array<int, array> */
+    public array $optionsHistory = [];
+
+    public function testConnection(string $apiKey, ?string $model = null): bool
+    {
+        return true;
+    }
+
+    public function getConfig(): array
+    {
+        return [];
+    }
+
+    public function generate(string $apiKey, string $prompt, ?string $model = null, array $options = []): array
+    {
+        $this->calls++;
+        $this->optionsHistory[] = $options;
+        $text = $this->responseQueue !== []
+            ? array_shift($this->responseQueue)
+            : $this->responseText;
+
+        return [
+            'text' => $text,
+            'prompt_tokens' => 100,
+            'completion_tokens' => 500,
+            'total_tokens' => 600,
+            'estimated_cost' => 0.01,
+            'raw_response' => [],
+        ];
+    }
+}
+
 class CoverageNewsroomWorkflowTest extends TestCase
 {
     use RefreshDatabase;
@@ -107,46 +148,7 @@ class CoverageNewsroomWorkflowTest extends TestCase
         $this->app->instance(EntitlementService::class, $entitlements);
 
         // AI provider boundary is mocked with a scriptable fake driver.
-        $this->fakeDriver = new class implements AIProviderClientInterface
-        {
-            public string $responseText = '[]';
-
-            /** @var array<int, string> */
-            public array $responseQueue = [];
-
-            public int $calls = 0;
-
-            /** @var array<int, array> */
-            public array $optionsHistory = [];
-
-            public function testConnection(string $apiKey, ?string $model = null): bool
-            {
-                return true;
-            }
-
-            public function getConfig(): array
-            {
-                return [];
-            }
-
-            public function generate(string $apiKey, string $prompt, ?string $model = null, array $options = []): array
-            {
-                $this->calls++;
-                $this->optionsHistory[] = $options;
-                $text = $this->responseQueue !== []
-                    ? array_shift($this->responseQueue)
-                    : $this->responseText;
-
-                return [
-                    'text' => $text,
-                    'prompt_tokens' => 100,
-                    'completion_tokens' => 500,
-                    'total_tokens' => 600,
-                    'estimated_cost' => 0.01,
-                    'raw_response' => [],
-                ];
-            }
-        };
+        $this->fakeDriver = new CoverageNewsroomFakeDriver;
 
         $providerService = Mockery::mock(AIProviderService::class);
         $providerService->shouldReceive('getDriver')->andReturn($this->fakeDriver);
@@ -212,7 +214,6 @@ class CoverageNewsroomWorkflowTest extends TestCase
         );
         $this->assertLessThanOrEqual(4, NewsDiscoveryService::DISCOVERY_BATCH_SIZE);
     }
-
 
     public function test_discovery_disables_gemini_dynamic_thinking_to_protect_json_output_budget(): void
     {
@@ -306,6 +307,33 @@ class CoverageNewsroomWorkflowTest extends TestCase
         $run->refresh();
         $this->assertEquals('failed', $run->status);
         $this->assertNotNull($run->error_message);
+        $this->assertEquals(0, $run->candidates()->count());
+    }
+
+    public function test_discovery_rejects_candidates_outside_the_forty_eight_hour_window(): void
+    {
+        $payload = array_map(function (array $candidate): array {
+            $candidate['event_date'] = now()->subDays(5)->toDateString();
+            $candidate['published_at_relative'] = '5 days ago';
+
+            return $candidate;
+        }, $this->distinctCandidatesPayload());
+        $this->fakeDriver->responseText = json_encode($payload);
+
+        $run = PipelineRun::create([
+            'pipeline_id' => $this->pipeline->id,
+            'status' => 'queued',
+            'run_type' => PipelineRun::TYPE_DISCOVERY,
+        ]);
+
+        try {
+            (new GenerateNewsCandidatesJob($run->id))->handle(app(NewsDiscoveryService::class));
+            $this->fail('Expected stale discovery results to be rejected.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('candidates', $e->getMessage());
+        }
+
+        $this->assertEquals('failed', $run->fresh()->status);
         $this->assertEquals(0, $run->candidates()->count());
     }
 

@@ -97,6 +97,23 @@ class BusinessLicensingTest extends TestCase
         ]);
     }
 
+    public function test_license_tracks_multiple_domains_up_to_its_installation_limit(): void
+    {
+        $license = $this->licenseService->generateLicense($this->customer->id, 2);
+
+        $this->licenseService->activateLicense($license->license_key, 'https://one.example');
+        $this->licenseService->activateLicense($license->license_key, 'https://two.example');
+
+        $license->refresh();
+        $this->assertSame(2, $license->installations_count);
+        $this->assertTrue($this->licenseService->verifyLicense($license->license_key, 'https://one.example')['valid']);
+        $this->assertTrue($this->licenseService->verifyLicense($license->license_key, 'https://two.example')['valid']);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Installation limit reached');
+        $this->licenseService->activateLicense($license->license_key, 'https://three.example');
+    }
+
     public function test_admin_can_perform_user_management_crud(): void
     {
         // 1. Create User

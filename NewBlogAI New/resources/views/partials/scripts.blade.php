@@ -4821,7 +4821,7 @@
                         </div>` : ''}
                     </div>
 
-                    <button onclick="generateFromCandidate(${c.id})" class="w-full bg-accent/10 hover:bg-accent text-accent hover:text-background font-bold text-[10px] py-2 rounded-xl transition flex items-center justify-center gap-1.5 border border-accent/30 hover:border-accent mt-3">
+                    <button onclick="generateFromCandidate(${c.id}, this)" class="w-full bg-accent/10 hover:bg-accent text-accent hover:text-background font-bold text-[10px] py-2 rounded-xl transition flex items-center justify-center gap-1.5 border border-accent/30 hover:border-accent mt-3">
                         <span class="material-symbols-outlined text-xs">auto_awesome</span>
                         ${t('Generate Article', 'लेख तैयार करें')}
                     </button>
@@ -4836,8 +4836,7 @@
     }
 
     // ── Step 2 → 3: Generate article from selected candidate ──────────────────
-    window.generateFromCandidate = async function (candidateId) {
-        const btn = event?.target?.closest('button');
+    window.generateFromCandidate = async function (candidateId, btn = null) {
         if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined text-xs animate-spin">autorenew</span> Writing...'; }
 
         try {

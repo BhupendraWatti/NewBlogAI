@@ -4,28 +4,68 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Modules\AIProviderManager\Contracts\AIProviderClientInterface;
+use App\Modules\AIProviderManager\Models\AIProvider;
+use App\Modules\AIProviderManager\Services\AIProviderService;
 use App\Modules\ContentPipeline\DTOs\PipelineContext;
 use App\Modules\ContentPipeline\DTOs\SourceDTO;
 use App\Modules\ContentPipeline\Models\ContentPipeline;
 use App\Modules\ContentPipeline\Models\PipelineRun;
+use App\Modules\ContentPipeline\Services\ContentGeneratorService;
 use App\Modules\ContentPipeline\Services\PromptEngine;
+use App\Modules\ContentPipeline\Services\SourceCollectionService;
+use App\Modules\PromptManager\Models\Prompt;
 use App\Modules\SiteManager\Models\Site;
 use App\Modules\TopicManager\Models\Topic;
-use App\Modules\PromptManager\Models\Prompt;
-use App\Modules\AIProviderManager\Models\AIProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
 use Tests\TestCase;
+
+final class PromptCapturingFakeDriver implements AIProviderClientInterface
+{
+    public int $calls = 0;
+
+    public string $prompt = '';
+
+    /** @var array<int, string> */
+    public array $prompts = [];
+
+    public function testConnection(string $apiKey, ?string $model = null): bool
+    {
+        return true;
+    }
+
+    public function getConfig(): array
+    {
+        return [];
+    }
+
+    public function generate(string $apiKey, string $prompt, ?string $model = null, array $options = []): array
+    {
+        $this->calls++;
+        $this->prompt = $prompt;
+        $this->prompts[] = $prompt;
+
+        return ['text' => '# Verified report', 'prompt_tokens' => 1, 'completion_tokens' => 1, 'total_tokens' => 2];
+    }
+}
 
 class PromptEngineImprovementTest extends TestCase
 {
     use RefreshDatabase;
 
     protected Site $site;
+
     protected Topic $topic;
+
     protected Prompt $prompt;
+
     protected AIProvider $provider;
+
     protected ContentPipeline $pipeline;
+
     protected PipelineRun $run;
+
     protected PromptEngine $promptEngine;
 
     protected function setUp(): void
@@ -93,7 +133,7 @@ class PromptEngineImprovementTest extends TestCase
     public function test_compile_research_context_renders_details_and_clusters(): void
     {
         $context = new PipelineContext($this->run, $this->pipeline);
-        
+
         $source1 = new SourceDTO(
             url: 'https://laravel.com/doc/12',
             title: 'Laravel 12 Docs',
@@ -106,7 +146,7 @@ class PromptEngineImprovementTest extends TestCase
 
         // Add topic cluster metadata
         $context->metadata['topic_clusters'] = [
-            'Modular Architecture' => ['https://laravel.com/doc/12']
+            'Modular Architecture' => ['https://laravel.com/doc/12'],
         ];
 
         $compiled = $this->promptEngine->compileResearchContext($context);
@@ -123,14 +163,14 @@ class PromptEngineImprovementTest extends TestCase
     public function test_compile_context_injection_renders_extracted_facts(): void
     {
         $context = new PipelineContext($this->run, $this->pipeline);
-        
+
         $facts = [
             'people' => ['Taylor Otwell'],
             'organizations' => ['Laravel LLC'],
             'locations' => ['USA'],
             'dates' => ['2026'],
             'events' => ['Laracon US 2026'],
-            'keywords' => ['PHP', 'Framework']
+            'keywords' => ['PHP', 'Framework'],
         ];
         $context->metadata['extracted_facts'] = $facts;
 
@@ -151,7 +191,7 @@ class PromptEngineImprovementTest extends TestCase
             'topic' => 'Laravel 12 Features',
             'website' => 'https://laravel-news.com',
             'language' => 'en',
-            'category' => 'Development'
+            'category' => 'Development',
         ];
 
         $compiled = $this->promptEngine->compileUserPrompt($template, $variables);
@@ -184,7 +224,7 @@ class PromptEngineImprovementTest extends TestCase
         $this->assertStringContainsString('Format the news article using clean, readable Markdown.', $default);
 
         $custom = $this->promptEngine->compileOutputInstructions([
-            'additional_output_instructions' => 'Include a brief conclusion.'
+            'additional_output_instructions' => 'Include a brief conclusion.',
         ]);
         $this->assertStringContainsString('Include a brief conclusion.', $custom);
     }
@@ -193,7 +233,7 @@ class PromptEngineImprovementTest extends TestCase
     {
         $context = new PipelineContext($this->run, $this->pipeline);
         $context->metadata['extracted_facts'] = [
-            'people' => ['Taylor Otwell']
+            'people' => ['Taylor Otwell'],
         ];
         $context->metadata['tone'] = 'informative';
 
@@ -210,5 +250,34 @@ class PromptEngineImprovementTest extends TestCase
         $this->assertStringContainsString('Dynamic Instructions:', $fullPrompt);
         $this->assertStringContainsString('Tone: Write with a informative tone.', $fullPrompt);
         $this->assertStringContainsString('Output Instructions:', $fullPrompt);
+    }
+
+    public function test_generator_requires_evidence_and_never_hardcodes_mutable_officeholders(): void
+    {
+        $driver = new PromptCapturingFakeDriver;
+        $providers = Mockery::mock(AIProviderService::class);
+        $providers->shouldReceive('getDriver')->andReturn($driver);
+        $collector = Mockery::mock(SourceCollectionService::class);
+        $collector->shouldReceive('scrapeArticleBody')->andReturn('Verified source report text.');
+        $generator = new ContentGeneratorService($providers, $this->promptEngine, $collector);
+
+        $withoutEvidence = new PipelineContext($this->run, $this->pipeline);
+        $generator->handle($withoutEvidence);
+        $this->assertFalse($withoutEvidence->hasErrors());
+        $this->assertSame(1, $driver->calls);
+        $this->assertStringContainsString('BACKGROUND ONLY', $driver->prompts[0]);
+        $this->assertStringContainsString('do not present any claim as current news', $driver->prompts[0]);
+
+        $withEvidence = new PipelineContext($this->run, $this->pipeline);
+        $withEvidence->metadata['selected_news'] = [
+            'title' => 'Verified current report',
+            'summary' => 'A source-backed summary.',
+            'source_references' => [['name' => 'Example', 'url' => 'https://example.com/report']],
+        ];
+        $generator->handle($withEvidence);
+
+        $this->assertSame(2, $driver->calls);
+        $this->assertStringContainsString('Verify every current officeholder', $driver->prompt);
+        $this->assertStringNotContainsString('President Joe Biden', $driver->prompt);
     }
 }

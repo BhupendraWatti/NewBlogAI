@@ -60,7 +60,13 @@ class LicenseService
             throw new \RuntimeException('This license key has expired.');
         }
 
-        if ($license->installations_count >= $license->max_installations && $license->domain !== $domain) {
+        $domain = $this->normalizeDomain($domain);
+        $installations = $this->installationsFor($license);
+        $existingIndex = collect($installations)->search(
+            fn (array $installation): bool => $installation['domain'] === $domain
+        );
+
+        if ($existingIndex === false && count($installations) >= $license->max_installations) {
             throw new \RuntimeException('Installation limit reached for this license key.');
         }
 
@@ -75,11 +81,24 @@ class LicenseService
             }
         }
 
+        $entry = [
+            'domain' => $domain,
+            'site_id' => $siteId,
+            'activated_at' => now()->toIso8601String(),
+        ];
+        if ($existingIndex === false) {
+            $installations[] = $entry;
+        } else {
+            $installations[$existingIndex] = array_merge($installations[$existingIndex], array_filter($entry));
+        }
+
         $license->update([
             'status' => 'active',
-            'domain' => $domain,
-            'site_id' => $siteId ?? $license->site_id,
-            'installations_count' => 1,
+            // Keep the legacy columns populated for older plugin clients.
+            'domain' => $installations[0]['domain'],
+            'site_id' => $installations[0]['site_id'] ?? $license->site_id,
+            'installations' => array_values($installations),
+            'installations_count' => count($installations),
         ]);
 
         return $license;
@@ -95,14 +114,23 @@ class LicenseService
             throw new InvalidArgumentException('License key not found.');
         }
 
-        if ($license->domain !== $domain) {
+        $domain = $this->normalizeDomain($domain);
+        $installations = $this->installationsFor($license);
+        $remaining = array_values(array_filter(
+            $installations,
+            fn (array $installation): bool => $installation['domain'] !== $domain
+        ));
+
+        if (count($remaining) === count($installations)) {
             throw new InvalidArgumentException('License key is not bound to this domain.');
         }
 
         $license->update([
-            'status' => 'inactive',
-            'domain' => null,
-            'installations_count' => 0,
+            'status' => $remaining === [] ? 'inactive' : 'active',
+            'domain' => $remaining[0]['domain'] ?? null,
+            'site_id' => $remaining[0]['site_id'] ?? null,
+            'installations' => $remaining,
+            'installations_count' => count($remaining),
         ]);
 
         return $license;
@@ -132,7 +160,11 @@ class LicenseService
             return ['valid' => false, 'reason' => 'License is inactive.'];
         }
 
-        if ($license->domain !== $domain) {
+        $domain = $this->normalizeDomain($domain);
+        $isInstalled = collect($this->installationsFor($license))->contains(
+            fn (array $installation): bool => $installation['domain'] === $domain
+        );
+        if (! $isInstalled) {
             return ['valid' => false, 'reason' => 'License domain mismatch.'];
         }
 
@@ -176,5 +208,30 @@ class LicenseService
         ]);
 
         return $license;
+    }
+
+    /** @return array<int, array{domain:string, site_id:?int, activated_at:?string}> */
+    private function installationsFor(PluginLicense $license): array
+    {
+        $installations = is_array($license->installations) ? $license->installations : [];
+        if ($installations === [] && $license->domain) {
+            $installations[] = [
+                'domain' => $this->normalizeDomain($license->domain),
+                'site_id' => $license->site_id,
+                'activated_at' => null,
+            ];
+        }
+
+        return $installations;
+    }
+
+    private function normalizeDomain(string $domain): string
+    {
+        $normalized = rtrim(strtolower(trim($domain)), '/');
+        if (! filter_var($normalized, FILTER_VALIDATE_URL)) {
+            throw new InvalidArgumentException('A valid license domain URL is required.');
+        }
+
+        return $normalized;
     }
 }

@@ -16,6 +16,7 @@ class PluginLicense extends Model
         'customer_id',
         'site_id',
         'domain',
+        'installations',
         'status', // active, inactive, expired, revoked
         'installations_count',
         'max_installations',
@@ -24,6 +25,7 @@ class PluginLicense extends Model
 
     protected $casts = [
         'expires_at' => 'datetime',
+        'installations' => 'array',
     ];
 
     public function customer(): BelongsTo

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\ContentPipeline\Services;
 
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -103,14 +104,14 @@ class ContentQualityFilterService
     /**
      * Score a single candidate array and return the quality score (0-100).
      *
-     * @param array{title: string, summary?: string|null, source_references?: array} $candidate
+     * @param  array{title: string, summary?: string|null, source_references?: array}  $candidate
      */
     public function score(array $candidate): int
     {
-        $score   = 100;
+        $score = 100;
         $reasons = [];
 
-        $title   = strtolower((string) ($candidate['title'] ?? ''));
+        $title = strtolower((string) ($candidate['title'] ?? ''));
         $summary = strtolower((string) ($candidate['summary'] ?? ''));
 
         // -- Gossip signals in title (heavier penalty) ----------------------
@@ -138,7 +139,7 @@ class ContentQualityFilterService
         }
 
         // -- No named source publisher --------------------------------------
-        $sources        = (array) ($candidate['source_references'] ?? []);
+        $sources = (array) ($candidate['source_references'] ?? []);
         $hasNamedSource = collect($sources)->contains(function ($src) {
             return ! empty($src['name']) && trim((string) $src['name']) !== '';
         });
@@ -154,6 +155,7 @@ class ContentQualityFilterService
         // grounding redirect proxies — these cannot be directly verified.
         $hasRealUrl = collect($sources)->contains(function ($src) {
             $url = (string) ($src['url'] ?? '');
+
             return str_starts_with($url, 'http')
                 && ! str_contains($url, 'google.com/grounding-api-redirect')
                 && ! str_contains($url, 'google.com/search?');
@@ -174,8 +176,8 @@ class ContentQualityFilterService
 
         if (! empty($reasons)) {
             Log::debug('ContentQualityFilterService: candidate penalised.', [
-                'title'   => mb_substr((string) ($candidate['title'] ?? ''), 0, 80),
-                'score'   => $finalScore,
+                'title' => mb_substr((string) ($candidate['title'] ?? ''), 0, 80),
+                'score' => $finalScore,
                 'reasons' => $reasons,
             ]);
         }
@@ -200,24 +202,69 @@ class ContentQualityFilterService
      */
     public function filter(array $candidates): array
     {
-        $passed   = [];
+        $passed = [];
         $rejected = [];
 
         foreach ($candidates as $candidate) {
-            $qualityScore              = $this->score($candidate);
+            $qualityScore = $this->score($candidate);
             $candidate['quality_score'] = $qualityScore;
 
-            if ($qualityScore >= self::MIN_QUALITY_SCORE) {
+            $freshnessReason = $this->freshnessRejectionReason($candidate);
+            if ($qualityScore >= self::MIN_QUALITY_SCORE && $freshnessReason === null) {
                 $passed[] = $candidate;
             } else {
+                if ($freshnessReason !== null) {
+                    $candidate['quality_rejection_reason'] = $freshnessReason;
+                }
                 $rejected[] = $candidate;
                 Log::info('ContentQualityFilterService: candidate rejected.', [
                     'title' => mb_substr((string) ($candidate['title'] ?? ''), 0, 80),
                     'score' => $qualityScore,
+                    'reason' => $freshnessReason ?? 'quality_score',
                 ]);
             }
         }
 
         return ['passed' => $passed, 'rejected' => $rejected];
+    }
+
+    private function freshnessRejectionReason(array $candidate): ?string
+    {
+        $eventDate = trim((string) ($candidate['event_date'] ?? ''));
+        $relative = trim((string) ($candidate['published_at_relative'] ?? ''));
+
+        if ($eventDate === '' && $relative === '') {
+            return 'freshness_unverified';
+        }
+
+        if ($relative !== '' && preg_match('/(\d+)\s*(min|minute|hour|hr|day|week|month)/i', $relative, $matches)) {
+            $value = (int) $matches[1];
+            $unit = strtolower($matches[2]);
+            $hours = match (true) {
+                str_starts_with($unit, 'min') => $value / 60,
+                str_starts_with($unit, 'h') => $value,
+                str_starts_with($unit, 'd') => $value * 24,
+                str_starts_with($unit, 'w') => $value * 24 * 7,
+                str_starts_with($unit, 'm') => $value * 24 * 30,
+                default => null,
+            };
+            if ($hours !== null && $hours > 48) {
+                return 'outside_48_hour_window';
+            }
+        }
+
+        if ($eventDate !== '') {
+            try {
+                $date = Carbon::parse($eventDate)->startOfDay();
+                $today = now()->startOfDay();
+                if ($date->gt($today) || $date->lt($today->copy()->subDay())) {
+                    return $date->gt($today) ? 'future_event' : 'outside_48_hour_window';
+                }
+            } catch (\Throwable) {
+                return 'invalid_event_date';
+            }
+        }
+
+        return null;
     }
 }

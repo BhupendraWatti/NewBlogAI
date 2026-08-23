@@ -10,7 +10,7 @@ class OllamaDriver implements AIProviderClientInterface
 {
     public function testConnection(string $apiKey, ?string $model = null): bool
     {
-        $host = $apiKey ?: 'http://localhost:11434';
+        $host = $this->resolveBaseUrl($apiKey);
         $model = $model ?: 'llama3';
 
         try {
@@ -39,7 +39,7 @@ class OllamaDriver implements AIProviderClientInterface
 
     public function generate(string $apiKey, string $prompt, ?string $model = null, array $options = []): array
     {
-        $host = $apiKey ?: 'http://localhost:11434';
+        $host = $this->resolveBaseUrl($apiKey);
         $model = $model ?: 'llama3';
 
         try {
@@ -83,7 +83,16 @@ class OllamaDriver implements AIProviderClientInterface
     public function getConfig(): array
     {
         return [
-            'base_url' => 'http://localhost:11434',
+            'base_url' => $this->resolveBaseUrl(''),
         ];
+    }
+
+    private function resolveBaseUrl(string $configuredProviderUrl): string
+    {
+        $baseUrl = filter_var($configuredProviderUrl, FILTER_VALIDATE_URL)
+            ? $configuredProviderUrl
+            : (string) config('services.ollama.base_url', 'http://localhost:11434');
+
+        return rtrim($baseUrl, '/');
     }
 }
