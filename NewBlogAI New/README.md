@@ -44,11 +44,11 @@ The application includes a health endpoint at `/up`. Browser smoke testing shoul
 
 ## Universal news prompt
 
-The production prompt is versioned in `app/Modules/PromptManager/Support/UniversalNewsPrompt.php`. It is installed or upgraded through the database migrations and supports these runtime variables:
+Create production prompts manually in the Prompt Library. The editor and generation pipeline support these runtime variables:
 
 `topic`, `headline`, `summary`, `category`, `language`, `website`, `tone`, `keywords`, `sources`, `date`, and `research_context`.
 
-The prompt is designed to keep every mutable claim inside retrieved evidence, apply inverted-pyramid reporting, distinguish current news from historical background, and produce search-friendly reporting without clickbait or keyword stuffing.
+Use `research_context` as the factual boundary, apply inverted-pyramid reporting, distinguish current news from historical background, and avoid clickbait or keyword stuffing.
 
 ## Production deployment
 
@@ -57,7 +57,7 @@ Follow [PRODUCTION.md](PRODUCTION.md) before exposing the application publicly. 
 ## Important directories
 
 - `app/Modules/ContentPipeline` — discovery, evidence collection, generation, quality, and publishing pipeline
-- `app/Modules/PromptManager` — prompt library and universal prompt definition
+- `app/Modules/PromptManager` — user-managed prompt library and runtime interpolation
 - `app/Modules/AIProviderManager` — provider drivers and credential routing
 - `app/Modules/SiteManager` — WordPress connectivity and synchronization
 - `wordpress-plugin` — companion WordPress integration

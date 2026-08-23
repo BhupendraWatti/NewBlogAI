@@ -7,7 +7,6 @@ use App\Models\User;
 use App\Modules\AIProviderManager\Models\AIProvider;
 use App\Modules\CustomerManager\Models\Customer;
 use App\Modules\PromptManager\Models\Prompt;
-use App\Modules\PromptManager\Support\UniversalNewsPrompt;
 use App\Modules\SiteManager\Models\Site;
 use App\Modules\SubscriptionManager\Models\Plan;
 use App\Modules\SubscriptionManager\Models\Subscription;
@@ -124,10 +123,9 @@ class DatabaseSeeder extends Seeder
 
         // Seed Prompts — must be 'active' for pipeline validation
         $prompt1 = Prompt::create([
-            'name' => UniversalNewsPrompt::NAME,
-            'prompt' => UniversalNewsPrompt::template(),
-            'variables' => UniversalNewsPrompt::variables(),
-            'version' => UniversalNewsPrompt::VERSION,
+            'name' => 'Standard Universal Article Generator',
+            'prompt' => 'You are a professional news journalist writing a comprehensive update on {{topic}}. Incorporate key insights and maintain an objective, engaging tone. Language: {{language}}. Website: {{website}}.',
+            'version' => 'v1.0',
             'status' => 'active',
         ]);
     }

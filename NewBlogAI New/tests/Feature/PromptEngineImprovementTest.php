@@ -15,7 +15,6 @@ use App\Modules\ContentPipeline\Services\ContentGeneratorService;
 use App\Modules\ContentPipeline\Services\PromptEngine;
 use App\Modules\ContentPipeline\Services\SourceCollectionService;
 use App\Modules\PromptManager\Models\Prompt;
-use App\Modules\PromptManager\Support\UniversalNewsPrompt;
 use App\Modules\SiteManager\Models\Site;
 use App\Modules\TopicManager\Models\Topic;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -201,18 +200,6 @@ class PromptEngineImprovementTest extends TestCase
             'Write about Laravel 12 Features for https://laravel-news.com in en under category Development.',
             $compiled
         );
-    }
-
-    public function test_universal_news_prompt_is_fact_anchored_and_uses_supported_variables(): void
-    {
-        $variables = array_fill_keys(UniversalNewsPrompt::variables(), 'verified input');
-        $compiled = $this->promptEngine->compileUserPrompt(UniversalNewsPrompt::template(), $variables);
-
-        $this->assertStringNotContainsString('{{', $compiled);
-        $this->assertStringContainsString('Treat the evidence as the boundary of truth', $compiled);
-        $this->assertStringContainsString('inverted pyramid', $compiled);
-        $this->assertStringContainsString('without clickbait', $compiled);
-        $this->assertStringContainsString('## Key Takeaways', $compiled);
     }
 
     public function test_compile_dynamic_instructions_based_on_context(): void

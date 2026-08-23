@@ -17,7 +17,7 @@ Ship readiness improved from **62/100** to **94/100**. The application passes it
 - Privileged dashboard APIs return successful responses for a super-admin session.
 - Desktop and 390px mobile layouts were exercised.
 - The mobile navigation drawer opens, closes after navigation, and leaves the newsroom workspace at full width.
-- The migrated `Standard Universal Article Generator` appears in Prompt Library as active version `v2.0`.
+- Prompt Library exposes all eleven runtime variables for manually maintained templates.
 - Unknown routes render a branded 404 with a recovery link.
 
 ## Defects fixed
@@ -33,7 +33,7 @@ Ship readiness improved from **62/100** to **94/100**. The application passes it
 
 ## Automated release gate
 
-- PHPUnit: **194 tests passed, 1,101 assertions**.
+- PHPUnit: **193 tests passed, 1,096 assertions**.
 - Vite: production build passed; CSS and JavaScript assets emitted successfully.
 - Laravel: migrations applied, `php artisan optimize` passed, `/up` returned HTTP 200.
 - Formatting: changed PHP production files and new tests pass Pint; `git diff --check` passes.
