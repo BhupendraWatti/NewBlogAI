@@ -38,6 +38,9 @@ final class CoverageNewsroomFakeDriver implements AIProviderClientInterface
     /** @var array<int, array> */
     public array $optionsHistory = [];
 
+    /** @var array<int, string> */
+    public array $promptsHistory = [];
+
     public function testConnection(string $apiKey, ?string $model = null): bool
     {
         return true;
@@ -52,6 +55,7 @@ final class CoverageNewsroomFakeDriver implements AIProviderClientInterface
     {
         $this->calls++;
         $this->optionsHistory[] = $options;
+        $this->promptsHistory[] = $prompt;
         $text = $this->responseQueue !== []
             ? array_shift($this->responseQueue)
             : $this->responseText;
@@ -195,6 +199,68 @@ class CoverageNewsroomWorkflowTest extends TestCase
         $this->assertEquals(0, $run->candidates()->count());
     }
 
+    public function test_unkeyed_requested_provider_does_not_block_discovery_queueing(): void
+    {
+        AIProvider::create([
+            'provider_key' => 'groq',
+            'name' => 'Groq without credentials',
+            'api_key' => null,
+            'default_model' => 'llama-3.3-70b-versatile',
+            'is_enabled' => true,
+        ]);
+
+        $run = app(PipelineService::class)->triggerDiscovery($this->pipeline, 'groq');
+
+        $this->assertSame('queued', $run->status);
+        $this->assertSame('groq', $run->properties['requested_discovery_provider_key']);
+        $this->assertArrayNotHasKey('discovery_provider_id', $run->properties);
+    }
+
+    public function test_grounded_provider_is_preferred_without_hiding_keyed_fallbacks(): void
+    {
+        $gemini = AIProvider::create([
+            'provider_key' => 'gemini',
+            'name' => 'Gemini',
+            'api_key' => 'gemini-key',
+            'default_model' => 'gemini-2.5-flash',
+            'is_enabled' => true,
+            'priority' => 1,
+        ]);
+
+        $providers = app(NewsDiscoveryService::class)->getAvailableProviders($gemini);
+
+        $this->assertSame('gemini', $providers->first()->provider_key);
+        $this->assertTrue($providers->contains(fn (AIProvider $provider) => $provider->provider_key === 'openai'));
+    }
+
+    public function test_discovery_terminalizes_clearly_when_no_provider_has_credentials(): void
+    {
+        AIProvider::query()->update(['api_key' => null]);
+        $run = PipelineRun::create([
+            'pipeline_id' => $this->pipeline->id,
+            'status' => 'queued',
+            'run_type' => PipelineRun::TYPE_DISCOVERY,
+            'properties' => [
+                'telemetry' => [
+                    'stage' => 'queued',
+                    'timeout_ms' => NewsDiscoveryService::REQUEST_TIMEOUT_SECONDS * 1000,
+                ],
+            ],
+        ]);
+
+        try {
+            app(NewsDiscoveryService::class)->discover($run);
+            $this->fail('Discovery should fail when every provider is unkeyed.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('at least one API key', $e->getMessage());
+        }
+
+        $run->refresh();
+        $this->assertSame('failed', $run->status);
+        $this->assertSame('failed', $run->properties['telemetry']['stage']);
+        $this->assertNotNull($run->completed_at);
+    }
+
     /**
      * Verify the discovery token budget is bounded.
      *
@@ -234,6 +300,10 @@ class CoverageNewsroomWorkflowTest extends TestCase
 
         $this->assertNotEmpty($this->fakeDriver->optionsHistory);
         $this->assertSame(0, $this->fakeDriver->optionsHistory[0]['thinking_budget']);
+        $this->assertSame(0, $this->fakeDriver->optionsHistory[0]['max_retries']);
+        $this->assertLessThanOrEqual(NewsDiscoveryService::REQUEST_TIMEOUT_SECONDS, $this->fakeDriver->optionsHistory[0]['timeout']);
+        $this->assertStringContainsString('2 to 4 concise factual sentences', $this->fakeDriver->promptsHistory[0]);
+        $this->assertStringContainsString('two independent credible publisher sources when available', $this->fakeDriver->promptsHistory[0]);
     }
 
     public function test_discovery_retries_when_gemini_returns_early_truncated_json(): void
@@ -284,6 +354,59 @@ class CoverageNewsroomWorkflowTest extends TestCase
 
         // Usage tracking: reservation updated to success with aggregated tokens.
         $this->assertDatabaseHas('ai_request_logs', ['status' => 'success', 'total_tokens' => 1200]);
+
+        $telemetry = $run->properties['telemetry'];
+        $this->assertSame('completed', $telemetry['stage']);
+        $this->assertSame(2, $telemetry['requests_completed']);
+        $this->assertSame(1200, $telemetry['tokens']['total']);
+        $this->assertEqualsWithDelta(0.02, $telemetry['estimated_cost_usd'], 0.000001);
+        $this->assertSame(NewsDiscoveryService::REQUEST_TIMEOUT_SECONDS * 1000, $telemetry['timeout_ms']);
+    }
+
+    public function test_city_focused_discovery_does_not_reject_its_own_city_stories(): void
+    {
+        $payload = array_map(
+            fn (array $candidate) => array_merge($candidate, [
+                'geo_city' => 'Ujjain',
+                'geo_state' => 'Madhya Pradesh',
+            ]),
+            array_slice($this->distinctCandidatesPayload(), 0, 9),
+        );
+        $this->fakeDriver->responseText = json_encode($payload);
+        $this->pipeline->update(['news_category' => 'Latest Ujjain news']);
+
+        $run = PipelineRun::create([
+            'pipeline_id' => $this->pipeline->id,
+            'status' => 'queued',
+            'run_type' => PipelineRun::TYPE_DISCOVERY,
+        ]);
+
+        (new GenerateNewsCandidatesJob($run->id))->handle(app(NewsDiscoveryService::class));
+
+        $run->refresh();
+        $this->assertSame(PipelineRun::STATUS_READY, $run->status);
+        $this->assertCount(9, $run->candidates);
+        $this->assertStringContainsString('multiple stories MAY share that location', $this->fakeDriver->promptsHistory[0]);
+        $this->assertStringNotContainsString('Each story MUST come from a DIFFERENT city', $this->fakeDriver->promptsHistory[0]);
+    }
+
+    public function test_queued_discovery_failure_is_contained_at_the_job_boundary(): void
+    {
+        $run = PipelineRun::create([
+            'pipeline_id' => $this->pipeline->id,
+            'status' => 'processing',
+            'run_type' => PipelineRun::TYPE_DISCOVERY,
+        ]);
+        $service = Mockery::mock(NewsDiscoveryService::class);
+        $service->shouldReceive('discover')
+            ->once()
+            ->andThrow(new \RuntimeException('provider output failed'));
+
+        (new GenerateNewsCandidatesJob($run->id))->handle($service);
+
+        $run->refresh();
+        $this->assertSame('failed', $run->status);
+        $this->assertSame('provider output failed', $run->error_message);
     }
 
     public function test_discovery_fails_explicitly_when_unique_candidates_fall_short(): void
@@ -297,16 +420,11 @@ class CoverageNewsroomWorkflowTest extends TestCase
             'run_type' => PipelineRun::TYPE_DISCOVERY,
         ]);
 
-        try {
-            (new GenerateNewsCandidatesJob($run->id))->handle(app(NewsDiscoveryService::class));
-            $this->fail('Expected discovery shortfall to throw.');
-        } catch (\RuntimeException $e) {
-            $this->assertStringContainsString('candidates', $e->getMessage());
-        }
+        (new GenerateNewsCandidatesJob($run->id))->handle(app(NewsDiscoveryService::class));
 
         $run->refresh();
         $this->assertEquals('failed', $run->status);
-        $this->assertNotNull($run->error_message);
+        $this->assertStringContainsString('candidates', $run->error_message);
         $this->assertEquals(0, $run->candidates()->count());
     }
 
@@ -326,14 +444,11 @@ class CoverageNewsroomWorkflowTest extends TestCase
             'run_type' => PipelineRun::TYPE_DISCOVERY,
         ]);
 
-        try {
-            (new GenerateNewsCandidatesJob($run->id))->handle(app(NewsDiscoveryService::class));
-            $this->fail('Expected stale discovery results to be rejected.');
-        } catch (\RuntimeException $e) {
-            $this->assertStringContainsString('candidates', $e->getMessage());
-        }
+        (new GenerateNewsCandidatesJob($run->id))->handle(app(NewsDiscoveryService::class));
 
-        $this->assertEquals('failed', $run->fresh()->status);
+        $run->refresh();
+        $this->assertEquals('failed', $run->status);
+        $this->assertStringContainsString('candidates', $run->error_message);
         $this->assertEquals(0, $run->candidates()->count());
     }
 

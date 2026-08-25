@@ -84,6 +84,28 @@
                                     Discover Top News Stories
                                 </button>
                                 <p class="text-[10px] text-muted text-center">Finds 9 real trending stories for you to choose from.</p>
+
+                                <div id="discovery-telemetry" class="hidden rounded-xl border border-border bg-background/60 p-3 space-y-2" aria-live="polite">
+                                    <div class="flex items-center justify-between gap-3">
+                                        <span id="discovery-telemetry-stage" class="text-[10px] font-mono uppercase tracking-wider text-accent">Queued</span>
+                                        <span id="discovery-telemetry-time" class="text-[10px] font-mono text-muted">0.0s / 300s</span>
+                                    </div>
+                                    <div class="grid grid-cols-3 gap-2 text-center">
+                                        <div class="rounded-lg bg-surface p-2">
+                                            <div id="discovery-telemetry-provider" class="text-xs font-bold truncate">Auto</div>
+                                            <div class="text-[9px] text-muted uppercase">Provider</div>
+                                        </div>
+                                        <div class="rounded-lg bg-surface p-2">
+                                            <div id="discovery-telemetry-tokens" class="text-xs font-bold">0</div>
+                                            <div class="text-[9px] text-muted uppercase">Reported tokens</div>
+                                        </div>
+                                        <div class="rounded-lg bg-surface p-2">
+                                            <div id="discovery-telemetry-cost" class="text-xs font-bold">$0.000000</div>
+                                            <div class="text-[9px] text-muted uppercase">Est. provider cost</div>
+                                        </div>
+                                    </div>
+                                    <p id="discovery-telemetry-requests" class="text-[9px] text-muted font-mono">0 provider responses completed</p>
+                                </div>
                             </div>
                         </div>
 

@@ -212,7 +212,8 @@ class PromptEngineImprovementTest extends TestCase
 
         $compiled = $this->promptEngine->compileDynamicInstructions($context);
 
-        $this->assertStringContainsString("Language: The news article must be written in language code 'fr'.", $compiled);
+        $this->assertStringContainsString("Language: Write the complete article in fr (code 'fr').", $compiled);
+        $this->assertStringContainsString('Translate every visible heading, label, bullet, caption, and disclosure', $compiled);
         $this->assertStringContainsString('Style Guide: Write in short paragraphs.', $compiled);
         $this->assertStringContainsString('Tone: Write with a professional and technical tone.', $compiled);
         $this->assertStringContainsString('Additional Guidelines: Add code examples where possible.', $compiled);
@@ -222,11 +223,40 @@ class PromptEngineImprovementTest extends TestCase
     {
         $default = $this->promptEngine->compileOutputInstructions();
         $this->assertStringContainsString('Format the news article using clean, readable Markdown.', $default);
+        $this->assertStringContainsString('Keep structure proportional to the verified evidence', $default);
+        $this->assertStringContainsString('every visible heading and label', $default);
+        $this->assertStringNotContainsString("Include a 'Key Takeaways'", $default);
+        $this->assertStringNotContainsString('followed by supporting sections', $default);
 
         $custom = $this->promptEngine->compileOutputInstructions([
             'additional_output_instructions' => 'Include a brief conclusion.',
         ]);
         $this->assertStringContainsString('Include a brief conclusion.', $custom);
+    }
+
+    public function test_summary_only_generation_requests_a_compact_non_repetitive_report(): void
+    {
+        $driver = new PromptCapturingFakeDriver;
+        $providers = Mockery::mock(AIProviderService::class);
+        $providers->shouldReceive('getDriver')->andReturn($driver);
+        $collector = Mockery::mock(SourceCollectionService::class);
+        $collector->shouldReceive('scrapeArticleBody')->andReturn('');
+        $generator = app()->makeWith(ContentGeneratorService::class, [
+            'providerService' => $providers,
+            'sourceCollector' => $collector,
+        ]);
+
+        $context = new PipelineContext($this->run, $this->pipeline);
+        $context->metadata['selected_news'] = [
+            'title' => 'Brief verified report',
+            'summary' => 'Only one source-backed sentence is available.',
+            'source_references' => [['name' => 'Example', 'url' => 'https://example.com/report']],
+        ];
+        $generator->handle($context);
+
+        $this->assertStringContainsString('SUMMARY-ONLY EVIDENCE MODE', $driver->prompt);
+        $this->assertStringContainsString('Do not use H2 headings', $driver->prompt);
+        $this->assertStringContainsString('Do not add a recap, summary bullets, or Key Takeaways', $driver->prompt);
     }
 
     public function test_build_full_prompt_combines_all_sections(): void
@@ -259,7 +289,12 @@ class PromptEngineImprovementTest extends TestCase
         $providers->shouldReceive('getDriver')->andReturn($driver);
         $collector = Mockery::mock(SourceCollectionService::class);
         $collector->shouldReceive('scrapeArticleBody')->andReturn('Verified source report text.');
-        $generator = new ContentGeneratorService($providers, $this->promptEngine, $collector);
+        $generator = new ContentGeneratorService(
+            $providers,
+            $this->promptEngine,
+            $collector,
+            app(\App\Modules\ContentPipeline\Services\ArticleStructureNormalizer::class),
+        );
 
         $withoutEvidence = new PipelineContext($this->run, $this->pipeline);
         $generator->handle($withoutEvidence);

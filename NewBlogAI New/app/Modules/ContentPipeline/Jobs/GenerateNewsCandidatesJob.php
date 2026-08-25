@@ -24,7 +24,8 @@ class GenerateNewsCandidatesJob implements ShouldQueue
     /** Discovery failures are surfaced on the run; retries go through the retry endpoint. */
     public int $tries = 1;
 
-    public int $timeout = 300;
+    /** Leave cleanup time after the service's 300-second request deadline. */
+    public int $timeout = 315;
 
     public function __construct(
         protected int $runId
@@ -48,7 +49,32 @@ class GenerateNewsCandidatesJob implements ShouldQueue
 
         Log::info("Coverage discovery started for pipeline ID {$run->pipeline_id} (Run ID {$this->runId}).");
 
-        // NewsDiscoveryService owns run status transitions and failure marking.
-        $discovery->discover($run);
+        // NewsDiscoveryService owns normal run status transitions. Contain the
+        // exception at this queued boundary: with the sync driver an exception
+        // escaping an afterResponse callback is appended to/corrupts the JSON
+        // HTTP response that already queued the run.
+        try {
+            $discovery->discover($run);
+        } catch (\Throwable $e) {
+            Log::error('Coverage discovery job failed.', [
+                'run_id' => $run->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            $run->refresh();
+            if ($run->status !== 'failed') {
+                $properties = $run->properties ?? [];
+                $properties['telemetry'] = array_merge($properties['telemetry'] ?? [], [
+                    'stage' => 'failed',
+                    'error' => $e->getMessage(),
+                ]);
+                $run->update([
+                    'status' => 'failed',
+                    'error_message' => $e->getMessage(),
+                    'properties' => $properties,
+                    'completed_at' => now(),
+                ]);
+            }
+        }
     }
 }

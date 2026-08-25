@@ -175,6 +175,7 @@ class PipelineService
         // ── Resolve the discovery provider model ─────────────────────────────
         $discoveryProviderModel = null;
         $resolvedProviderKey    = null;
+        $requestedProviderKey   = $discoveryProvider !== 'auto' ? $discoveryProvider : null;
 
         if ($discoveryProvider !== 'auto') {
             // Explicit provider requested — validate it exists and is enabled
@@ -182,17 +183,11 @@ class PipelineService
                 ->where('is_enabled', true)
                 ->first();
 
-            if (! $discoveryProviderModel) {
-                // Requested provider unavailable — warn and fall back to pipeline default
-                Log::warning("Discovery provider '{$discoveryProvider}' not available, falling back to pipeline provider.");
-                $discoveryProviderModel = $pipeline->provider;
-                $resolvedProviderKey    = $pipeline->provider->provider_key;
-            } else {
+            if ($discoveryProviderModel && ! empty($discoveryProviderModel->api_key)) {
                 $resolvedProviderKey = $discoveryProvider;
-            }
-
-            if (empty($discoveryProviderModel->api_key)) {
-                throw new InvalidArgumentException("Discovery provider '{$resolvedProviderKey}' has no API key configured.");
+            } else {
+                Log::warning("Discovery provider '{$discoveryProvider}' is unavailable or unkeyed; execution will try configured fallbacks.");
+                $discoveryProviderModel = null;
             }
         }
         // When $discoveryProvider === 'auto', we store no provider ID in run
@@ -201,20 +196,32 @@ class PipelineService
         // automatically tries every other enabled provider via failover.
 
         try {
-            return DB::transaction(function () use ($pipeline, $resolvedProviderKey, $discoveryProviderModel) {
-                $properties = [];
+            return DB::transaction(function () use ($pipeline, $resolvedProviderKey, $requestedProviderKey, $discoveryProviderModel) {
+                $properties = [
+                    'telemetry' => [
+                        'stage' => 'queued',
+                        'requests_completed' => 0,
+                        'tokens' => ['prompt' => 0, 'completion' => 0, 'total' => 0],
+                        'estimated_cost_usd' => 0.0,
+                        'cost_accuracy' => 'estimated_from_provider_usage',
+                        'elapsed_ms' => 0,
+                        'timeout_ms' => NewsDiscoveryService::REQUEST_TIMEOUT_SECONDS * 1000,
+                        'remaining_ms' => NewsDiscoveryService::REQUEST_TIMEOUT_SECONDS * 1000,
+                    ],
+                ];
+                if ($requestedProviderKey) {
+                    $properties['requested_discovery_provider_key'] = $requestedProviderKey;
+                }
                 if ($discoveryProviderModel) {
-                    $properties = [
-                        'discovery_provider_key' => $resolvedProviderKey,
-                        'discovery_provider_id'  => $discoveryProviderModel->id,
-                    ];
+                    $properties['discovery_provider_key'] = $resolvedProviderKey;
+                    $properties['discovery_provider_id'] = $discoveryProviderModel->id;
                 }
 
                 $run = PipelineRun::create([
                     'pipeline_id' => $pipeline->id,
                     'status'      => 'queued',
                     'run_type'    => PipelineRun::TYPE_DISCOVERY,
-                    'properties'  => $properties ?: null,
+                    'properties'  => $properties,
                     'user_id'     => auth()->id(),
                 ]);
 

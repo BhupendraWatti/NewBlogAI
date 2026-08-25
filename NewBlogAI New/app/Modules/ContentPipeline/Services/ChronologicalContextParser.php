@@ -454,7 +454,7 @@ You MUST follow these framing rules:
    - "Weeks after the [incident], authorities today announced..."
 3. Do NOT frame the article as if the original incident happened today. The incident is historical. The story today is the REACTION or RESPONSE to it.
 4. The headline and lead paragraph must reflect what is NEW TODAY — not what happened on {$rootDateFormatted}.
-5. In your Key Takeaways, clearly distinguish: (a) when the incident occurred, (b) what new development happened today.
+5. In the article body, clearly distinguish: (a) when the incident occurred, and (b) what new development happened today. Do not add a repetitive recap section.
 GUARDRAIL;
         }
 

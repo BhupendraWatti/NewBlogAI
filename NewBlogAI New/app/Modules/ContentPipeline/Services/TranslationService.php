@@ -67,7 +67,7 @@ class TranslationService implements TranslationInterface
                         // Translate content only if it is not already in the target language
                         $isContentAlreadyInTargetLanguage = ($context->metadata['content_language'] ?? 'en') === $targetLanguage;
                         if (!$isContentAlreadyInTargetLanguage) {
-                            $contentPrompt = "Translate the following article content to language code '{$targetLanguage}'. Preserve all markdown formatting, headings, and structure. Output ONLY the translated content:\n\n{$originalContent}";
+                        $contentPrompt = "Translate the following article content to language code '{$targetLanguage}'. Preserve markdown hierarchy, but translate EVERY visible heading, label, bullet, caption, and disclosure. Do not retain English structural labels in non-English output. Output ONLY the translated content:\n\n{$originalContent}";
                             $contentResult = $client->generate($apiKey, $contentPrompt, $provider->default_model, [
                                 'task' => 'translation_content',
                             ]);

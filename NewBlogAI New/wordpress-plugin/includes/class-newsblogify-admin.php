@@ -55,38 +55,6 @@ class Admin
         );
     }
 
-    private function validate_local_app_password($username, $password)
-    {
-        $user = get_user_by('login', $username);
-        if (! $user) {
-            $user = get_user_by('email', $username);
-        }
-
-        if (! $user) {
-            return new \WP_Error('invalid_username', __('WordPress username not found.', 'newsblogify-client'));
-        }
-
-        if (! class_exists('WP_Application_Passwords')) {
-            return new \WP_Error('disabled_app_passwords', __('Application passwords are not supported or active on this site.', 'newsblogify-client'));
-        }
-
-        $passwords = \WP_Application_Passwords::get_user_application_passwords($user->ID);
-        $validated = false;
-
-        foreach ($passwords as $app_password) {
-            if (wp_check_password($password, $app_password['password'], $user->ID)) {
-                $validated = true;
-                break;
-            }
-        }
-
-        if (! $validated) {
-            return new \WP_Error('invalid_app_password', __('WordPress validation failed. Please check your username and password.', 'newsblogify-client'));
-        }
-
-        return true;
-    }
-
     /**
      * Handle form submissions and administrative commands.
      */
@@ -128,23 +96,18 @@ class Admin
 
         if ($action === 'wizard_step2') {
             $site_name = sanitize_text_field($_POST['site_name']);
-            $wp_username = sanitize_text_field($_POST['wp_username']);
-            $wp_app_pwd = sanitize_text_field($_POST['wp_app_pwd']);
             $site_url = get_site_url();
             $backend_url = Config::get('backend_url', '');
             $api_token = Config::get('plugin_token', '');
+            $site_token = Config::get('site_token', '');
 
-            // Remove spaces from Application Password if any
-            $wp_app_pwd = str_replace(' ', '', $wp_app_pwd);
-
-            // Validate application password locally first
-            $validation = $this->validate_local_app_password($wp_username, $wp_app_pwd);
-            if (is_wp_error($validation)) {
-                $this->redirect_with_query(['error_msg' => urlencode($validation->get_error_message())]);
+            if (empty($site_token)) {
+                $site_token = wp_generate_password(64, false, false);
             }
 
-            // Register site on backend using client API
-            $res = API_Client::get_instance()->register_site($backend_url, $api_token, $site_name, $site_url, $wp_app_pwd);
+            // Register a plugin-specific site token. WordPress login credentials
+            // are intentionally never requested or transmitted.
+            $res = API_Client::get_instance()->register_site($backend_url, $api_token, $site_name, $site_url, $site_token);
 
             if (is_wp_error($res)) {
                 $this->redirect_with_query(['error_msg' => urlencode($res->get_error_message())]);
@@ -153,11 +116,6 @@ class Admin
             $site_id = isset($res['site_id']) ? $res['site_id'] : '';
             $config = isset($res['configuration']) ? $res['configuration'] : [];
 
-            Config::update('site_id', $site_id);
-            Config::update('site_name', $site_name);
-            Config::update('wp_username', $wp_username);
-            Config::update('wp_app_pwd', hash('sha256', $wp_app_pwd));
-            Config::update('wp_user_id', get_current_user_id());
             $posting_slot = isset($config['slot']) && is_scalar($config['slot'])
                 ? sanitize_text_field((string) $config['slot'])
                 : 'Daily';
@@ -168,14 +126,20 @@ class Admin
                 )))
                 : [];
             Config::update_many([
+                'site_id' => $site_id,
+                'site_name' => $site_name,
+                'site_token' => $site_token,
+                'wp_user_id' => get_current_user_id(),
                 'posting_slot' => $posting_slot,
                 'publishing_mode' => $posting_slot,
                 'selected_topics' => $selected_topics,
                 'synced_topics' => $selected_topics,
+                'connection_status' => 'connected',
+                'last_sync_time' => current_time('mysql'),
+                'wizard_step' => 'completed',
             ]);
-            Config::update('connection_status', 'connected');
-            Config::update('last_sync_time', current_time('mysql'));
-            Config::update('wizard_step', 'completed');
+            Config::delete('wp_username');
+            Config::delete('wp_app_pwd');
 
             Logger::get_instance()->log('info', 'Setup Wizard completed. Site registered: '.$site_id);
             $this->redirect_with_query([]);

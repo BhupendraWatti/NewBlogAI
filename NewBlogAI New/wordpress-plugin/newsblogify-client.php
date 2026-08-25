@@ -30,7 +30,7 @@ if (! defined('ABSPATH')) {
 // ---------------------------------------------------------------------------
 
 if (! defined('NEWSBLOGIFY_VERSION')) {
-    define('NEWSBLOGIFY_VERSION', '2.1.0');
+    define('NEWSBLOGIFY_VERSION', '2.1.1');
 }
 
 if (! defined('NEWSBLOGIFY_PATH')) {

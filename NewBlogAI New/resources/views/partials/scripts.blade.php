@@ -4561,6 +4561,51 @@
     let lastGeneratedArticleId = null;
     let currentPipelineId = null;
     let currentRunId = null;
+    let latestDiscoveryTelemetry = null;
+    let discoveryTelemetryReceivedAt = 0;
+
+    function renderDiscoveryTelemetry(runOrTelemetry, forceStage = null) {
+        const panel = document.getElementById('discovery-telemetry');
+        if (!panel) return;
+
+        const telemetry = runOrTelemetry?.telemetry
+            ?? runOrTelemetry?.properties?.telemetry
+            ?? runOrTelemetry
+            ?? {};
+        const stage = forceStage ?? telemetry.stage ?? 'queued';
+        latestDiscoveryTelemetry = { ...telemetry, stage };
+        discoveryTelemetryReceivedAt = Date.now();
+        panel.classList.remove('hidden');
+
+        const provider = telemetry.current_provider ?? 'Auto failover';
+        const elapsedMs = Number(telemetry.elapsed_ms ?? 0);
+        const timeoutMs = Number(telemetry.timeout_ms ?? 300000);
+        const tokens = Number(telemetry.tokens?.total ?? 0);
+        const cost = Number(telemetry.estimated_cost_usd ?? 0);
+        const requests = Number(telemetry.requests_completed ?? 0);
+
+        document.getElementById('discovery-telemetry-stage').textContent = stage.replaceAll('_', ' ');
+        document.getElementById('discovery-telemetry-provider').textContent = provider;
+        document.getElementById('discovery-telemetry-time').textContent = `${(elapsedMs / 1000).toFixed(1)}s / ${Math.round(timeoutMs / 1000)}s`;
+        document.getElementById('discovery-telemetry-tokens').textContent = tokens.toLocaleString();
+        document.getElementById('discovery-telemetry-cost').textContent = `$${cost.toFixed(6)}`;
+        document.getElementById('discovery-telemetry-requests').textContent = `${requests} provider response${requests === 1 ? '' : 's'} completed · cost is estimated from provider-reported usage`;
+    }
+
+    // Keep the elapsed clock live between API polls. Token and cost figures only
+    // advance after a provider response because non-streaming APIs expose no
+    // accurate usage before then.
+    setInterval(() => {
+        if (!latestDiscoveryTelemetry || ['completed', 'failed'].includes(latestDiscoveryTelemetry.stage)) return;
+        const extraMs = Date.now() - discoveryTelemetryReceivedAt;
+        renderDiscoveryTelemetry({
+            ...latestDiscoveryTelemetry,
+            elapsed_ms: Math.min(
+                Number(latestDiscoveryTelemetry.timeout_ms ?? 300000),
+                Number(latestDiscoveryTelemetry.elapsed_ms ?? 0) + extraMs,
+            ),
+        });
+    }, 1000);
 
     // ── Step 1: Discover 9 trending news stories ──────────────────────────────
     window.triggerDiscover = async function () {
@@ -4575,6 +4620,7 @@
         if (!siteId || !provider || !category || !promptId) return;
 
         if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">autorenew</span> Discovering stories...'; }
+        renderDiscoveryTelemetry({ stage: 'queued', elapsed_ms: 0, timeout_ms: 300000, requests_completed: 0, tokens: { total: 0 }, estimated_cost_usd: 0 });
 
         try {
             // Create a pipeline
@@ -4600,8 +4646,9 @@
             const newPipe = await readApiJson(createRes, 'Failed to create pipeline.');
             currentPipelineId = newPipe.data?.id ?? newPipe.id;
 
-            // Run discovery (use Groq for fast, free discovery)
-            const discoveryProvider = document.getElementById('gen-discovery-provider')?.value || 'groq';
+            // Provider eligibility and failover are resolved server-side from
+            // the visible pipeline selection. Never inject a hidden default.
+            const discoveryProvider = 'auto';
             const discoverRes = await apiFetch(`/api/v1/pipelines/${currentPipelineId}/discover`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -4613,6 +4660,7 @@
             }
             const discoverData = await readApiJson(discoverRes, 'Discovery failed.');
             currentRunId = discoverData.data?.id ?? discoverData.data?.run_id ?? discoverData.run_id ?? null;
+            renderDiscoveryTelemetry(discoverData.data ?? discoverData);
 
             // The discovery job may run after the HTTP response when the queue
             // driver is sync, so always poll the returned run until it is ready.
@@ -4626,12 +4674,13 @@
             }
         } catch (err) {
             console.error('Discover error:', err);
+            renderDiscoveryTelemetry(latestDiscoveryTelemetry, 'failed');
             showError('Discovery Failed', err.message || 'Could not discover news stories.');
             if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined text-sm">travel_explore</span> Discover Top News Stories'; }
         }
     };
 
-    async function pollForCandidates(pipelineId, maxAttempts = 20, intervalMs = 3000) {
+    async function pollForCandidates(pipelineId, maxAttempts = 105, intervalMs = 3000) {
         for (let i = 0; i < maxAttempts; i++) {
             await new Promise(r => setTimeout(r, intervalMs));
             try {
@@ -4639,6 +4688,8 @@
                 if (runsRes.ok) {
                     const runsData = await readApiJson(runsRes, 'Could not load discovery run status.');
                     const runs = runsData.data ?? runsData;
+                    const active = Array.isArray(runs) ? runs.find(r => ['queued', 'processing'].includes(r.status)) : null;
+                    if (active) renderDiscoveryTelemetry(active);
                     const ready = Array.isArray(runs) ? runs.find(r => r.status === 'ready' || r.status === 'completed') : null;
                     if (ready) {
                         currentRunId = ready.id;
@@ -4655,7 +4706,7 @@
         throw new Error('Discovery timed out. Check AI provider configuration.');
     }
 
-    async function pollRunForCandidates(runId, maxAttempts = 30, intervalMs = 3000) {
+    async function pollRunForCandidates(runId, maxAttempts = 105, intervalMs = 3000) {
         for (let i = 0; i < maxAttempts; i++) {
             const loaded = await loadCandidates(runId, false);
             if (loaded) return;
@@ -4674,6 +4725,7 @@
         const data = await readApiJson(res, 'Could not load news candidates.');
         const run = data.data?.run ?? null;
         const candidates = data.data?.candidates ?? data.data ?? data;
+        if (run) renderDiscoveryTelemetry(run);
 
         if (run?.status === 'failed') {
             throw new Error(run.error_message || 'Discovery run failed.');
@@ -5042,7 +5094,13 @@
         });
     }
 
-    window.resetToStep1 = function () { setStep(1); currentPipelineId = null; currentRunId = null; };
+    window.resetToStep1 = function () {
+        setStep(1);
+        currentPipelineId = null;
+        currentRunId = null;
+        latestDiscoveryTelemetry = null;
+        document.getElementById('discovery-telemetry')?.classList.add('hidden');
+    };
     window.resetToStep2 = function () { setStep(2); };
 
     // ── Form validation — enable discover button ───────────────────────────────

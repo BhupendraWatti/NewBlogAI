@@ -54,7 +54,13 @@ class REST_Controller
             $token = $request->get_param('api_key');
         }
 
-        $stored_token = Config::get('plugin_token', '');
+        $stored_token = Config::get('site_token', '');
+
+        // Existing installations used the account token for both directions.
+        // Keep that fallback until they reconnect and receive a per-site token.
+        if (empty($stored_token)) {
+            $stored_token = Config::get('plugin_token', '');
+        }
 
         if (empty($stored_token)) {
             return new \WP_Error(

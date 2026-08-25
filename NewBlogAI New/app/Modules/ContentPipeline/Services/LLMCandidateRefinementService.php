@@ -159,6 +159,8 @@ class LLMCandidateRefinementService
             'completion_tokens' => 0,
             'total_tokens' => 0,
             'estimated_cost' => 0.0,
+            'provider' => null,
+            'model' => null,
         ];
 
         if (empty($rawCandidates)) {
@@ -216,6 +218,8 @@ class LLMCandidateRefinementService
                 'completion_tokens' => (int) ($result['completion_tokens'] ?? 0),
                 'total_tokens' => (int) ($result['total_tokens'] ?? 0),
                 'estimated_cost' => (float) ($result['estimated_cost'] ?? 0.0),
+                'provider' => $provider->provider_key,
+                'model' => $model,
             ];
 
         } catch (\Throwable $e) {

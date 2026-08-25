@@ -32,7 +32,7 @@ if (! defined('ABSPATH')) {
             <?php wp_nonce_field('newsblogify_admin_nonce_action', 'newsblogify_admin_nonce'); ?>
             <input type="hidden" name="newsblogify_action" value="wizard_step2" />
 
-            <p style="margin-top:0; color: #646970; font-size: 14px;"><?php esc_html_e('Review and submit your local site metadata to establish remote posting verification.', 'newsblogify-client'); ?></p>
+            <p style="margin-top:0; color: #646970; font-size: 14px;"><?php esc_html_e('Review your site details. NewsBlogify will generate a secure, site-specific connection token automatically.', 'newsblogify-client'); ?></p>
 
             <table class="newsblogify-wizard-table">
                 <tr>
@@ -43,21 +43,11 @@ if (! defined('ABSPATH')) {
                     <td class="label-column"><label><?php esc_html_e('Website Public URL', 'newsblogify-client'); ?></label></td>
                     <td><input type="text" class="newsblogify-wizard-input" value="<?php echo esc_url(get_site_url()); ?>" readonly /></td>
                 </tr>
-                <tr>
-                    <td class="label-column"><label><?php esc_html_e('WordPress Username', 'newsblogify-client'); ?></label></td>
-                    <td><input type="text" class="newsblogify-wizard-input" name="wp_username" value="admin" required /></td>
-                </tr>
-                <tr>
-                    <td class="label-column"><label><?php esc_html_e('WordPress App Password', 'newsblogify-client'); ?></label></td>
-                    <td>
-                        <input type="password" class="newsblogify-wizard-input" name="wp_app_pwd" placeholder="xxxx xxxx xxxx xxxx xxxx xxxx" required />
-                        <p class="description" style="margin-top: 6px; font-size: 11px;">
-                            <strong><?php esc_html_e('Why is this required?', 'newsblogify-client'); ?></strong><br>
-                            <?php esc_html_e('WordPress disallows using your regular password to call REST APIs. You must generate an Application Password under Users -> Profile -> Application Passwords.', 'newsblogify-client'); ?>
-                        </p>
-                    </td>
-                </tr>
             </table>
+
+            <p class="description" style="margin-top: 12px;">
+                <?php esc_html_e('Your WordPress username and password are not required and never leave this site.', 'newsblogify-client'); ?>
+            </p>
 
             <div style="display: flex; justify-content: space-between; flex-direction: row-reverse; margin-top: 25px;">
                 <button type="submit" class="button button-primary button-large"><?php esc_html_e('Register &amp; Finish Setup', 'newsblogify-client'); ?></button>

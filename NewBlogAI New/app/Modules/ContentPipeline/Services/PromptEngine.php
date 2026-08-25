@@ -158,7 +158,8 @@ GUARD;
         // Language guidelines
         $language = $context->metadata['language'] ?? $context->pipeline->language ?? null;
         if ($language) {
-            $instructions[] = "Language: The news article must be written in language code '{$language}'.";
+            $languageName = ['en' => 'English', 'hi' => 'Hindi'][$language] ?? $language;
+            $instructions[] = "Language: Write the complete article in {$languageName} (code '{$language}'). Translate every visible heading, label, bullet, caption, and disclosure into this language; do not leave English structural labels in non-English output.";
         }
 
         // Category context
@@ -221,9 +222,13 @@ GUARD;
     /**
      * Formats final markdown instructions.
      */
-    public function compileOutputInstructions(array $options = []): string
+    public function compileOutputInstructions(array $options = [], ?PipelineContext $context = null): string
     {
-        $instructions = $options['instructions'] ?? "Format the news article using clean, readable Markdown. Structure with a compelling headline (# H1), a concise lead paragraph answering Who/What/When/Where/Why, followed by supporting sections (## H2 subheadings). Use short paragraphs (2-3 sentences). Include a 'Key Takeaways' bullet list at the end. Do not output HTML tags. Do not wrap in markdown code blocks. Output only the raw Markdown content of the news article.";
+        $instructions = $options['instructions'] ?? "Format the news article using clean, readable Markdown. Keep structure proportional to the verified evidence. Use one accurate # headline and a concise lead, then advance the reporting with new facts in each paragraph. Use ## headings only when the evidence supports genuinely distinct, substantial sections; do not create a heading for a single short paragraph. Do not add a Key Takeaways, recap, summary, conclusion, or bullet list that repeats the article. Avoid repeating facts from the headline or lead. Use bold sparingly—never bold full paragraphs or routine facts. Write every visible heading and label in the requested article language. Do not output HTML tags or markdown code fences. Output only the raw Markdown article.";
+
+        if (($context?->metadata['evidence_mode'] ?? null) === 'summary_only') {
+            $instructions .= "\nSUMMARY-ONLY EVIDENCE MODE: The source body could not be retrieved. Produce a compact brief using only the verified headline and summary. Do not use H2 headings. Do not use bullet points. Do not add a recap, summary bullets, or Key Takeaways. Do not repeat the same fact in different wording. Explicitly say that further details are unavailable only when needed for clarity.";
+        }
         
         if (isset($options['additional_output_instructions'])) {
             $instructions .= ' '.$options['additional_output_instructions'];
@@ -245,7 +250,7 @@ GUARD;
         $contextInjection = $this->compileContextInjection($context);
         $userPrompt = $this->compileUserPrompt($userTemplate, $variables);
         $dynamicInstructions = $this->compileDynamicInstructions($context);
-        $outputInstructions = $this->compileOutputInstructions($options);
+        $outputInstructions = $this->compileOutputInstructions($options, $context);
 
         return implode("\n\n", [
             "System Prompt:\n" . $systemPrompt,

@@ -15,7 +15,8 @@ class ContentGeneratorService implements ContentGeneratorInterface
     public function __construct(
         protected AIProviderService $providerService,
         protected PromptEngine $promptEngine,
-        protected SourceCollectionService $sourceCollector
+        protected SourceCollectionService $sourceCollector,
+        protected ArticleStructureNormalizer $structureNormalizer,
     ) {}
 
     /**
@@ -139,6 +140,7 @@ class ContentGeneratorService implements ContentGeneratorInterface
 
                 $scrapedBody = implode("\n\n---\n\n", $scrapedParts);
                 $context->metadata['scraped_article_body'] = $scrapedBody;
+                $context->metadata['evidence_mode'] = $scrapedBody === '' ? 'summary_only' : 'detailed';
                 $variables['research_context'] = $scrapedBody
                     ?: 'No article body could be retrieved from the source URLs. Write only what is verifiable from the headline and summary above. Do NOT invent facts, quotes, or statistics.';
 
@@ -244,6 +246,11 @@ class ContentGeneratorService implements ContentGeneratorInterface
 
             // 5. Structure results into context
             $context->generatedContent = $result['text'];
+            $context->generatedContent = $this->structureNormalizer->normalize(
+                (string) $context->generatedContent,
+                $language,
+                ($context->metadata['evidence_mode'] ?? null) === 'summary_only',
+            );
 
             // Title: Category News — Date  (news-appropriate format)
             $title = "{$categoryLabel} News: ".now()->format('F j, Y');

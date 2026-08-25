@@ -141,14 +141,14 @@ class API_Client
     /**
      * Register website details on Laravel backend.
      */
-    public function register_site($backend_url, $api_token, $site_name, $site_url, $wp_app_pwd)
+    public function register_site($backend_url, $api_token, $site_name, $site_url, $site_token)
     {
         $url = rtrim($backend_url, '/').'/api/v1/plugin/register-website';
 
         $payload = [
             'domain_url' => $site_url,
             'name' => $site_name,
-            'api_key' => $wp_app_pwd,
+            'api_key' => $site_token,
             'slot' => 'Daily',
         ];
 

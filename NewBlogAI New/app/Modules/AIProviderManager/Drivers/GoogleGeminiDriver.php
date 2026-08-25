@@ -135,7 +135,7 @@ class GoogleGeminiDriver implements AIProviderClientInterface
         array $options,
         callable $apiCall
     ): array {
-        $maxRetries = 3;
+        $maxRetries = max(0, (int) ($options['max_retries'] ?? 3));
         $lastException = null;
 
         for ($retry = 0; $retry <= $maxRetries; $retry++) {

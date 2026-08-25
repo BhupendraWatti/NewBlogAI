@@ -7,6 +7,7 @@ use App\Modules\SiteManager\Models\Site;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class WebsiteManagementTest extends TestCase
@@ -46,6 +47,22 @@ class WebsiteManagementTest extends TestCase
         $site = Site::where('domain_url', 'https://testsite.com')->firstOrFail();
         $this->assertEquals('wp-api-token-12345', $site->api_key); // Eloquent automatically decrypts via casting
         $this->assertNotEquals('wp-api-token-12345', DB::table('sites')->where('domain_url', 'https://testsite.com')->first()->api_key); // raw DB contains encrypted text
+    }
+
+    public function test_site_api_key_column_can_store_long_encrypted_tokens(): void
+    {
+        $this->assertSame('text', Schema::getColumnType('sites', 'api_key'));
+
+        $token = str_repeat('a', 64);
+        $site = Site::create([
+            'domain_url' => 'https://secure-token.example.com',
+            'api_key' => $token,
+            'is_active' => true,
+        ]);
+
+        $this->assertSame($token, $site->fresh()->api_key);
+        $storedToken = DB::table('sites')->where('id', $site->id)->value('api_key');
+        $this->assertGreaterThan(255, strlen($storedToken));
     }
 
     public function test_cannot_set_inactive_site_as_default(): void

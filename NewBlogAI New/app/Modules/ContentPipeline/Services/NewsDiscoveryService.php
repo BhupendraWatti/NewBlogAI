@@ -9,6 +9,7 @@ use App\Modules\AIProviderManager\Services\AIProviderService;
 use App\Modules\AIProviderManager\Support\ProviderErrorClassifier;
 use App\Modules\ContentPipeline\Models\NewsCandidate;
 use App\Modules\ContentPipeline\Models\PipelineRun;
+use App\Modules\ContentPipeline\Support\DiscoveryRunTelemetry;
 use App\Modules\ContentPipeline\Support\PipelineErrorFormatter;
 use App\Modules\SubscriptionManager\Services\EntitlementService;
 use Carbon\Carbon;
@@ -27,6 +28,9 @@ use RuntimeException;
  */
 class NewsDiscoveryService
 {
+    /** Absolute wall-clock budget shared by every provider and retry. */
+    public const REQUEST_TIMEOUT_SECONDS = 300;
+
     /** The newsroom contract: exactly this many candidates per coverage run. */
     public const CANDIDATE_TARGET = 9;
 
@@ -91,7 +95,7 @@ class NewsDiscoveryService
      */
     public function discover(PipelineRun $run): void
     {
-        @set_time_limit(300); // 5 minutes execution limit for candidate discovery
+        @set_time_limit(self::REQUEST_TIMEOUT_SECONDS + 5);
 
         if (! $run->isDiscovery()) {
             throw new RuntimeException("Run ID {$run->id} is not a discovery run.");
@@ -133,10 +137,27 @@ class NewsDiscoveryService
         $availableProviders = $this->getAvailableProviders($preferredProvider);
 
         if ($availableProviders->isEmpty()) {
-            throw new RuntimeException('No AI providers are enabled and configured. Please add at least one API key in AI Providers.');
+            $message = 'No AI providers are enabled and configured. Please add at least one API key in AI Providers.';
+            $properties = $run->properties ?? [];
+            $properties['telemetry'] = array_merge($properties['telemetry'] ?? [], [
+                'stage' => 'failed',
+                'error' => $message,
+                'remaining_ms' => 0,
+            ]);
+            $run->update([
+                'status' => 'failed',
+                'error_message' => $message,
+                'properties' => $properties,
+                'completed_at' => now(),
+            ]);
+
+            // Waiting cannot make a credential appear. The important contract
+            // is that one unkeyed preference never blocks other keyed Adapters.
+            throw new RuntimeException($message);
         }
 
         $reservation = null;
+        $telemetry = null;
         $startTime = microtime(true);
 
         try {
@@ -155,6 +176,7 @@ class NewsDiscoveryService
                 null,
                 $reservationProvider->id,
             );
+            $telemetry = new DiscoveryRunTelemetry($run, $reservation, self::REQUEST_TIMEOUT_SECONDS);
 
             $site->loadMissing('customer');
             $country = $pipeline->target_country ?: ($site->customer?->country ?? null);
@@ -167,6 +189,7 @@ class NewsDiscoveryService
                 $availableProviders,
                 $category,
                 $language,
+                $telemetry,
                 $country,
             );
 
@@ -195,21 +218,17 @@ class NewsDiscoveryService
                     ]);
                 }
 
-                $run->update(['status' => PipelineRun::STATUS_READY]);
+                $run->update([
+                    'status' => PipelineRun::STATUS_READY,
+                    'completed_at' => now(),
+                ]);
             });
 
+            $telemetry->complete($usedProviderKey);
+
             $reservation?->update([
-                'prompt_tokens' => $totalTokens['prompt'] ?: null,
-                'completion_tokens' => $totalTokens['completion'] ?: null,
-                'total_tokens' => $totalTokens['total'] ?: null,
-                'estimated_cost' => $totalCost,
                 'execution_time_ms' => (int) ((microtime(true) - $startTime) * 1000),
                 'status' => 'success',
-                'response_metadata' => [
-                    'run_type' => PipelineRun::TYPE_DISCOVERY,
-                    'run_id' => $run->id,
-                    'provider_used' => $usedProviderKey,
-                ],
             ]);
 
             Log::info('NewsDiscoveryService: discovery run ready for employee selection.', [
@@ -218,11 +237,11 @@ class NewsDiscoveryService
                 'provider_used' => $usedProviderKey,
             ]);
         } catch (\Exception $e) {
+            $telemetry?->fail($e->getMessage());
             $reservation?->update([
                 'status' => 'failed',
                 'error_log' => $e->getMessage(),
                 'execution_time_ms' => (int) ((microtime(true) - $startTime) * 1000),
-                'response_metadata' => ['run_type' => PipelineRun::TYPE_DISCOVERY, 'run_id' => $run->id],
             ]);
 
             $run->update([
@@ -263,18 +282,13 @@ class NewsDiscoveryService
             return $p->status === 'healthy';
         });
 
-        // Rule 21 & Grounded Search Router: Newsroom Candidate Discovery requires real-time
-        // search grounding. Filter available discovery providers to those that support grounding.
-        $grounded = $healthy->filter(fn (AIProvider $p) => $p->supportsGrounding());
-
-        // Fallback to healthy if no grounded provider is configured (will throw clear runtime error downstream)
-        $candidates = $grounded->isNotEmpty() ? $grounded : $healthy;
-
-        // Sort by priority ascending, then preferred first
-        $sorted = $candidates->sortBy(function (AIProvider $p) use ($preferred) {
+        // Grounded Adapters are preferred for current-news accuracy, but must
+        // never hide other keyed healthy Adapters from the failover list.
+        $sorted = $healthy->sortBy(function (AIProvider $p) use ($preferred) {
+            $isGrounded = $p->supportsGrounding() ? 0 : 1;
             $isPreferred = ($preferred && $p->id === $preferred->id) ? 0 : 1;
 
-            return [$p->priority, $isPreferred, $p->id];
+            return [$isGrounded, $isPreferred, $p->priority, $p->id];
         })->values();
 
         return $sorted;
@@ -299,6 +313,7 @@ class NewsDiscoveryService
         Collection $providers,
         string $category,
         string $language,
+        DiscoveryRunTelemetry $telemetry,
         ?string $country = null,
     ): array {
         $allErrors = [];
@@ -308,6 +323,7 @@ class NewsDiscoveryService
 
             for ($attempt = 1; $attempt <= self::FAILOVER_MAX_ATTEMPTS; $attempt++) {
                 try {
+                    $telemetry->beginAttempt($provider, $attempt);
                     Log::info('NewsDiscoveryService: Trying provider.', [
                         'run_id' => $run->id,
                         'provider' => $providerKey,
@@ -320,6 +336,7 @@ class NewsDiscoveryService
                         $provider,
                         $category,
                         $language,
+                        $telemetry,
                         $country,
                     );
 
@@ -336,6 +353,7 @@ class NewsDiscoveryService
                     $allErrors[$providerKey][] = "attempt {$attempt}: {$errorMsg}";
 
                     $provider->handleFailure($e);
+                    $telemetry->recordFailure($provider, $attempt, $errorMsg);
 
                     Log::warning('NewsDiscoveryService: Provider attempt failed.', [
                         'run_id' => $run->id,
@@ -363,6 +381,11 @@ class NewsDiscoveryService
                     // Exponential back-off between retries (not after the last attempt)
                     if ($attempt < self::FAILOVER_MAX_ATTEMPTS) {
                         $delaySeconds = self::FAILOVER_BASE_DELAY_SECONDS ** $attempt; // 2, 4, 8
+                        $delaySeconds = min($delaySeconds, max(0, $telemetry->remainingSeconds() - 1));
+                        if ($delaySeconds <= 0) {
+                            $telemetry->assertWithinDeadline();
+                            break;
+                        }
                         Log::debug("NewsDiscoveryService: Backing off {$delaySeconds}s before next attempt.");
                         sleep($delaySeconds);
                     }
@@ -399,6 +422,7 @@ class NewsDiscoveryService
         AIProvider $provider,
         string $category,
         string $language,
+        DiscoveryRunTelemetry $telemetry,
         ?string $country = null,
     ): array {
         $excludedTitles = [];
@@ -409,6 +433,7 @@ class NewsDiscoveryService
         $site = $run->pipeline->site;
 
         for ($attempt = 1; $attempt <= self::MAX_ATTEMPTS && count($unique) < self::CANDIDATE_TARGET; $attempt++) {
+            $telemetry->assertWithinDeadline();
             $needed = min(self::DISCOVERY_BATCH_SIZE, self::CANDIDATE_TARGET - count($unique));
             $promptText = $this->buildDiscoveryPrompt(
                 $category,
@@ -439,7 +464,10 @@ class NewsDiscoveryService
                 [
                     'max_tokens' => self::DISCOVERY_MAX_TOKENS,
                     'temperature' => 0.2,
-                    'timeout' => 300,
+                    'timeout' => $telemetry->remainingSeconds(),
+                    // The execution Module owns retries so nested Adapter
+                    // backoffs cannot overrun the single run deadline.
+                    'max_retries' => 0,
                     'tools' => $tools,
                     // Gemini 2.5 Flash defaults to dynamic thinking. For a
                     // grounded JSON extraction call, hidden reasoning can
@@ -450,6 +478,14 @@ class NewsDiscoveryService
                     // INVALID_ARGUMENT: "Tool use with a response mime type: 'application/json'
                     // is unsupported". parseCandidates() extracts JSON from free-text safely.
                 ]
+            );
+
+            // Persist provider-reported usage immediately. This retains paid
+            // calls even if parsing or a later provider attempt fails.
+            $telemetry->recordResponse(
+                $provider->provider_key,
+                $provider->default_model,
+                $result,
             );
 
             // Update rate limits in database
@@ -498,6 +534,15 @@ class NewsDiscoveryService
             $refinementResult = $this->llmRefiner->refine($parsed, $provider, $category, $country);
             $parsed = $refinementResult['candidates'];
 
+            if (($refinementResult['provider'] ?? null) !== null) {
+                $telemetry->recordResponse(
+                    $refinementResult['provider'],
+                    $refinementResult['model'] ?? null,
+                    $refinementResult,
+                    'refinement_response',
+                );
+            }
+
             // Accumulate LLM refinement token costs into the run totals
             $totalTokens['prompt'] += (int) ($refinementResult['prompt_tokens'] ?? 0);
             $totalTokens['completion'] += (int) ($refinementResult['completion_tokens'] ?? 0);
@@ -512,7 +557,7 @@ class NewsDiscoveryService
             $qualityDropped = count($qualityResult['rejected']);
 
             // Geographic diversity enforcer: limit over-represented regions.
-            $geoResult = $this->geoEnforcer->filter($qualityPassed);
+            $geoResult = $this->geoEnforcer->filter($qualityPassed, $category);
             $geoAllowed = $geoResult['passed'];
             $geoBlocked = count($geoResult['blocked']);
 
@@ -541,8 +586,8 @@ class NewsDiscoveryService
 
         return [
             array_slice($unique, 0, self::CANDIDATE_TARGET),
-            $totalTokens,
-            $totalCost,
+            $telemetry->tokens(),
+            $telemetry->estimatedCostUsd(),
         ];
     }
 
@@ -574,10 +619,17 @@ class NewsDiscoveryService
                 : " focusing specifically on national news events relevant to or occurring in {$country}")
             : '';
 
-        // Build geographic diversity instruction for the prompt
-        $geoInstruction = $country
-            ? "- If the region is {$country}: spread stories across different states/regions — do NOT cluster multiple stories in the same city."
-            : '- Spread stories across different cities and regions globally.';
+        // Custom topics can be a city/state name. Requiring different cities
+        // for a query such as "Ujjain" contradicts the topic constraint and
+        // guarantees a downstream geo-quota shortfall.
+        $geoInstruction = $isCustomTopic
+            ? "- If '{$category}' names a city or state, multiple stories MAY share that location. Diversify by event and subject instead of inventing other locations."
+            : ($country
+                ? "- If the region is {$country}: spread stories across different states/regions — do NOT cluster multiple stories in the same city."
+                : '- Spread stories across different cities and regions globally.');
+        $geoDiversityRules = $isCustomTopic
+            ? '- Keep every story directly relevant to the requested topic. For a place-specific topic, same-city stories are valid when they cover distinct events.'
+            : "- Each story MUST come from a DIFFERENT city wherever possible. Do NOT return multiple stories from the same city.\n- Spread coverage across different states/regions. Maximum 2 stories per state/region.";
 
         // Embed explicit date range operators so Gemini Search grounding
         // anchors its retrieval to the last 48 hours rather than returning
@@ -605,8 +657,7 @@ TASK: Return exactly {$count} current, fresh real-world news events{$topicConstr
 Do NOT return news older than 48 hours. Prioritize breaking news and trending events that happened within the last 30 minutes, 1 hour, 4 hours, or up to 24 hours.
 
 GEOGRAPHIC DIVERSITY RULES (strictly enforced):
-- Each story MUST come from a DIFFERENT city wherever possible. Do NOT return multiple stories from the same city.
-- Spread coverage across different states/regions. Maximum 2 stories per state/region.
+{$geoDiversityRules}
 {$geoInstruction}
 - "geo_city": the primary city where the event occurred (e.g. "Mumbai"). Use null if the story is national/international with no single city focus.
 - "geo_state": the state or region of the event (e.g. "Maharashtra"). Use null if national/international.
@@ -626,8 +677,11 @@ CRITICAL TEMPORAL RULES (must be strictly followed):
 - For truly live/breaking events set freshness_score 80-99. For events from yesterday use 50-79. For events 2-3 days old use 20-49.
 
 STRICT URL RULES (strictly enforced):
+- Include two independent credible publisher sources when available; use one only when no second report exists.
 - For "source_references", you MUST output the clean, direct publisher URL (e.g. "https://www.thehindu.com/news/national/article123.ece" or "https://timesofindia.indiatimes.com/articleshow/456.cms").
 - Do NOT output the long google.com/grounding-api-redirect/... URLs. Wasting output tokens on redirect URLs will truncate the response and break the parser.
+- Do NOT use Facebook, Instagram, TikTok, X/Twitter, or other social-media post URLs as news sources.
+- Each source URL must be a direct article URL under 240 characters with tracking query parameters removed.
 
 STRICT OUTPUT RULES — VIOLATIONS WILL BREAK THE PARSER:
 - Your ENTIRE response must be a single valid JSON array starting with [ and ending with ]
@@ -642,8 +696,8 @@ Return exactly this JSON structure (no extra fields, no missing fields):
 [
   {
     "title": "concise headline max 120 chars",
-    "summary": "1 concise factual sentence with the key city, event, official body/person if known, and current status. Do not exceed 220 characters.",
-    "source_references": [{"name": "Outlet Name", "url": "https://real-url.com"}],
+    "summary": "2 to 4 concise factual sentences (300-700 characters total). Preserve every verified detail available about the precise location/landmark, occurrence time, identified people and ages, hospital status, official statements, investigation or traffic status, and public helplines. Omit details not reported by sources; never invent them.",
+    "source_references": [{"name": "Outlet Name", "url": "https://real-url.com"}, {"name": "Second Outlet When Available", "url": "https://second-real-url.com"}],
     "keywords": ["keyword1", "keyword2", "keyword3"],
     "trend_score": 85,
     "freshness_score": 95,

@@ -43,8 +43,9 @@ class CoverageController extends Controller
             return $denied;
         }
 
-        // Get discovery provider from request body (defaults to 'groq' for fast, free discovery)
-        $discoveryProvider = $request->input('discovery_provider', 'groq');
+        // "auto" preserves the visible pipeline provider as a preference while
+        // allowing the execution layer to skip unkeyed/unhealthy providers.
+        $discoveryProvider = $request->input('discovery_provider', 'auto');
 
         try {
             $run = $this->pipelineService->triggerDiscovery($pipeline, $discoveryProvider);

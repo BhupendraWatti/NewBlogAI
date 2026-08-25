@@ -50,14 +50,17 @@ class GeographicDiversityEnforcer
      * the geo filter.
      *
      * @param  array<int, array>  $candidates  Each item must have optional keys: geo_city, geo_state, title.
+     * @param  string|null  $geographicFocus  Custom topic such as "Ujjain";
+     *                                        matching city/state quotas are relaxed.
      * @return array{passed: array<int, array>, blocked: array<int, array>}
      */
-    public function filter(array $candidates): array
+    public function filter(array $candidates, ?string $geographicFocus = null): array
     {
         $cityCount  = [];
         $stateCount = [];
         $passed     = [];
         $blocked    = [];
+        $focus      = $this->normalizeGeo((string) ($geographicFocus ?? ''));
 
         foreach ($candidates as $candidate) {
             $city  = $this->normalizeGeo((string) ($candidate['geo_city'] ?? ''));
@@ -72,8 +75,18 @@ class GeographicDiversityEnforcer
             $cityCount[$city]   = ($cityCount[$city] ?? 0);
             $stateCount[$state] = ($stateCount[$state] ?? 0);
 
-            $cityBlocked  = $city !== null && $cityCount[$city] >= self::MAX_PER_CITY;
-            $stateBlocked = $state !== null && $stateCount[$state] >= self::MAX_PER_STATE;
+            // A city-focused query naturally returns several stories from that
+            // city. Applying the global diversity cap makes the contract
+            // impossible (max 2 accepted vs minimum 4 required).
+            $matchesFocusedCity = $this->focusContainsLocation($focus, $city);
+            $matchesFocusedState = $this->focusContainsLocation($focus, $state);
+            $cityBlocked = ! $matchesFocusedCity
+                && $city !== null
+                && $cityCount[$city] >= self::MAX_PER_CITY;
+            $stateBlocked = ! $matchesFocusedCity
+                && ! $matchesFocusedState
+                && $state !== null
+                && $stateCount[$state] >= self::MAX_PER_STATE;
 
             if ($cityBlocked || $stateBlocked) {
                 $blocked[] = $candidate;
@@ -163,5 +176,31 @@ class GeographicDiversityEnforcer
         $cleaned = mb_strtolower(trim($value));
 
         return $cleaned === '' || $cleaned === 'null' ? null : $cleaned;
+    }
+
+    /**
+     * Match a returned place as a complete phrase within any custom topic.
+     * Examples: "Ujjain", "latest Ujjain news", and "उज्जैन समाचार".
+     * Padded phrase matching avoids partial matches such as "York" in
+     * "Yorkshire" and works with Unicode text without ASCII word boundaries.
+     */
+    private function focusContainsLocation(?string $focus, ?string $location): bool
+    {
+        if ($focus === null || $location === null) {
+            return false;
+        }
+
+        $normalizePhrase = static function (string $value): string {
+            $value = mb_strtolower(trim($value));
+            $value = preg_replace('/[^\p{L}\p{N}]+/u', ' ', $value) ?? $value;
+
+            return trim(preg_replace('/\s+/u', ' ', $value) ?? $value);
+        };
+
+        $normalizedFocus = $normalizePhrase($focus);
+        $normalizedLocation = $normalizePhrase($location);
+
+        return $normalizedLocation !== ''
+            && str_contains(" {$normalizedFocus} ", " {$normalizedLocation} ");
     }
 }

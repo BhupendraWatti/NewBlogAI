@@ -699,7 +699,7 @@ class SourceCollectionService implements SourceCollectorInterface
         try {
             $response = Http::timeout(8)
                 ->withHeaders([
-                    'User-Agent'      => 'Mozilla/5.0 (compatible; NewsBlogBot/1.0; +https://newsblogai.in/bot)',
+                    'User-Agent'      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
                     'Accept'          => 'text/html,application/xhtml+xml',
                     'Accept-Language' => 'en-IN,en;q=0.9,hi;q=0.8',
                 ])
@@ -720,6 +720,11 @@ class SourceCollectionService implements SourceCollectorInterface
             }
 
             $html = $response->body();
+
+            // Prefer structured NewsArticle data when available. Many modern
+            // sites render the visible body client-side and leave no useful
+            // <p> tags in the initial HTML, but expose articleBody in JSON-LD.
+            $structuredBody = $this->extractStructuredArticleBody($html);
 
             // ── Remove boilerplate blocks entirely ────────────────────────────
             // Strip scripts, styles, nav, footer, header, sidebar, forms, ads
@@ -764,7 +769,7 @@ class SourceCollectionService implements SourceCollectorInterface
             }
 
             if (empty($paragraphs)) {
-                return '';
+                return $structuredBody;
             }
 
             // Join paragraphs with double newlines and cap at 2500 chars
@@ -778,6 +783,41 @@ class SourceCollectionService implements SourceCollectorInterface
             ]);
             return '';
         }
+    }
+
+    private function extractStructuredArticleBody(string $html): string
+    {
+        if (! preg_match_all('/<script[^>]+type=["\']application\/ld\+json["\'][^>]*>(.*?)<\/script>/is', $html, $matches)) {
+            return '';
+        }
+
+        $findBody = function (mixed $node) use (&$findBody): ?string {
+            if (! is_array($node)) {
+                return null;
+            }
+            if (isset($node['articleBody']) && is_string($node['articleBody'])) {
+                $body = trim(html_entity_decode(strip_tags($node['articleBody']), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                if (mb_strlen($body) >= 80) {
+                    return $body;
+                }
+            }
+            foreach ($node as $value) {
+                if (($body = $findBody($value)) !== null) {
+                    return $body;
+                }
+            }
+
+            return null;
+        };
+
+        foreach ($matches[1] as $json) {
+            $decoded = json_decode(html_entity_decode(trim($json), ENT_QUOTES | ENT_HTML5, 'UTF-8'), true);
+            if (($body = $findBody($decoded)) !== null) {
+                return mb_substr($body, 0, 5000);
+            }
+        }
+
+        return '';
     }
 
     /**
