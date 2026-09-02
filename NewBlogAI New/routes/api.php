@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\AIProviderManager\Controllers\AIProviderController;
+use App\Modules\Analytics\Controllers\AnalyticsController;
 use App\Modules\AuthManager\Controllers\AuthController;
 use App\Modules\AuthManager\Controllers\UserController;
 use App\Modules\ContentGeneration\Controllers\GeneratedContentController;
@@ -16,9 +17,9 @@ use App\Modules\Publishing\Controllers\PublishingController;
 use App\Modules\ScheduleManager\Controllers\ScheduleController;
 use App\Modules\SiteManager\Controllers\SiteController;
 use App\Modules\SiteManager\Controllers\WPPluginAPIController;
+use App\Modules\SubscriptionManager\Controllers\InvoiceController;
 use App\Modules\SubscriptionManager\Controllers\PlanController;
 use App\Modules\SubscriptionManager\Controllers\SubscriptionController;
-use App\Modules\SubscriptionManager\Controllers\InvoiceController;
 use App\Modules\SystemSettings\Controllers\MasterOptionController;
 use App\Modules\SystemSettings\Controllers\SystemSettingsController;
 use App\Modules\TopicManager\Controllers\TopicController;
@@ -53,7 +54,7 @@ Route::prefix('v1')->group(function () {
         });
 
         // AI Providers Routes (SuperAdmin/Admin only)
-        Route::middleware(['auth', 'role:1,2,3'])->group(function () {
+        Route::middleware(['auth', 'role:1,2'])->group(function () {
             Route::post('providers/{provider}/test-connection', [AIProviderController::class, 'testConnection']);
             Route::post('providers/{provider}/set-default', [AIProviderController::class, 'setDefault']);
             Route::post('providers/{provider}/refresh-credits', [AIProviderController::class, 'refreshCredits']);
@@ -135,14 +136,14 @@ Route::prefix('v1')->group(function () {
             Route::post('notifications/{id}/read', [NotificationsController::class, 'markRead']);
 
             // Staging -> Production Site Analytics Routes
-            Route::get('sites/{siteId}/analytics/coverage', [\App\Modules\Analytics\Controllers\AnalyticsController::class, 'coverage']);
-            Route::get('sites/{siteId}/analytics/daily', [\App\Modules\Analytics\Controllers\AnalyticsController::class, 'daily']);
-            Route::get('sites/{siteId}/analytics/monthly', [\App\Modules\Analytics\Controllers\AnalyticsController::class, 'monthly']);
-            Route::get('sites/{siteId}/analytics/tokens', [\App\Modules\Analytics\Controllers\AnalyticsController::class, 'tokens']);
-            Route::get('sites/{siteId}/analytics/costs', [\App\Modules\Analytics\Controllers\AnalyticsController::class, 'costs']);
-            Route::get('sites/{siteId}/analytics/success-rate', [\App\Modules\Analytics\Controllers\AnalyticsController::class, 'successRate']);
-            Route::get('sites/{siteId}/analytics/failures', [\App\Modules\Analytics\Controllers\AnalyticsController::class, 'failures']);
-            Route::get('sites/{siteId}/analytics/providers', [\App\Modules\Analytics\Controllers\AnalyticsController::class, 'providers']);
+            Route::get('sites/{siteId}/analytics/coverage', [AnalyticsController::class, 'coverage']);
+            Route::get('sites/{siteId}/analytics/daily', [AnalyticsController::class, 'daily']);
+            Route::get('sites/{siteId}/analytics/monthly', [AnalyticsController::class, 'monthly']);
+            Route::get('sites/{siteId}/analytics/tokens', [AnalyticsController::class, 'tokens']);
+            Route::get('sites/{siteId}/analytics/costs', [AnalyticsController::class, 'costs']);
+            Route::get('sites/{siteId}/analytics/success-rate', [AnalyticsController::class, 'successRate']);
+            Route::get('sites/{siteId}/analytics/failures', [AnalyticsController::class, 'failures']);
+            Route::get('sites/{siteId}/analytics/providers', [AnalyticsController::class, 'providers']);
         });
 
         // WordPress Plugin Licensing REST API (Rate-limited)

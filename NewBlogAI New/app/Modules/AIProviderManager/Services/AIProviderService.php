@@ -41,7 +41,9 @@ class AIProviderService
             return DB::transaction(function () use ($data) {
                 // If this is set as default, unset others first
                 if (! empty($data['is_default'])) {
-                    AIProvider::where('is_default', true)->update(['is_default' => false]);
+                    AIProvider::ownedBy($data['customer_id'] ?? null)
+                        ->where('is_default', true)
+                        ->update(['is_default' => false]);
                 }
 
                 return AIProvider::create($data);
@@ -68,7 +70,8 @@ class AIProviderService
                 }
 
                 if (! empty($data['is_default'])) {
-                    AIProvider::where('id', '!=', $provider->id)
+                    AIProvider::ownedBy($provider->customer_id)
+                        ->where('id', '!=', $provider->id)
                         ->where('is_default', true)
                         ->update(['is_default' => false]);
                 }
@@ -113,7 +116,9 @@ class AIProviderService
 
         try {
             return DB::transaction(function () use ($provider) {
-                AIProvider::where('is_default', true)->update(['is_default' => false]);
+                AIProvider::ownedBy($provider->customer_id)
+                    ->where('is_default', true)
+                    ->update(['is_default' => false]);
                 $provider->update(['is_default' => true]);
 
                 return $provider;

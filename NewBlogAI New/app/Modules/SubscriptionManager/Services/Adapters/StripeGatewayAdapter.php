@@ -30,7 +30,7 @@ class StripeGatewayAdapter implements PaymentGatewayInterface
                 'transaction_id' => 'ch_stripe_' . bin2hex(random_bytes(8)),
                 'status' => 'succeeded',
                 'amount' => $amount,
-                'currency' => 'usd',
+                'currency' => 'INR',
                 'gateway' => 'Stripe',
             ];
         }
@@ -40,7 +40,7 @@ class StripeGatewayAdapter implements PaymentGatewayInterface
                 ->asForm()
                 ->post('https://api.stripe.com/v1/payment_intents', [
                     'amount' => (int)($amount * 100),
-                    'currency' => 'usd',
+                    'currency' => 'inr',
                     'receipt_email' => $customerEmail,
                     'payment_method' => $token ?? 'pm_card_visa',
                     'confirm' => true,
@@ -58,7 +58,7 @@ class StripeGatewayAdapter implements PaymentGatewayInterface
                 'transaction_id' => $response->json('id'),
                 'status' => $response->json('status') === 'succeeded' ? 'succeeded' : 'failed',
                 'amount' => $amount,
-                'currency' => 'usd',
+                'currency' => 'INR',
                 'gateway' => 'Stripe',
             ];
         } catch (\Exception $e) {
@@ -76,7 +76,7 @@ class StripeGatewayAdapter implements PaymentGatewayInterface
                 'refund_id' => 're_stripe_' . bin2hex(random_bytes(8)),
                 'status' => 'succeeded',
                 'amount' => $amount,
-                'currency' => 'usd',
+                'currency' => 'INR',
                 'gateway' => 'Stripe',
             ];
         }
@@ -97,7 +97,7 @@ class StripeGatewayAdapter implements PaymentGatewayInterface
                 'refund_id' => $response->json('id'),
                 'status' => 'succeeded',
                 'amount' => $amount,
-                'currency' => 'usd',
+                'currency' => 'INR',
                 'gateway' => 'Stripe',
             ];
         } catch (\Exception $e) {

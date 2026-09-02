@@ -208,7 +208,7 @@
                             </thead>
                             <tbody class="font-body-sm text-on-surface" id="customers-table-body">
                                 <!-- Row 1 -->
-                                <tr onclick="selectCustomer('Sarah Jenkins', 'GlobalTech Media', 'Enterprise Tier 2', '$4,500.00', 'Oct 12, 2025', 82)" class="border-b border-[#1F2937] hover:bg-[#1F2937] transition-colors h-12 cursor-pointer bg-primary/5 border-l-2 border-l-primary">
+                                <tr onclick="selectCustomer('Sarah Jenkins', 'GlobalTech Media', 'Enterprise Tier 2', '₹4,500.00', 'Oct 12, 2025', 82)" class="border-b border-[#1F2937] hover:bg-[#1F2937] transition-colors h-12 cursor-pointer bg-primary/5 border-l-2 border-l-primary">
                                     <td class="py-2 px-4 text-center">
                                         <input checked class="rounded bg-[#0B0F19] border-[#1F2937] text-primary focus:ring-primary/20" type="checkbox"/>
                                     </td>
@@ -230,7 +230,7 @@
                                     <td class="py-2 px-4 font-mono-sm text-on-surface-variant">Oct 12, 2025</td>
                                 </tr>
                                 <!-- Row 2 -->
-                                <tr onclick="selectCustomer('Marcus Reed', 'Daily News Co.', 'Pro Tier 1', '$1,200.00', 'Nov 01, 2024', 45)" class="border-b border-[#1F2937] hover:bg-[#1F2937] transition-colors h-12 cursor-pointer">
+                                <tr onclick="selectCustomer('Marcus Reed', 'Daily News Co.', 'Pro Tier 1', '₹1,200.00', 'Nov 01, 2024', 45)" class="border-b border-[#1F2937] hover:bg-[#1F2937] transition-colors h-12 cursor-pointer">
                                     <td class="py-2 px-4 text-center">
                                         <input class="rounded bg-[#0B0F19] border-[#1F2937] text-primary focus:ring-primary/20" type="checkbox"/>
                                     </td>
@@ -278,7 +278,7 @@
                             </div>
                             <div class="flex justify-between items-center">
                                 <span class="text-sm text-on-surface-variant">MRR</span>
-                                <span class="font-mono-sm text-on-surface" id="inspector-mrr">$4,500.00</span>
+                                <span class="font-mono-sm text-on-surface" id="inspector-mrr">₹4,500.00</span>
                             </div>
                             <div class="flex justify-between items-center">
                                 <span class="text-sm text-on-surface-variant">Renewal</span>

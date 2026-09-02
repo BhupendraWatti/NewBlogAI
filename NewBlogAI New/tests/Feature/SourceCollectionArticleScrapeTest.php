@@ -24,5 +24,8 @@ HTML, 200, ['Content-Type' => 'text/html']),
 
         $this->assertStringContainsString('Highway 44 at 8:30 PM', $body);
         $this->assertStringContainsString('investigation continues', $body);
+        Http::assertSent(fn ($request) => $request->url() === 'https://example.com/report'
+            && $request->hasHeader('Referer', 'https://example.com/')
+            && $request->hasHeader('Sec-Fetch-Mode', 'navigate'));
     }
 }

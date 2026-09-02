@@ -31,12 +31,11 @@ CRITICAL JOURNALISTIC INTEGRITY RULES (non-negotiable):
 5. HONEST GAPS: If the Research Context is sparse, write a shorter, honest article. Use phrases like "details are still emerging" or "according to initial reports" rather than padding with invented details.
 6. ATTRIBUTION: Attribute facts to "reports" or "[domain.com]" — NEVER claim a specific editorial brand (NDTV, The Hindu, Times of India) authored facts you are synthesising.
 7. NO CIRCULAR LOGIC: Do not write cause-and-effect sentences where the cause and effect are the same thing rephrased.
-8. CLEAR DISCLOSURE: You MUST append this exact markdown disclosure statement on a new line at the very end of the article: "*Disclosure: This report was synthesized with AI assistance and is undergoing human verification.*"
-9. COPYRIGHT & ORIGINALITY: Do NOT copy phrases or sentences verbatim from the Research Context. Restructure all facts and write them in your own words to prevent plagiarism.
-10. BIAS & NEUTRALITY: Write with complete objectivity. Eliminate speculative adjectives, emotional language, and biased framing.
+8. COPYRIGHT & ORIGINALITY: Do NOT copy phrases or sentences verbatim from the Research Context. Restructure all facts and write them in your own words to prevent plagiarism.
+9. BIAS & NEUTRALITY: Write with complete objectivity. Eliminate speculative adjectives, emotional language, and biased framing.
 GUARD;
 
-        return $base . "\n" . $honestGuard;
+        return $base."\n".$honestGuard;
     }
 
     /**
@@ -44,9 +43,9 @@ GUARD;
      */
     public function compileResearchContext(PipelineContext $context): string
     {
-        $researchContext = "Research Context:\n";
-        
-        if (!empty($context->sources)) {
+        $researchContext = '';
+
+        if (! empty($context->sources)) {
             $researchContext .= "Source References:\n";
             // Limit to top 3 sources to keep prompt tokens within the target budget
             $sources = array_slice($context->sources, 0, 3);
@@ -54,13 +53,13 @@ GUARD;
                 $title = $source['title'] ?? 'No Title';
                 $url = $source['url'] ?? 'No URL';
                 $snippet = $source['snippet'] ?? '';
-                
+
                 // Extract publisher details and published dates
                 $publisher = $source['publisher'] ?? $source['metadata']['publisher'] ?? null;
                 $publishedDate = $source['published_date'] ?? $source['metadata']['published_date'] ?? $source['publishedDate'] ?? null;
                 $region = $source['metadata']['region'] ?? null;
                 $locale = $source['metadata']['locale'] ?? null;
-                
+
                 $details = [];
                 if ($publisher) {
                     $details[] = "Publisher: {$publisher}";
@@ -69,10 +68,10 @@ GUARD;
                     $details[] = "Date: {$publishedDate}";
                 }
                 if ($region || $locale) {
-                    $details[] = "Region: " . ($region ?? 'N/A') . " (" . ($locale ?? 'N/A') . ")";
+                    $details[] = 'Region: '.($region ?? 'N/A').' ('.($locale ?? 'N/A').')';
                 }
-                
-                $detailsStr = !empty($details) ? " [" . implode(', ', $details) . "]" : "";
+
+                $detailsStr = ! empty($details) ? ' ['.implode(', ', $details).']' : '';
                 $researchContext .= "- {$title} ({$url}){$detailsStr}: {$snippet}\n";
             }
         } else {
@@ -85,22 +84,22 @@ GUARD;
         $scrapedBody = trim($context->metadata['scraped_article_body'] ?? '');
         if (! empty($scrapedBody)) {
             $researchContext .= "\n--- ARTICLE BODY TEXT (PRIMARY FACT SOURCE) ---\n";
-            $researchContext .= "The following is the ACTUAL text scraped from the source article(s). ";
+            $researchContext .= 'The following is the ACTUAL text scraped from the source article(s). ';
             $researchContext .= "You MUST use ONLY the facts contained here. Do NOT add details not present in this text.\n\n";
-            $researchContext .= $scrapedBody . "\n";
+            $researchContext .= $scrapedBody."\n";
             $researchContext .= "--- END OF ARTICLE BODY TEXT ---\n";
         } else {
             $researchContext .= "\n[NOTE: No article body text could be retrieved from the source URLs. ";
-            $researchContext .= "Write ONLY what is verifiable from the headline and summary. ";
+            $researchContext .= 'Write ONLY what is verifiable from the headline and summary. ';
             $researchContext .= "Do NOT invent facts, quotes, statistics, or milestones.]\n";
         }
 
         // Add topic clusters/regions
         $topicClusters = $context->metadata['topic_clusters'] ?? [];
-        if (!empty($topicClusters)) {
+        if (! empty($topicClusters)) {
             $researchContext .= "\nTopic Clusters:\n";
             foreach ($topicClusters as $clusterName => $urls) {
-                $researchContext .= "- {$clusterName}: " . implode(', ', $urls) . "\n";
+                $researchContext .= "- {$clusterName}: ".implode(', ', $urls)."\n";
             }
         }
 
@@ -113,22 +112,22 @@ GUARD;
     public function compileContextInjection(PipelineContext $context): string
     {
         $facts = $context->metadata['extracted_facts'] ?? $context->researchData['extracted_facts'] ?? [];
-        
+
         if (empty($facts)) {
             return "No extracted facts available.\n";
         }
 
         $injection = "Extracted Facts:\n";
         foreach (['people', 'organizations', 'locations', 'dates', 'events', 'keywords'] as $type) {
-            if (!empty($facts[$type])) {
+            if (! empty($facts[$type])) {
                 // Determine label: e.g. organizations -> Organizations, keywords -> Key Terms
                 $label = $type === 'keywords' ? 'Key Terms' : ucfirst($type);
                 // Limit to top 10 items to prevent token bloat
                 $limitedFacts = array_slice($facts[$type], 0, 10);
-                $injection .= "- {$label}: " . implode(', ', $limitedFacts) . "\n";
+                $injection .= "- {$label}: ".implode(', ', $limitedFacts)."\n";
             }
         }
-        
+
         return $injection;
     }
 
@@ -159,7 +158,7 @@ GUARD;
         $language = $context->metadata['language'] ?? $context->pipeline->language ?? null;
         if ($language) {
             $languageName = ['en' => 'English', 'hi' => 'Hindi'][$language] ?? $language;
-            $instructions[] = "Language: Write the complete article in {$languageName} (code '{$language}'). Translate every visible heading, label, bullet, caption, and disclosure into this language; do not leave English structural labels in non-English output.";
+            $instructions[] = "Language: Write the complete article in {$languageName} (code '{$language}'). Translate every visible heading, label, bullet, and caption into this language; do not leave English structural labels in non-English output.";
         }
 
         // Category context
@@ -192,16 +191,16 @@ GUARD;
         // Populated by ChronologicalContextParser. For follow-up/background
         // stories this contains mandatory framing rules that prevent the AI
         // writer from treating historical events as breaking news.
-        $storyType  = $context->metadata['story_type'] ?? 'breaking';
+        $storyType = $context->metadata['story_type'] ?? 'breaking';
         $guardrailText = trim($context->metadata['dynamic_instructions'] ?? '');
 
         if ($storyType === 'breaking') {
             // Confirm this is a live story so the AI approaches it with urgency
-            $instructions[] = "Story Classification: BREAKING / CURRENT EVENT — write with immediacy. This story covers events that are happening now or very recently.";
-            if (!empty($guardrailText)) {
-                $instructions[] = "Additional Guidelines: " . $guardrailText;
+            $instructions[] = 'Story Classification: BREAKING / CURRENT EVENT — write with immediacy. This story covers events that are happening now or very recently.';
+            if (! empty($guardrailText)) {
+                $instructions[] = 'Additional Guidelines: '.$guardrailText;
             }
-        } elseif (!empty($guardrailText)) {
+        } elseif (! empty($guardrailText)) {
             // The full TEMPORAL FRAMING GUARDRAIL from ChronologicalContextParser
             // is injected verbatim so the AI writer receives the exact framing rules.
             $instructions[] = $guardrailText;
@@ -221,7 +220,7 @@ GUARD;
         }
 
         if (empty($instructions)) {
-            return "Write natural, engaging, and professional content appropriate for the topic.";
+            return 'Write natural, engaging, and professional content appropriate for the topic.';
         }
 
         return implode("\n", $instructions);
@@ -232,12 +231,14 @@ GUARD;
      */
     public function compileOutputInstructions(array $options = [], ?PipelineContext $context = null): string
     {
-        $instructions = $options['instructions'] ?? "Format the news article using clean, readable Markdown. Keep structure proportional to the verified evidence. Use one accurate # headline and a concise lead, then advance the reporting with new facts in each paragraph. Use ## headings only when the evidence supports genuinely distinct, substantial sections; do not create a heading for a single short paragraph. Do not add a Key Takeaways, recap, summary, conclusion, or bullet list that repeats the article. Avoid repeating facts from the headline or lead. Use bold sparingly—never bold full paragraphs or routine facts. Write every visible heading and label in the requested article language. Do not output HTML tags or markdown code fences. Output only the raw Markdown article.";
+        $instructions = $options['instructions'] ?? 'Format the news article using clean, readable Markdown. Keep structure proportional to the verified evidence. Use one accurate # headline and a concise lead, then advance the reporting with new facts in each paragraph. Use ## headings only when the evidence supports genuinely distinct, substantial sections; do not create a heading for a single short paragraph. Do not add a Key Takeaways, recap, summary, conclusion, or bullet list that repeats the article. Avoid repeating facts from the headline or lead. Use bold sparingly—never bold full paragraphs or routine facts. Write every visible heading and label in the requested article language. Do not output HTML tags or markdown code fences. Output only the raw Markdown article.';
+
+        $instructions .= "\nEvidence boundary: use only the supplied source text. Never invent names, dates, quotations, locations, statistics, or office titles. Current Date: ".now()->format('F j, Y').'. Verify every current officeholder and title from the supplied evidence; omit any current designation the evidence does not establish.';
 
         if (($context?->metadata['evidence_mode'] ?? null) === 'summary_only') {
             $instructions .= "\nSUMMARY-ONLY EVIDENCE MODE: The source body could not be retrieved. Produce a compact brief using only the verified headline and summary. Do not use H2 headings. Do not use bullet points. Do not add a recap, summary bullets, or Key Takeaways. Do not repeat the same fact in different wording. Explicitly say that further details are unavailable only when needed for clarity.";
         }
-        
+
         if (isset($options['additional_output_instructions'])) {
             $instructions .= ' '.$options['additional_output_instructions'];
         }
@@ -252,7 +253,7 @@ GUARD;
     {
         // Extract override options if passed via metadata/options
         $options = $context->metadata['prompt_options'] ?? [];
-        
+
         $systemPrompt = $this->compileSystemPrompt($options);
         $researchContext = $this->compileResearchContext($context);
         $contextInjection = $this->compileContextInjection($context);
@@ -261,12 +262,12 @@ GUARD;
         $outputInstructions = $this->compileOutputInstructions($options, $context);
 
         return implode("\n\n", [
-            "System Prompt:\n" . $systemPrompt,
-            "Research Context:\n" . $researchContext,
-            "Context Injection:\n" . $contextInjection,
-            "User Prompt:\n" . $userPrompt,
-            "Dynamic Instructions:\n" . $dynamicInstructions,
-            "Output Instructions:\n" . $outputInstructions
+            "System Prompt:\n".$systemPrompt,
+            "Research Context:\n".$researchContext,
+            "Context Injection:\n".$contextInjection,
+            "User Prompt:\n".$userPrompt,
+            "Dynamic Instructions:\n".$dynamicInstructions,
+            "Output Instructions:\n".$outputInstructions,
         ]);
     }
 }

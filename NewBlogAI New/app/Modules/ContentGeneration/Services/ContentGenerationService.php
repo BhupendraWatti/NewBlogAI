@@ -2,14 +2,29 @@
 
 namespace App\Modules\ContentGeneration\Services;
 
+use App\Models\User;
 use App\Modules\AIProviderManager\Models\AIProvider;
 use App\Modules\AIProviderManager\Services\AIProviderService;
 use App\Modules\AIProviderManager\Support\ProviderErrorClassifier;
 use App\Modules\ContentGeneration\Models\AIRequestLog;
 use App\Modules\ContentGeneration\Models\ContentRevision;
 use App\Modules\ContentGeneration\Models\GeneratedContent;
+use App\Modules\ContentPipeline\Contracts\ChronologicalContextParserInterface;
+use App\Modules\ContentPipeline\Contracts\ContentGeneratorInterface;
+use App\Modules\ContentPipeline\Contracts\FactAuditorInterface;
+use App\Modules\ContentPipeline\Contracts\FactExtractorInterface;
+use App\Modules\ContentPipeline\Contracts\MediaPreparatorInterface;
+use App\Modules\ContentPipeline\Contracts\PublishingQueueInterface;
+use App\Modules\ContentPipeline\Contracts\ResearchServiceInterface;
+use App\Modules\ContentPipeline\Contracts\SEOServiceInterface;
+use App\Modules\ContentPipeline\Contracts\SourceCollectorInterface;
+use App\Modules\ContentPipeline\Contracts\TopicResolverInterface;
+use App\Modules\ContentPipeline\Contracts\TranslationInterface;
 use App\Modules\ContentPipeline\DTOs\PipelineContext;
+use App\Modules\ContentPipeline\Exceptions\DuplicateNewsException;
 use App\Modules\ContentPipeline\Models\PipelineRun;
+use App\Modules\ContentPipeline\Services\DuplicateDetectionService;
+use App\Modules\ContentPipeline\Support\PipelineErrorFormatter;
 use App\Modules\Operations\Notifications\AIGenerationFailedNotification;
 use App\Modules\SubscriptionManager\Services\EntitlementService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -17,6 +32,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Pipeline;
 use InvalidArgumentException;
 
 class ContentGenerationService
@@ -55,18 +71,6 @@ class ContentGenerationService
     }
 
     /**
-     * Parse variables in prompt templates.
-     */
-    public function compilePrompt(string $template, array $variables): string
-    {
-        foreach ($variables as $key => $value) {
-            $template = str_replace(["@{{{$key}}}", "{{{$key}}}"], (string) $value, $template);
-        }
-
-        return $template;
-    }
-
-    /**
      * Orchestrate content generation for a pipeline run.
      *
      * Tries each available AI provider in cost order. Each provider gets up to
@@ -83,15 +87,15 @@ class ContentGenerationService
             throw new InvalidArgumentException('Pipeline run has no associated pipeline config.');
         }
 
-        $site           = $pipeline->site;
+        $site = $pipeline->site;
         $promptTemplate = $pipeline->prompt;
-        $provider       = $pipeline->provider;  // preferred provider — tried first
+        $provider = $pipeline->provider;  // preferred provider — tried first
 
         if (! $site || ! $promptTemplate || ! $provider) {
             throw new InvalidArgumentException('Pipeline configuration dependencies are incomplete.');
         }
 
-        $startTime   = microtime(true);
+        $startTime = microtime(true);
         $reservation = null;
 
         try {
@@ -126,27 +130,27 @@ class ContentGenerationService
                         continue;
                     }
                     $context->addSource([
-                        'url'             => (string) $reference['url'],
-                        'title'           => (string) ($reference['name'] ?? $selectedCandidate['title']),
-                        'snippet'         => (string) ($selectedCandidate['summary'] ?? ''),
-                        'publisher'       => $reference['name'] ?? null,
+                        'url' => (string) $reference['url'],
+                        'title' => (string) ($reference['name'] ?? $selectedCandidate['title']),
+                        'snippet' => (string) ($selectedCandidate['summary'] ?? ''),
+                        'publisher' => $reference['name'] ?? null,
                         'relevance_score' => 0.9,
-                        'keywords'        => array_values(array_filter(array_map('strval', (array) ($selectedCandidate['keywords'] ?? [])))),
-                        'metadata'        => ['origin' => 'news_candidate'],
+                        'keywords' => array_values(array_filter(array_map('strval', (array) ($selectedCandidate['keywords'] ?? [])))),
+                        'metadata' => ['origin' => 'news_candidate'],
                     ]);
                 }
             }
 
             // ── Run with automatic provider failover ─────────────────────────
-            $availableProviders = $this->getAvailableProviders($provider);
+            $availableProviders = $this->getAvailableProviders($provider, $site->customer_id);
             [$generatedContent, $usedProvider] = $this->generateWithFailover($context, $availableProviders);
 
             // Update reservation with the provider that actually succeeded
             $reservation?->update([
-                'provider'      => $usedProvider->provider_key,
-                'provider_id'   => $usedProvider->id,
-                'model'         => $usedProvider->default_model ?? 'unknown',
-                'status'        => 'success',
+                'provider' => $usedProvider->provider_key,
+                'provider_id' => $usedProvider->id,
+                'model' => $usedProvider->default_model ?? 'unknown',
+                'status' => 'success',
                 'execution_time_ms' => (int) ((microtime(true) - $startTime) * 1000),
             ]);
 
@@ -157,17 +161,17 @@ class ContentGenerationService
 
             // Log failed AI request
             $requestLogData = [
-                'customer_id'       => $site->customer_id,
-                'subscription_id'   => $reservation?->subscription_id ?? ($this->entitlements->subscriptionForSite($site)?->id ?? null),
-                'site_id'           => $site->id,
-                'provider'          => $provider->provider_key,
-                'provider_id'       => $provider->id,
-                'model'             => $provider->default_model ?? 'unknown',
-                'prompt_id'         => $promptTemplate->id,
-                'topic_id'          => null,
+                'customer_id' => $site->customer_id,
+                'subscription_id' => $reservation?->subscription_id ?? ($this->entitlements->subscriptionForSite($site)?->id ?? null),
+                'site_id' => $site->id,
+                'provider' => $provider->provider_key,
+                'provider_id' => $provider->id,
+                'model' => $provider->default_model ?? 'unknown',
+                'prompt_id' => $promptTemplate->id,
+                'topic_id' => null,
                 'execution_time_ms' => $executionTimeMs,
-                'status'            => 'failed',
-                'error_log'         => $e->getMessage(),
+                'status' => 'failed',
+                'error_log' => $e->getMessage(),
             ];
 
             if ($reservation) {
@@ -177,16 +181,16 @@ class ContentGenerationService
             }
 
             $run->update([
-                'status'        => 'failed',
+                'status' => 'failed',
                 'error_message' => $e->getMessage(),
-                'completed_at'  => now(),
+                'completed_at' => now(),
             ]);
             $pipeline->update(['status' => 'failed']);
 
             // Notify site admins that AI generation failed.
             try {
                 if ($site->customer_id) {
-                    $adminUsers = \App\Models\User::where('customer_id', $site->customer_id)
+                    $adminUsers = User::where('customer_id', $site->customer_id)
                         ->whereIn('role', [1, 2])
                         ->get();
                     if ($adminUsers->isNotEmpty()) {
@@ -205,12 +209,6 @@ class ContentGenerationService
     // Provider failover helpers
     // ─────────────────────────────────────────────────────────────────────────
 
-    /**
-     * Generation provider priority order (cheapest / fastest first).
-     * Only providers that are enabled and have a valid API key are used.
-     */
-    private const PROVIDER_PRIORITY = ['groq', 'gemini', 'openai', 'claude', 'openrouter', 'ollama'];
-
     /** Max attempts per provider before moving to the next one. */
     private const FAILOVER_MAX_ATTEMPTS = 3;
 
@@ -226,9 +224,10 @@ class ContentGenerationService
      *
      * @return Collection<int, AIProvider>
      */
-    public function getAvailableProviders(?AIProvider $preferred = null): Collection
+    public function getAvailableProviders(?AIProvider $preferred = null, ?string $customerId = null): Collection
     {
-        $allEnabled = AIProvider::where('is_enabled', true)
+        $allEnabled = AIProvider::availableToCustomer($customerId)
+            ->where('is_enabled', true)
             ->whereNotNull('api_key')
             ->get()
             ->filter(fn (AIProvider $p) => ! empty($p->api_key));
@@ -236,13 +235,16 @@ class ContentGenerationService
         // Cooldown check / Auto-recovery
         $healthy = $allEnabled->filter(function (AIProvider $p) {
             $p->checkRecovery();
+
             return $p->status === 'healthy';
         });
 
         // Sort by priority ascending, then preferred first
-        $sorted = $healthy->sortBy(function (AIProvider $p) use ($preferred) {
+        $sorted = $healthy->sortBy(function (AIProvider $p) use ($preferred, $customerId) {
             $isPreferred = ($preferred && $p->id === $preferred->id) ? 0 : 1;
-            return [$p->priority, $isPreferred, $p->id];
+            $isPlatformFallback = $customerId !== null && $p->customer_id === null ? 1 : 0;
+
+            return [$isPreferred, $isPlatformFallback, $p->priority, $p->id];
         })->values();
 
         return $sorted;
@@ -264,7 +266,7 @@ class ContentGenerationService
      * pipeline's configured provider, keeping the pipeline model untouched.
      *
      * @param  Collection<int, AIProvider>  $providers
-     * @return array{0: GeneratedContent, 1: AIProvider}  [content, usedProvider (the AIProvider object that succeeded)]
+     * @return array{0: GeneratedContent, 1: AIProvider} [content, usedProvider (the AIProvider object that succeeded)]
      *
      * @throws \RuntimeException when ALL providers fail
      */
@@ -278,18 +280,18 @@ class ContentGenerationService
             for ($attempt = 1; $attempt <= self::FAILOVER_MAX_ATTEMPTS; $attempt++) {
                 try {
                     Log::info('ContentGenerationService: Trying provider.', [
-                        'run_id'       => $context->run->id,
-                        'provider'     => $providerKey,
-                        'provider_id'  => $provider->id,
-                        'attempt'      => $attempt,
+                        'run_id' => $context->run->id,
+                        'provider' => $providerKey,
+                        'provider_id' => $provider->id,
+                        'attempt' => $attempt,
                         'max_attempts' => self::FAILOVER_MAX_ATTEMPTS,
                     ]);
 
                     // Clone context and inject the current failover provider so
                     // ContentGeneratorService uses it instead of pipeline->provider.
-                    $attemptContext                  = clone $context;
+                    $attemptContext = clone $context;
                     $attemptContext->overrideProvider = $provider;
-                    $attemptContext->errors           = []; // clear any errors from prior stages
+                    $attemptContext->errors = []; // clear any errors from prior stages
 
                     // Run the full pipeline stage chain
                     $attemptContext = $this->runPipelineStages($attemptContext);
@@ -300,10 +302,10 @@ class ContentGenerationService
                     }
 
                     Log::info('ContentGenerationService: Provider succeeded.', [
-                        'run_id'   => $context->run->id,
+                        'run_id' => $context->run->id,
                         'provider' => $providerKey,
                         'provider_id' => $provider->id,
-                        'attempt'  => $attempt,
+                        'attempt' => $attempt,
                     ]);
 
                     // Mark provider success
@@ -311,7 +313,7 @@ class ContentGenerationService
 
                     return [$generatedContent, $provider];
 
-                } catch (\App\Modules\ContentPipeline\Exceptions\DuplicateNewsException $e) {
+                } catch (DuplicateNewsException $e) {
                     // Rethrow immediately to abort the failover loop (no point retrying other providers for duplicates)
                     throw $e;
                 } catch (\Exception $e) {
@@ -321,11 +323,11 @@ class ContentGenerationService
                     $provider->handleFailure($e);
 
                     Log::warning('ContentGenerationService: Provider attempt failed.', [
-                        'run_id'   => $context->run->id,
+                        'run_id' => $context->run->id,
                         'provider' => $providerKey,
                         'provider_id' => $provider->id,
-                        'attempt'  => $attempt,
-                        'error'    => $errorMsg,
+                        'attempt' => $attempt,
+                        'error' => $errorMsg,
                     ]);
 
                     // Permanent failures (bad key, connection refused, bad
@@ -337,10 +339,10 @@ class ContentGenerationService
                     // within our budget, so move straight to the next one.
                     if (! ProviderErrorClassifier::shouldRetrySameProvider($e)) {
                         Log::info('ContentGenerationService: Not retrying this provider, moving to next.', [
-                            'run_id'   => $context->run->id,
+                            'run_id' => $context->run->id,
                             'provider' => $providerKey,
                             'provider_id' => $provider->id,
-                            'reason'   => ProviderErrorClassifier::reason($e),
+                            'reason' => ProviderErrorClassifier::reason($e),
                         ]);
                         break;
                     }
@@ -355,16 +357,16 @@ class ContentGenerationService
             }
 
             Log::warning('ContentGenerationService: All attempts failed for provider, moving to next.', [
-                'run_id'   => $context->run->id,
+                'run_id' => $context->run->id,
                 'provider' => $providerKey,
                 'provider_id' => $provider->id,
-                'errors'   => $allErrors[$providerKey] ?? [],
+                'errors' => $allErrors[$providerKey] ?? [],
             ]);
         }
 
         // Every provider failed — build a descriptive exception
         throw new \RuntimeException(
-            \App\Modules\ContentPipeline\Support\PipelineErrorFormatter::format($allErrors, 'Content generation')
+            PipelineErrorFormatter::format($allErrors, 'Content generation')
         );
     }
 
@@ -378,26 +380,37 @@ class ContentGenerationService
      */
     protected function runPipelineStages(PipelineContext $context): PipelineContext
     {
-        return \Illuminate\Support\Facades\Pipeline::send($context)
+        return Pipeline::send($context)
             ->through([
                 function (PipelineContext $context, \Closure $next) {
-                    if ($context->hasErrors()) { return $next($context); }
-                    $context = app(\App\Modules\ContentPipeline\Contracts\TopicResolverInterface::class)->handle($context);
+                    if ($context->hasErrors()) {
+                        return $next($context);
+                    }
+                    $context = app(TopicResolverInterface::class)->handle($context);
+
                     return $next($context);
                 },
                 function (PipelineContext $context, \Closure $next) {
-                    if ($context->hasErrors()) { return $next($context); }
-                    $context = app(\App\Modules\ContentPipeline\Contracts\ResearchServiceInterface::class)->handle($context);
+                    if ($context->hasErrors()) {
+                        return $next($context);
+                    }
+                    $context = app(ResearchServiceInterface::class)->handle($context);
+
                     return $next($context);
                 },
                 function (PipelineContext $context, \Closure $next) {
-                    if ($context->hasErrors()) { return $next($context); }
-                    $context = app(\App\Modules\ContentPipeline\Contracts\SourceCollectorInterface::class)->handle($context);
+                    if ($context->hasErrors()) {
+                        return $next($context);
+                    }
+                    $context = app(SourceCollectorInterface::class)->handle($context);
+
                     return $next($context);
                 },
                 function (PipelineContext $context, \Closure $next) {
-                    if ($context->hasErrors()) { return $next($context); }
-                    
+                    if ($context->hasErrors()) {
+                        return $next($context);
+                    }
+
                     // Duplicate check for automated/scheduled runs (runs without manual selection)
                     $selectedNews = $context->metadata['selected_news'] ?? null;
                     if (! is_array($selectedNews) && ! empty($context->sources)) {
@@ -405,25 +418,29 @@ class ContentGenerationService
                         if ($topSource) {
                             $title = $topSource->title ?? '';
                             $keywords = $topSource->keywords ?? [];
-                            $duplicatesService = app(\App\Modules\ContentPipeline\Services\DuplicateDetectionService::class);
-                            
+                            $duplicatesService = app(DuplicateDetectionService::class);
+
                             if ($duplicatesService->isDuplicate((string) $title, (array) $keywords, $context->pipeline->site_id)) {
                                 Log::info("ContentGenerationService: Pipeline run aborted. News event '{$title}' is duplicate of recently published content.", [
                                     'title' => $title,
                                     'site_id' => $context->pipeline->site_id,
                                     'run_id' => $context->run->id,
                                 ]);
-                                throw new \App\Modules\ContentPipeline\Exceptions\DuplicateNewsException(
+                                throw new DuplicateNewsException(
                                     "This news event ('{$title}') has already been covered recently on this website."
                                 );
                             }
                         }
                     }
+
                     return $next($context);
                 },
                 function (PipelineContext $context, \Closure $next) {
-                    if ($context->hasErrors()) { return $next($context); }
-                    $context = app(\App\Modules\ContentPipeline\Contracts\FactExtractorInterface::class)->handle($context);
+                    if ($context->hasErrors()) {
+                        return $next($context);
+                    }
+                    $context = app(FactExtractorInterface::class)->handle($context);
+
                     return $next($context);
                 },
                 // ── Temporal Context Analysis ────────────────────────────────
@@ -433,37 +450,56 @@ class ContentGenerationService
                 // so the AI writer does not mis-frame follow-up stories as breaking news.
                 // Non-blocking: any failure here is logged and the pipeline continues.
                 function (PipelineContext $context, \Closure $next) {
-                    $context = app(\App\Modules\ContentPipeline\Contracts\ChronologicalContextParserInterface::class)->handle($context);
+                    $context = app(ChronologicalContextParserInterface::class)->handle($context);
+
                     return $next($context);
                 },
                 function (PipelineContext $context, \Closure $next) {
-                    if ($context->hasErrors()) { return $next($context); }
-                    $context = app(\App\Modules\ContentPipeline\Contracts\ContentGeneratorInterface::class)->handle($context);
+                    if ($context->hasErrors()) {
+                        return $next($context);
+                    }
+                    $context = app(ContentGeneratorInterface::class)->handle($context);
+
                     return $next($context);
                 },
                 function (PipelineContext $context, \Closure $next) {
-                    if ($context->hasErrors()) { return $next($context); }
-                    $context = app(\App\Modules\ContentPipeline\Contracts\TranslationInterface::class)->handle($context);
+                    if ($context->hasErrors()) {
+                        return $next($context);
+                    }
+                    $context = app(TranslationInterface::class)->handle($context);
+
                     return $next($context);
                 },
                 function (PipelineContext $context, \Closure $next) {
-                    if ($context->hasErrors()) { return $next($context); }
-                    $context = app(\App\Modules\ContentPipeline\Contracts\FactAuditorInterface::class)->handle($context);
+                    if ($context->hasErrors()) {
+                        return $next($context);
+                    }
+                    $context = app(FactAuditorInterface::class)->handle($context);
+
                     return $next($context);
                 },
                 function (PipelineContext $context, \Closure $next) {
-                    if ($context->hasErrors()) { return $next($context); }
-                    $context = app(\App\Modules\ContentPipeline\Contracts\SEOServiceInterface::class)->handle($context);
+                    if ($context->hasErrors()) {
+                        return $next($context);
+                    }
+                    $context = app(SEOServiceInterface::class)->handle($context);
+
                     return $next($context);
                 },
                 function (PipelineContext $context, \Closure $next) {
-                    if ($context->hasErrors()) { return $next($context); }
-                    $context = app(\App\Modules\ContentPipeline\Contracts\MediaPreparatorInterface::class)->handle($context);
+                    if ($context->hasErrors()) {
+                        return $next($context);
+                    }
+                    $context = app(MediaPreparatorInterface::class)->handle($context);
+
                     return $next($context);
                 },
                 function (PipelineContext $context, \Closure $next) {
-                    if ($context->hasErrors()) { return $next($context); }
-                    $context = app(\App\Modules\ContentPipeline\Contracts\PublishingQueueInterface::class)->handle($context);
+                    if ($context->hasErrors()) {
+                        return $next($context);
+                    }
+                    $context = app(PublishingQueueInterface::class)->handle($context);
+
                     return $next($context);
                 },
             ])
@@ -472,6 +508,7 @@ class ContentGenerationService
                     $allErrors = array_merge(...array_values($context->errors));
                     throw new \RuntimeException('Pipeline execution failed: '.implode(', ', $allErrors));
                 }
+
                 return $context;
             });
     }

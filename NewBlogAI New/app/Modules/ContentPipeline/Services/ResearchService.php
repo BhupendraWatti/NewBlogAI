@@ -6,6 +6,7 @@ namespace App\Modules\ContentPipeline\Services;
 
 use App\Modules\ContentPipeline\Contracts\ResearchServiceInterface;
 use App\Modules\ContentPipeline\DTOs\PipelineContext;
+use App\Modules\SystemSettings\Models\MasterOption;
 use Illuminate\Support\Facades\Log;
 
 class ResearchService implements ResearchServiceInterface
@@ -42,9 +43,9 @@ class ResearchService implements ResearchServiceInterface
             $context->addResearchData('researched_at', now()->toIso8601String());
 
             Log::info('ResearchService: News research queries prepared successfully.', [
-                'category'        => $category,
+                'category' => $category,
                 'category_subject' => $categorySubject,
-                'queries'         => $queries,
+                'queries' => $queries,
             ]);
         } catch (\Exception $e) {
             Log::error('ResearchService failed: '.$e->getMessage(), [
@@ -88,86 +89,35 @@ class ResearchService implements ResearchServiceInterface
 
         // Base news query templates applicable to all categories
         $baseTemplates = [
-            '"' . $subject . '" breaking news ' . $today,
-            '"' . $subject . '" latest updates today',
-            'top ' . $subject . ' headlines',
+            '"'.$subject.'" breaking news '.$today,
+            '"'.$subject.'" latest updates today',
+            'top '.$subject.' headlines',
         ];
 
         // Check if MasterOption metadata defines custom search query templates for this topic
         try {
             $catLower = strtolower(trim($category));
-            $option = \App\Modules\SystemSettings\Models\MasterOption::ofType('topic')
-                ->where(function ($q) use ($category, $catLower) {
+            $option = MasterOption::ofType('topic')
+                ->where(function ($q) use ($catLower) {
                     $q->whereRaw('LOWER(name) = ?', [$catLower])
-                      ->orWhere('code', $catLower);
+                        ->orWhere('code', $catLower);
                 })
                 ->first();
 
             if ($option && ! empty($option->metadata['queries']) && is_array($option->metadata['queries'])) {
-                return array_merge($baseTemplates, $option->metadata['queries']);
+                return array_values(array_unique(array_merge($baseTemplates, $option->metadata['queries'])));
             }
         } catch (\Throwable) {
             // Fall through safely
         }
 
-        // Category-specific news query extensions
-        $categoryTemplates = match (strtolower($category)) {
-            'global'        => [
-                'world news highlights today',
-                'international breaking stories today',
-                'global events ' . date('Y'),
-            ],
-            'trending'      => [
-                'most shared trending news today',
-                'viral news stories right now',
-                'top trending stories ' . $today,
-            ],
-            'local'         => [
-                'local community news today',
-                'regional news updates ' . $today,
-                'city council local events today',
-            ],
-            'technology'    => [
-                'tech industry news and product launches today',
-                'AI and software developments ' . date('Y'),
-                'cybersecurity alerts and digital news today',
-            ],
-            'business'      => [
-                'stock market and finance news today',
-                'corporate earnings and economic data ' . $today,
-                'startup and investment news today',
-            ],
-            'politics'      => [
-                'government policy and political news today',
-                'election and legislative updates ' . $today,
-                'geopolitical developments and diplomacy news',
-            ],
-            'sports'        => [
-                'sports scores and match results today',
-                'athlete and team news ' . $today,
-                'sports transfers and breaking sports news',
-            ],
-            'health'        => [
-                'health and medical research news today',
-                'public health alerts and wellness updates ' . $today,
-                'new medical treatments and drug approvals today',
-            ],
-            'science'       => [
-                'scientific research discoveries today',
-                'space exploration and environment news ' . $today,
-                'peer-reviewed study findings in the news',
-            ],
-            'entertainment' => [
-                'celebrity and entertainment industry news today',
-                'film, music, and TV releases ' . $today,
-                'arts and culture events today',
-            ],
-            default => [
-                "latest {$category} updates and developments " . $today,
-                "top {$category} news stories today",
-                "breaking {$category} headlines " . date('Y'),
-            ],
-        };
+        // Administrators can specialize these through MasterOption metadata.
+        // The fallback stays category-agnostic so new SaaS topics need no code change.
+        $categoryTemplates = [
+            "latest {$category} updates and developments {$today}",
+            "top {$category} news stories today",
+            "breaking {$category} headlines ".now()->year,
+        ];
 
         return array_merge($baseTemplates, $categoryTemplates);
     }

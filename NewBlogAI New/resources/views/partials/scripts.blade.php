@@ -1,4 +1,14 @@
 <script>
+    const USD_TO_INR_RATE = Number(@json(config('services.ai_pricing.usd_to_inr_rate')));
+    window.formatUsdAsInr = function (value, maximumFractionDigits = 2) {
+        return new Intl.NumberFormat('en-IN', {
+            style: 'currency',
+            currency: 'INR',
+            minimumFractionDigits: maximumFractionDigits === 0 ? 0 : 2,
+            maximumFractionDigits,
+        }).format(Number(value || 0) * USD_TO_INR_RATE);
+    };
+
     // Centralized Premium Notification System (SweetAlert2)
     function getSwalTheme() {
         const isDark = document.documentElement.classList.contains('dark');
@@ -2194,11 +2204,11 @@
         costs.className = "text-3xl font-display font-bold text-warning animate-pulse";
 
         setTimeout(() => {
-            mrr.innerText = "$48,942";
+            mrr.innerText = formatUsdAsInr(48942, 0);
             mrr.className = "text-3xl font-display font-bold text-accent";
-            costs.innerText = "$682.12";
+            costs.innerText = formatUsdAsInr(682.12);
             costs.className = "text-3xl font-display font-bold text-accent";
-            showSuccess("Cost Sync Complete", "Cost forecast audit sync completed successfully! Expected MRR: $48.9K, Expected cost reductions: $160.00.");
+            showSuccess("Cost Sync Complete", `Cost forecast audit sync completed successfully! Expected MRR: ${formatUsdAsInr(48900, 0)}, Expected cost reductions: ${formatUsdAsInr(160)}.`);
         }, 3000);
     }
 
@@ -2514,7 +2524,7 @@
                 });
             }
 
-            if (apiCostEl) apiCostEl.innerText = `₹${totalCost.toFixed(2)}`;
+            if (apiCostEl) apiCostEl.innerText = formatUsdAsInr(totalCost);
 
             tbody.innerHTML = '';
             if (subscriptions.length === 0) {
@@ -2922,14 +2932,14 @@
                         providerData.forEach(prov => {
                             const name = prov.provider.toUpperCase();
                             const count = prov.count || 0;
-                            const cost = parseFloat(prov.cost || 0).toFixed(2);
+                            const cost = formatUsdAsInr(prov.cost || 0);
                             const pct = Math.round((count / maxCount) * 100);
 
                             providerContainer.innerHTML += `
                                     <div class="space-y-1">
                                         <div class="flex justify-between text-xs font-mono">
                                             <span class="text-text font-bold">${name}</span>
-                                            <span class="text-muted">${count} requests ($${cost})</span>
+                                            <span class="text-muted">${count} requests (${cost})</span>
                                         </div>
                                         <div class="w-full bg-white/5 border border-border h-2.5 rounded-full overflow-hidden">
                                             <div class="bg-accent h-full rounded-full transition-all duration-500" style="width: ${pct}%"></div>
@@ -4123,7 +4133,11 @@
 
                 // Display dynamic remaining credits / usage stats
                 const costUsd = p.estimated_cost_total || 0;
-                const costInr = (costUsd * 83).toFixed(2);
+                const totalTokens = Number(p.tokens_used_total || 0);
+                const inputTokens = Number(p.prompt_tokens_total || 0);
+                const outputTokens = Number(p.completion_tokens_total || 0);
+                const otherTokens = Math.max(0, totalTokens - inputTokens - outputTokens);
+                const tokenBreakdown = `${totalTokens.toLocaleString()} (${inputTokens.toLocaleString()} input + ${outputTokens.toLocaleString()} output${otherTokens ? ` + ${otherTokens.toLocaleString()} other` : ''})`;
                 
                 // Cooldown countdown display
                 let cooldownTimerHTML = '';
@@ -4173,13 +4187,13 @@
                         }
 
                         const reqsEl = panel.querySelector('.stat-reqs');
-                        if (reqsEl) reqsEl.textContent = `${totalReqs} req (✓${successReqs} / ✗${errorReqs})`;
+                        if (reqsEl) reqsEl.textContent = `${totalReqs} runs (✓${successReqs} / ✗${errorReqs})`;
 
                         const tokensEl = panel.querySelector('.stat-tokens');
-                        if (tokensEl) tokensEl.textContent = Number(p.tokens_used_total || 0).toLocaleString();
+                        if (tokensEl) tokensEl.textContent = tokenBreakdown;
 
                         const costEl = panel.querySelector('.stat-cost');
-                        if (costEl) costEl.textContent = `₹${costInr} ($${Number(costUsd).toFixed(4)})`;
+                        if (costEl) costEl.textContent = formatUsdAsInr(costUsd, 4);
 
                         const errorEl = panel.querySelector('.stat-error');
                         if (errorEl) {
@@ -4255,16 +4269,16 @@
                             <div class="provider-credits-panel pt-3 mt-3 border-t border-border/50 space-y-1.5 text-[11px] font-mono text-muted">
                                 ${cooldownTimerHTML}
                                 <div class="flex justify-between">
-                                    <span>Total / ✓ Success / ✗ Error:</span>
-                                    <span class="stat-reqs text-text font-bold">${totalReqs} req (✓${successReqs} / ✗${errorReqs})</span>
+                                    <span>Runs / ✓ Success / ✗ Error:</span>
+                                    <span class="stat-reqs text-text font-bold">${totalReqs} runs (✓${successReqs} / ✗${errorReqs})</span>
                                 </div>
                                 <div class="flex justify-between">
-                                    <span>Tokens (Prompt + Completion):</span>
-                                    <span class="stat-tokens text-accent font-bold">${Number(p.tokens_used_total || 0).toLocaleString()} (${Number(p.prompt_tokens_total || 0).toLocaleString()} + ${Number(p.completion_tokens_total || 0).toLocaleString()})</span>
+                                    <span>Total Tokens:</span>
+                                    <span class="stat-tokens text-accent font-bold">${tokenBreakdown}</span>
                                 </div>
                                 <div class="flex justify-between">
-                                    <span>Estimated Cost:</span>
-                                    <span class="stat-cost text-text font-bold">₹${costInr} ($${Number(costUsd).toFixed(4)})</span>
+                                    <span>Recorded Est. (INR):</span>
+                                    <span class="stat-cost text-text font-bold">${formatUsdAsInr(costUsd, 4)}</span>
                                 </div>
                                 ${p.credits_remaining !== null && p.credits_remaining !== undefined ? `
                                 <div class="flex justify-between">
@@ -4678,7 +4692,7 @@
         document.getElementById('discovery-telemetry-provider').textContent = provider;
         document.getElementById('discovery-telemetry-time').textContent = `${(elapsedMs / 1000).toFixed(1)}s / ${Math.round(timeoutMs / 1000)}s`;
         document.getElementById('discovery-telemetry-tokens').textContent = tokens.toLocaleString();
-        document.getElementById('discovery-telemetry-cost').textContent = `$${cost.toFixed(6)}`;
+        document.getElementById('discovery-telemetry-cost').textContent = formatUsdAsInr(cost, 6);
         document.getElementById('discovery-telemetry-requests').textContent = `${requests} provider response${requests === 1 ? '' : 's'} completed · cost is estimated from provider-reported usage`;
     }
 

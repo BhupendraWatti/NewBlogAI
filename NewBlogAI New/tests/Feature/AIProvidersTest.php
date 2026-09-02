@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Modules\AIProviderManager\Drivers\OllamaDriver;
 use App\Modules\AIProviderManager\Models\AIProvider;
+use App\Modules\CustomerManager\Models\Customer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -16,14 +17,24 @@ class AIProvidersTest extends TestCase
 
     protected User $admin;
 
+    protected Customer $customer;
+
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->customer = Customer::create([
+            'company_name' => 'Provider Tenant',
+            'owner_name' => 'Admin User',
+            'email' => 'owner@example.com',
+            'status' => 'active',
+        ]);
 
         $this->admin = User::create([
             'name' => 'Admin User',
             'email' => 'admin@example.com',
             'password' => bcrypt('password'),
+            'customer_id' => $this->customer->id,
         ]);
         $this->admin->role = 2; // Admin
         $this->admin->save();
@@ -47,6 +58,7 @@ class AIProvidersTest extends TestCase
 
         // Verify key is encrypted in database
         $dbRecord = AIProvider::where('provider_key', 'openai')->firstOrFail();
+        $this->assertSame($this->customer->id, $dbRecord->customer_id);
         $this->assertEquals('sk-test123456789', $dbRecord->api_key); // Eloquent automatically decrypts via casting
         $this->assertNotEquals('sk-test123456789', DB::table('ai_providers')->where('provider_key', 'openai')->first()->api_key); // raw DB contains encrypted text
     }
@@ -54,6 +66,7 @@ class AIProvidersTest extends TestCase
     public function test_admin_can_update_provider(): void
     {
         $provider = AIProvider::create([
+            'customer_id' => $this->customer->id,
             'provider_key' => 'gemini',
             'name' => 'Google Gemini',
             'api_key' => 'initial-key',
@@ -78,6 +91,7 @@ class AIProvidersTest extends TestCase
     public function test_cannot_set_disabled_provider_as_default(): void
     {
         $provider = AIProvider::create([
+            'customer_id' => $this->customer->id,
             'provider_key' => 'claude',
             'name' => 'Claude',
             'api_key' => 'secret',
@@ -100,6 +114,7 @@ class AIProvidersTest extends TestCase
         ]);
 
         $provider = AIProvider::create([
+            'customer_id' => $this->customer->id,
             'provider_key' => 'openai',
             'name' => 'OpenAI',
             'api_key' => 'valid-key',
@@ -131,6 +146,49 @@ class AIProvidersTest extends TestCase
             $this->assertStringContainsString('timeout', $content);
             $this->assertStringContainsString('90', $content);
         }
+    }
+
+    public function test_admin_cannot_read_or_modify_another_customers_provider(): void
+    {
+        $otherCustomer = Customer::create([
+            'company_name' => 'Other Tenant',
+            'owner_name' => 'Other Owner',
+            'email' => 'other@example.com',
+            'status' => 'active',
+        ]);
+        $provider = AIProvider::create([
+            'customer_id' => $otherCustomer->id,
+            'provider_key' => 'claude',
+            'name' => 'Other Claude',
+            'api_key' => 'other-secret',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->getJson("/api/v1/providers/{$provider->id}")
+            ->assertNotFound();
+
+        $this->actingAs($this->admin)
+            ->putJson("/api/v1/providers/{$provider->id}", ['name' => 'Hijacked'])
+            ->assertNotFound();
+
+        $this->assertSame('Other Claude', $provider->fresh()->name);
+    }
+
+    public function test_admin_can_read_but_not_modify_a_platform_provider(): void
+    {
+        $provider = AIProvider::create([
+            'provider_key' => 'claude',
+            'name' => 'Platform Claude',
+            'api_key' => 'platform-secret',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->getJson("/api/v1/providers/{$provider->id}")
+            ->assertOk();
+
+        $this->actingAs($this->admin)
+            ->putJson("/api/v1/providers/{$provider->id}", ['name' => 'Hijacked'])
+            ->assertNotFound();
     }
 
     public function test_ollama_driver_uses_the_configured_base_url(): void

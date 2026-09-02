@@ -25,6 +25,14 @@ final class ArticleStructureNormalizer
             $markdown,
         ) ?? $markdown;
 
+        // Disclosure is publication policy, not article copy. Remove the legacy
+        // sentence even when an older/custom prompt still asks the model for it.
+        $markdown = preg_replace(
+            '/^\s*\*?(?:Disclosure:\s*)?This report was synthesized with AI assistance and is undergoing human verification\.\*?\s*$/imu',
+            '',
+            $markdown,
+        ) ?? $markdown;
+
         $wordCount = count(array_filter(preg_split('/\s+/u', strip_tags($markdown)) ?: []));
         $isBrief = $summaryOnly || $wordCount < 350;
 

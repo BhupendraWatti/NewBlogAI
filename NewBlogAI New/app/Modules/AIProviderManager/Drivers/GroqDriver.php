@@ -108,19 +108,21 @@ class GroqDriver implements AIProviderClientInterface
                 $completionTokens = $usage['completion_tokens'] ?? 0;
                 $totalTokens = $usage['total_tokens'] ?? 0;
 
-                // Groq Pricing estimation per 1,000 tokens
-                if (str_contains($model, '8b')) {
-                    $promptRate     = 0.00005; // $0.05 / 1M input
-                    $completionRate = 0.00008; // $0.08 / 1M output
-                } elseif (str_contains($model, 'mixtral')) {
-                    $promptRate     = 0.00024; // $0.24 / 1M input
-                    $completionRate = 0.00024; // $0.24 / 1M output
-                } else {
-                    // llama-3.3-70b-versatile default
-                    $promptRate     = 0.00059; // $0.59 / 1M input
-                    $completionRate = 0.00079; // $0.79 / 1M output
-                }
-                $cost = (($promptTokens / 1000.0) * $promptRate) + (($completionTokens / 1000.0) * $completionRate);
+                // ponytail: unknown Groq IDs use the configured Llama 70B rate; use account billing data for custom contracts.
+                [$promptRate, $cachedRate, $completionRate] = match (true) {
+                    $model === 'openai/gpt-oss-120b' => [0.00015, 0.000075, 0.00060],
+                    in_array($model, ['openai/gpt-oss-20b', 'openai/gpt-oss-safeguard-20b'], true) => [0.000075, 0.0000375, 0.00030],
+                    $model === 'llama-3.1-8b-instant' => [0.00005, 0.00005, 0.00008],
+                    $model === 'qwen/qwen3.6-27b' => [0.00060, 0.00060, 0.00300],
+                    $model === 'qwen/qwen3.8-27b' => [0.00080, 0.00080, 0.00400],
+                    str_contains($model, '8b') => [0.00005, 0.00005, 0.00008],
+                    str_contains($model, 'mixtral') => [0.00024, 0.00024, 0.00024],
+                    default => [0.00059, 0.00059, 0.00079],
+                };
+                $cachedTokens = min($promptTokens, (int) ($usage['prompt_tokens_details']['cached_tokens'] ?? 0));
+                $cost = ((($promptTokens - $cachedTokens) / 1000.0) * $promptRate)
+                    + (($cachedTokens / 1000.0) * $cachedRate)
+                    + (($completionTokens / 1000.0) * $completionRate);
 
 
                 $limit     = $response->header('x-ratelimit-limit-tokens') ?: ($response->header('x-ratelimit-limit-requests') ?: null);

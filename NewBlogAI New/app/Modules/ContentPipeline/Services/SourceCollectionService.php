@@ -572,6 +572,7 @@ class SourceCollectionService implements SourceCollectorInterface
             'generationConfig' => [
                 'maxOutputTokens' => 1024,
                 'temperature'     => 0.1,
+                'thinkingConfig'  => ['thinkingBudget' => 0],
             ],
         ];
 
@@ -730,8 +731,13 @@ class SourceCollectionService implements SourceCollectorInterface
             $response = Http::timeout(8)
                 ->withHeaders([
                     'User-Agent'      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-                    'Accept'          => 'text/html,application/xhtml+xml',
+                    'Accept'          => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
                     'Accept-Language' => 'en-IN,en;q=0.9,hi;q=0.8',
+                    'Referer'         => parse_url($url, PHP_URL_SCHEME).'://'.parse_url($url, PHP_URL_HOST).'/',
+                    'Sec-Fetch-Dest'  => 'document',
+                    'Sec-Fetch-Mode'  => 'navigate',
+                    'Sec-Fetch-Site'  => 'same-origin',
+                    'Upgrade-Insecure-Requests' => '1',
                 ])
                 ->get($url);
 

@@ -28,12 +28,15 @@ class ArticleStructureNormalizerTest extends TestCase
 
 - तीन लोगों की मौत हुई।
 - छह लोग घायल हुए।
+
+*Disclosure: This report was synthesized with AI assistance and is undergoing human verification.*
 MD;
 
         $normalized = (new ArticleStructureNormalizer)->normalize($markdown, 'hi', true);
 
         $this->assertStringNotContainsString('## ', $normalized);
         $this->assertStringNotContainsString('Key Takeaways', $normalized);
+        $this->assertStringNotContainsString('Disclosure:', $normalized);
         $this->assertStringNotContainsString('**', $normalized);
         $this->assertStringContainsString('यह एक छोटा सत्यापित विवरण है।', $normalized);
         $this->assertStringContainsString('कार नागपुर से सीहोर जा रही थी।', $normalized);

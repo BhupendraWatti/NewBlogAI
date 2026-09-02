@@ -93,13 +93,12 @@ class OpenRouterDriver implements AIProviderClientInterface
             $completionTokens = $usage['completion_tokens'] ?? 0;
             $totalTokens = $usage['total_tokens'] ?? 0;
 
-            // OpenRouter natively returns usage.cost in USD when available
-            if (isset($usage['cost']) && is_numeric($usage['cost'])) {
-                $cost = (float) $usage['cost'];
-            } else {
-                $promptRate     = 0.00050; // $0.50 / 1M input default
-                $completionRate = 0.00150; // $1.50 / 1M output default
-                $cost = (($promptTokens / 1000.0) * $promptRate) + (($completionTokens / 1000.0) * $completionRate);
+            $hasNativeCost = isset($usage['cost']) && is_numeric($usage['cost']);
+            $cost = $hasNativeCost ? (float) $usage['cost'] : 0.0;
+            if (! $hasNativeCost) {
+                Log::warning('OpenRouter response omitted native usage cost; no model-agnostic estimate is possible.', [
+                    'model' => $model,
+                ]);
             }
 
 
@@ -113,6 +112,7 @@ class OpenRouterDriver implements AIProviderClientInterface
                 'completion_tokens' => $completionTokens,
                 'total_tokens' => $totalTokens,
                 'estimated_cost' => $cost,
+                'cost_accuracy' => $hasNativeCost ? 'provider_reported' : 'unavailable',
                 'raw_response' => $data,
                 'rate_limits' => [
                     'limit' => $limit,

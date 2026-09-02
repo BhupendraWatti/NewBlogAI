@@ -3,14 +3,18 @@
 namespace App\Modules\AIProviderManager\Models;
 
 use App\Modules\AIProviderManager\Support\ProviderErrorClassifier;
+use App\Modules\CustomerManager\Models\Customer;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AIProvider extends Model
 {
     protected $table = 'ai_providers';
 
     protected $fillable = [
+        'customer_id',
         'provider_key',
         'name',
         'api_key',
@@ -30,6 +34,27 @@ class AIProvider extends Model
         'error_count',
         'success_count',
     ];
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
+    public function scopeOwnedBy(Builder $query, ?string $customerId): Builder
+    {
+        return $query->where('customer_id', $customerId);
+    }
+
+    public function scopeAvailableToCustomer(Builder $query, ?string $customerId): Builder
+    {
+        return $query->where(function (Builder $query) use ($customerId) {
+            $query->whereNull('customer_id');
+
+            if ($customerId !== null) {
+                $query->orWhere('customer_id', $customerId);
+            }
+        });
+    }
 
     protected $hidden = [
         'api_key',
@@ -215,6 +240,7 @@ class AIProvider extends Model
                 $this->status = 'healthy';
                 $this->last_error = $message;
                 $this->save();
+
                 return;
             }
 
@@ -237,5 +263,4 @@ class AIProvider extends Model
 
         $this->save();
     }
-
 }

@@ -113,16 +113,18 @@ class NewsDiscoveryService
         // ── Resolve the preferred provider from run properties ──────────────
         $discoveryProviderId = $run->properties['discovery_provider_id'] ?? null;
         $preferredProvider = $discoveryProviderId
-            ? AIProvider::find($discoveryProviderId)
+            ? AIProvider::availableToCustomer($site->customer_id)->find($discoveryProviderId)
             : $pipeline->provider;
 
         // Auto-override: News discovery needs real-time search grounding to prevent hallucinations.
         // If preferred provider is not Gemini, but Gemini is enabled with an API key, we use Gemini for discovery.
         if ($preferredProvider && strtolower($preferredProvider->provider_key) !== 'gemini') {
-            $geminiProvider = AIProvider::where('provider_key', 'gemini')
+            $geminiProvider = AIProvider::availableToCustomer($site->customer_id)
+                ->where('provider_key', 'gemini')
                 ->where('is_enabled', true)
                 ->whereNotNull('api_key')
                 ->get()
+                ->sortBy(fn (AIProvider $provider) => $provider->customer_id === $site->customer_id ? 0 : 1)
                 ->first(fn ($p) => ! empty($p->api_key));
             if ($geminiProvider) {
                 Log::info("NewsDiscoveryService: Overriding preferred provider '{$preferredProvider->provider_key}' with 'gemini' to utilize search grounding.");
@@ -135,7 +137,7 @@ class NewsDiscoveryService
             ." ({$preferredProvider?->provider_key})");
 
         // ── Build the ordered failover list ─────────────────────────────────
-        $availableProviders = $this->getAvailableProviders($preferredProvider);
+        $availableProviders = $this->getAvailableProviders($preferredProvider, $site->customer_id);
 
         if ($availableProviders->isEmpty()) {
             $message = 'No AI providers are enabled and configured. Please add at least one API key in AI Providers.';
@@ -271,9 +273,10 @@ class NewsDiscoveryService
      *
      * @return Collection<int, AIProvider>
      */
-    public function getAvailableProviders(?AIProvider $preferred = null): Collection
+    public function getAvailableProviders(?AIProvider $preferred = null, ?string $customerId = null): Collection
     {
-        $allEnabled = AIProvider::where('is_enabled', true)
+        $allEnabled = AIProvider::availableToCustomer($customerId)
+            ->where('is_enabled', true)
             ->whereNotNull('api_key')
             ->get()
             ->filter(fn (AIProvider $p) => ! empty($p->api_key));
@@ -287,11 +290,12 @@ class NewsDiscoveryService
 
         // Grounded Adapters are preferred for current-news accuracy, but must
         // never hide other keyed healthy Adapters from the failover list.
-        $sorted = $healthy->sortBy(function (AIProvider $p) use ($preferred) {
+        $sorted = $healthy->sortBy(function (AIProvider $p) use ($preferred, $customerId) {
             $isGrounded = $p->supportsGrounding() ? 0 : 1;
             $isPreferred = ($preferred && $p->id === $preferred->id) ? 0 : 1;
+            $isPlatformFallback = $customerId !== null && $p->customer_id === null ? 1 : 0;
 
-            return [$isGrounded, $isPreferred, $p->priority, $p->id];
+            return [$isGrounded, $isPreferred, $isPlatformFallback, $p->priority, $p->id];
         })->values();
 
         return $sorted;
@@ -538,7 +542,7 @@ class NewsDiscoveryService
             // same-event stories, drops gossip/trash, enforces geographic balance, and
             // fills in missing geo fields in one pass. Fail-open: on any LLM error,
             // $parsed is returned unchanged.
-            $refinementResult = $this->llmRefiner->refine($parsed, $provider, $category, $country, $state);
+            $refinementResult = $this->llmRefiner->refine($parsed, $provider, $category, $country, $state, $site->customer_id);
             $parsed = $refinementResult['candidates'];
 
             if (($refinementResult['provider'] ?? null) !== null) {
@@ -641,7 +645,7 @@ class NewsDiscoveryService
         $geoInstruction = $isCustomTopic
             ? "- If '{$category}' names a city or state, multiple stories MAY share that location. Diversify by event and subject instead of inventing other locations."
             : ($state
-                ? "- Stories should focus on the state/region of {$state}" . ($country ? " in {$country}." : ".") . " Spread coverage across different cities within this state/region."
+                ? "- Stories should focus on the state/region of {$state}".($country ? " in {$country}." : '.').' Spread coverage across different cities within this state/region.'
                 : ($country
                     ? "- If the region is {$country}: spread stories across different states/regions — do NOT cluster multiple stories in the same city."
                     : '- Spread stories across different cities and regions globally.'));

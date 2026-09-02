@@ -124,7 +124,7 @@ class PipelineService
         $preferred = $pipeline->provider;
         if (! $preferred || ! $preferred->is_enabled || empty($preferred->api_key)) {
             Log::warning('PipelineService: Preferred provider unavailable at trigger time; failover will be used.', [
-                'pipeline_id'        => $pipeline->id,
+                'pipeline_id' => $pipeline->id,
                 'preferred_provider' => $preferred?->provider_key ?? 'none',
             ]);
         }
@@ -134,9 +134,9 @@ class PipelineService
                 // Create execution history entry
                 $run = PipelineRun::create([
                     'pipeline_id' => $pipeline->id,
-                    'status'      => 'queued',
-                    'properties'  => $properties ?: null,
-                    'user_id'     => auth()->id(),
+                    'status' => 'queued',
+                    'properties' => $properties ?: null,
+                    'user_id' => auth()->id(),
                 ]);
 
                 // Update pipeline status
@@ -153,15 +153,14 @@ class PipelineService
         }
     }
 
-
     /**
      * Trigger a coverage discovery run for a pipeline.
      *
-     * @param string $discoveryProvider
-     *   Provider key to use for discovery ('groq', 'gemini', 'openai', 'claude',
-     *   'openrouter', 'ollama') OR 'auto' (default) to let the failover logic in
-     *   NewsDiscoveryService pick the best available provider automatically.
-     *   Explicit provider keys are still supported for backward compatibility.
+     * @param  string  $discoveryProvider
+     *                                     Provider key to use for discovery ('groq', 'gemini', 'openai', 'claude',
+     *                                     'openrouter', 'ollama') OR 'auto' (default) to let the failover logic in
+     *                                     NewsDiscoveryService pick the best available provider automatically.
+     *                                     Explicit provider keys are still supported for backward compatibility.
      */
     public function triggerDiscovery(ContentPipeline $pipeline, string $discoveryProvider = 'auto'): PipelineRun
     {
@@ -174,13 +173,19 @@ class PipelineService
 
         // ── Resolve the discovery provider model ─────────────────────────────
         $discoveryProviderModel = null;
-        $resolvedProviderKey    = null;
-        $requestedProviderKey   = $discoveryProvider !== 'auto' ? $discoveryProvider : null;
+        $resolvedProviderKey = null;
+        $requestedProviderKey = $discoveryProvider !== 'auto' ? $discoveryProvider : null;
 
         if ($discoveryProvider !== 'auto') {
             // Explicit provider requested — validate it exists and is enabled
-            $discoveryProviderModel = AIProvider::where('provider_key', $discoveryProvider)
+            $discoveryProviderModel = AIProvider::availableToCustomer($pipeline->site->customer_id)
+                ->where('provider_key', $discoveryProvider)
                 ->where('is_enabled', true)
+                ->get()
+                ->sortBy(fn (AIProvider $provider) => [
+                    $provider->customer_id === $pipeline->site->customer_id ? 0 : 1,
+                    $provider->priority,
+                ])
                 ->first();
 
             if ($discoveryProviderModel && ! empty($discoveryProviderModel->api_key)) {
@@ -219,10 +224,10 @@ class PipelineService
 
                 $run = PipelineRun::create([
                     'pipeline_id' => $pipeline->id,
-                    'status'      => 'queued',
-                    'run_type'    => PipelineRun::TYPE_DISCOVERY,
-                    'properties'  => $properties,
-                    'user_id'     => auth()->id(),
+                    'status' => 'queued',
+                    'run_type' => PipelineRun::TYPE_DISCOVERY,
+                    'properties' => $properties,
+                    'user_id' => auth()->id(),
                 ]);
 
                 GenerateNewsCandidatesJob::dispatch($run->id)->afterResponse();
@@ -234,7 +239,6 @@ class PipelineService
             throw new \RuntimeException($e->getMessage(), 0, $e);
         }
     }
-
 
     /**
      * Retry a failed pipeline run. Dispatches by run_type so both full
@@ -252,11 +256,11 @@ class PipelineService
             return DB::transaction(function () use ($pipeline, $run) {
                 $newRun = PipelineRun::create([
                     'pipeline_id' => $pipeline->id,
-                    'status'      => 'queued',
-                    'run_type'    => $run->run_type ?? PipelineRun::TYPE_FULL,
+                    'status' => 'queued',
+                    'run_type' => $run->run_type ?? PipelineRun::TYPE_FULL,
                     'retry_count' => $run->retry_count + 1,
-                    'properties'  => $run->properties,
-                    'user_id'     => auth()->id() ?? $run->user_id,
+                    'properties' => $run->properties,
+                    'user_id' => auth()->id() ?? $run->user_id,
                 ]);
 
                 if ($newRun->isDiscovery()) {
@@ -334,7 +338,7 @@ class PipelineService
         }
 
         // 4. Validate active AI provider
-        $provider = AIProvider::find($data['ai_provider_id']);
+        $provider = AIProvider::availableToCustomer($site->customer_id)->find($data['ai_provider_id']);
         if (! $provider) {
             throw new InvalidArgumentException('Referenced AI Provider does not exist.');
         }

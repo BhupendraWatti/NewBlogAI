@@ -126,7 +126,7 @@ class DatabaseSeeder extends Seeder
         $prompt1 = Prompt::create([
             'name' => 'Standard Universal Article Generator',
             'prompt' => StandardUniversalNewsPromptV2::TEXT,
-            'version' => 'v2.0',
+            'version' => 'v2.1',
             'status' => 'active',
         ]);
     }

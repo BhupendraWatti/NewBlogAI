@@ -8,6 +8,8 @@ use App\Modules\AIProviderManager\Models\AIProvider;
 use App\Modules\AIProviderManager\Services\AIProviderService;
 use App\Modules\ContentPipeline\Contracts\ContentGeneratorInterface;
 use App\Modules\ContentPipeline\DTOs\PipelineContext;
+use App\Modules\PromptManager\Support\StandardUniversalNewsPromptV2;
+use App\Modules\SystemSettings\Models\MasterOption;
 use Illuminate\Support\Facades\Log;
 
 class ContentGeneratorService implements ContentGeneratorInterface
@@ -45,7 +47,7 @@ class ContentGeneratorService implements ContentGeneratorInterface
                     'prompt_id' => $promptTemplate->id,
                     'prompt_name' => $promptTemplate->name,
                 ]);
-                $promptText = \App\Modules\PromptManager\Support\StandardUniversalNewsPromptV2::TEXT;
+                $promptText = StandardUniversalNewsPromptV2::TEXT;
             }
 
             // 1. Resolve variables from category context (no topic model needed)
@@ -74,10 +76,10 @@ class ContentGeneratorService implements ContentGeneratorInterface
             // Check if MasterOption metadata defines a custom tone for this topic
             $masterTone = null;
             try {
-                $topicOption = \App\Modules\SystemSettings\Models\MasterOption::ofType('topic')
+                $topicOption = MasterOption::ofType('topic')
                     ->where(function ($q) use ($category) {
                         $q->whereRaw('LOWER(name) = ?', [strtolower(trim($category))])
-                          ->orWhere('code', strtolower(trim($category)));
+                            ->orWhere('code', strtolower(trim($category)));
                     })
                     ->first();
 
@@ -257,20 +259,6 @@ class ContentGeneratorService implements ContentGeneratorInterface
                 $variables
             );
 
-            // Append strict anti-hallucination guidelines
-            $compiledPrompt .= "\n\nCRITICAL ANTI-HALLUCINATION GUARDRAILS:\n- Generate the expanded article based ONLY on the provided source text. Do NOT invent names, dates, casualty numbers, locations, or statistics that are not explicitly present in the original report.\n- If facts are missing, state only what is verified by the sources.\n- Reject any generic boilerplate placeholders.";
-
-            // Mutable facts such as officeholders must come from retrieved
-            // evidence, never from source code where they inevitably drift.
-            $currentYear = now()->format('Y');
-            $politicalContext = "\n\nTEMPORAL & POLITICAL CONTEXT (Strictly anchor sourced facts to this timeline):\n"
-                .'- Current Date: '.now()->format('F j, Y')."\n"
-                ."- Current Year: {$currentYear}\n"
-                .'- Verify every current officeholder and title from the supplied source evidence. '
-                ."If the evidence does not establish a current designation, omit it.\n";
-
-            $compiledPrompt .= $politicalContext;
-
             Log::debug('ContentGeneratorService: Compiled prompt for generation.', [
                 'prompt_id' => $promptTemplate->id,
                 'prompt_name' => $promptTemplate->name,
@@ -344,13 +332,5 @@ class ContentGeneratorService implements ContentGeneratorInterface
         }
 
         return $context;
-    }
-
-    /**
-     * Parse variables in prompt templates.
-     */
-    protected function compilePrompt(string $template, array $variables): string
-    {
-        return $this->promptEngine->compileUserPrompt($template, $variables);
     }
 }

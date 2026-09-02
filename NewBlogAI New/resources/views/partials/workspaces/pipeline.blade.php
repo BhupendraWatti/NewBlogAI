@@ -128,7 +128,7 @@
                                             <div class="text-[9px] text-muted uppercase">Reported tokens</div>
                                         </div>
                                         <div class="rounded-lg bg-surface p-2">
-                                            <div id="discovery-telemetry-cost" class="text-xs font-bold">$0.000000</div>
+                                            <div id="discovery-telemetry-cost" class="text-xs font-bold">₹0.000000</div>
                                             <div class="text-[9px] text-muted uppercase">Est. provider cost</div>
                                         </div>
                                     </div>

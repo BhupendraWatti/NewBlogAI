@@ -114,7 +114,14 @@ class PromptController extends Controller
 
         // Retrieve default provider or the one passed in variables
         $providerId = $request->input('ai_provider_id');
-        $provider = $providerId ? AIProvider::find($providerId) : AIProvider::where('is_default', true)->first();
+        $customerId = (int) $request->user()->role === 1 ? null : $request->user()->customer_id;
+        $providers = AIProvider::query()
+            ->when((int) $request->user()->role !== 1, fn ($query) => $query->availableToCustomer($customerId));
+        $provider = $providerId
+            ? $providers->find($providerId)
+            : $providers->where('is_default', true)->get()
+                ->sortBy(fn (AIProvider $provider) => $provider->customer_id === $customerId ? 0 : 1)
+                ->first();
 
         if (! $provider || ! $provider->is_enabled || empty($provider->api_key)) {
             return response()->json([

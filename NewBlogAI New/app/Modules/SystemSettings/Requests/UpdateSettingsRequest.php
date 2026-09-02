@@ -16,7 +16,7 @@ class UpdateSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'currency' => ['sometimes', 'required', 'string', 'in:USD,INR'],
+            'currency' => ['sometimes', 'required', 'string', 'in:INR'],
             'timezone' => ['sometimes', 'required', 'string', 'timezone'],
             'language' => ['sometimes', 'required', 'string', 'in:en,es,fr,de,hi'],
             'ai_default_provider' => ['sometimes', 'required', 'string', 'in:gemini,openai,claude,groq,openrouter,ollama'],

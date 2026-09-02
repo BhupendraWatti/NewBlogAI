@@ -4,6 +4,7 @@ namespace App\Modules\MediaManager\Drivers;
 
 use App\Modules\AIProviderManager\Models\AIProvider;
 use App\Modules\MediaManager\Contracts\ImageGeneratorInterface;
+use App\Modules\SiteManager\Models\Site;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -24,7 +25,12 @@ class DalleDriver implements ImageGeneratorInterface
         if (empty($apiKey)) {
             // Check AIProvider table for openai
             try {
-                $provider = AIProvider::where('provider_key', 'openai')->first();
+                $customerId = isset($options['site_id']) ? Site::find($options['site_id'])?->customer_id : null;
+                $provider = AIProvider::availableToCustomer($customerId)
+                    ->where('provider_key', 'openai')
+                    ->get()
+                    ->sortBy(fn (AIProvider $provider) => $provider->customer_id === $customerId ? 0 : 1)
+                    ->first();
                 if ($provider && ! empty($provider->api_key)) {
                     $apiKey = $provider->api_key;
                 }

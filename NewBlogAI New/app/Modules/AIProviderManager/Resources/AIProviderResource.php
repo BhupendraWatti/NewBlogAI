@@ -2,6 +2,7 @@
 
 namespace App\Modules\AIProviderManager\Resources;
 
+use App\Modules\ContentGeneration\Models\AIRequestLog;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -11,13 +12,17 @@ class AIProviderResource extends JsonResource
     {
         // Aggregate real token usage and cost metrics directly from database logs.
         // Dual-match: new logs use provider_id FK; legacy logs only have the provider string key.
-        $stats = \App\Modules\ContentGeneration\Models\AIRequestLog::query()
+        $stats = AIRequestLog::query()
             ->where(function ($q) {
-                $q->where('provider_id', $this->id)
-                  ->orWhere(function ($q2) {
-                      $q2->whereNull('provider_id')
-                         ->where('provider', $this->provider_key);
-                  });
+                $q->where('provider_id', $this->id);
+
+                if ($this->customer_id === null) {
+                    $q->orWhere(function ($legacy) {
+                        $legacy->whereNull('provider_id')
+                            ->whereNull('customer_id')
+                            ->where('provider', $this->provider_key);
+                    });
+                }
             })
             ->selectRaw('
                 COALESCE(SUM(total_tokens), 0) as total_tokens,
@@ -30,13 +35,13 @@ class AIProviderResource extends JsonResource
             ')
             ->first();
 
-        $totalTokensUsed       = (int)   ($stats->total_tokens  ?? 0);
-        $promptTokensUsed      = (int)   ($stats->prompt_tokens ?? 0);
-        $completionTokensUsed  = (int)   ($stats->completion_tokens ?? 0);
-        $totalCost             = (float) ($stats->total_cost ?? 0);
-        $totalRequests         = (int)   ($stats->total_requests ?? 0);
-        $successRequests       = (int)   ($stats->success_requests ?? 0);
-        $errorRequests         = (int)   ($stats->error_requests ?? 0);
+        $totalTokensUsed = (int) ($stats->total_tokens ?? 0);
+        $promptTokensUsed = (int) ($stats->prompt_tokens ?? 0);
+        $completionTokensUsed = (int) ($stats->completion_tokens ?? 0);
+        $totalCost = (float) ($stats->total_cost ?? 0);
+        $totalRequests = (int) ($stats->total_requests ?? 0);
+        $successRequests = (int) ($stats->success_requests ?? 0);
+        $errorRequests = (int) ($stats->error_requests ?? 0);
 
         // Effective remaining credits calculation
         $creditsTotal = $this->credits_total;

@@ -35,7 +35,7 @@ class PaymentGatewayStub implements PaymentGatewayInterface
             'transaction_id' => 'ch_'.bin2hex(random_bytes(8)),
             'status' => 'succeeded',
             'amount' => $amount,
-            'currency' => 'usd',
+            'currency' => 'INR',
             'gateway' => 'Stripe Mock Core',
         ];
     }
@@ -58,7 +58,7 @@ class PaymentGatewayStub implements PaymentGatewayInterface
             'refund_id' => 're_'.bin2hex(random_bytes(8)),
             'status' => 'succeeded',
             'amount' => $amount,
-            'currency' => 'usd',
+            'currency' => 'INR',
             'gateway' => 'Stripe Mock Core',
         ];
     }

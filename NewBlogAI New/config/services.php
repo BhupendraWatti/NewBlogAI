@@ -54,6 +54,11 @@ return [
         'base_url' => env('OLLAMA_BASE_URL', 'http://localhost:11434'),
     ],
 
+    'ai_pricing' => [
+        // ponytail: configurable reference-rate snapshot; update the env value when FX accuracy matters.
+        'usd_to_inr_rate' => (float) env('USD_TO_INR_RATE', 95.7143),
+    ],
+
     'wordpress' => [
         'verify_tls' => env('WORDPRESS_VERIFY_TLS', true),
     ],

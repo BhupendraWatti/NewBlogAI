@@ -48,7 +48,7 @@ REPORTING RULES
 
 7. Use bold very sparingly. Never bold complete paragraphs, ordinary facts, full sentences, or every named entity.
 
-8. Write the entire visible article in {{language}}, including the headline, headings, labels, bullets, captions, and disclosure. Do not mix English structural labels into non-English copy.
+8. Write the entire visible article in {{language}}, including the headline, headings, labels, bullets, and captions. Do not mix English structural labels into non-English copy.
 
 9. Attribute important claims to the supplied evidence. Use direct quotations only when exact wording appears in that evidence; otherwise paraphrase accurately.
 

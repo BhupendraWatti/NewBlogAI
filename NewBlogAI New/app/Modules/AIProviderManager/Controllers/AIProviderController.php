@@ -9,6 +9,8 @@ use App\Modules\AIProviderManager\Requests\TestConnectionRequest;
 use App\Modules\AIProviderManager\Requests\UpdateProviderRequest;
 use App\Modules\AIProviderManager\Resources\AIProviderResource;
 use App\Modules\AIProviderManager\Services\AIProviderService;
+use App\Modules\ContentGeneration\Models\AIRequestLog;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -23,7 +25,7 @@ class AIProviderController extends Controller
      */
     public function index(): AnonymousResourceCollection
     {
-        return AIProviderResource::collection(AIProvider::all());
+        return AIProviderResource::collection($this->readableProviders()->get());
     }
 
     /**
@@ -31,7 +33,13 @@ class AIProviderController extends Controller
      */
     public function store(StoreProviderRequest $request): JsonResponse
     {
-        $provider = $this->providerService->createProvider($request->validated());
+        $data = $request->validated();
+        $user = $request->user();
+        $data['customer_id'] = (int) $user->role === 1 ? null : $user->customer_id;
+
+        abort_if((int) $user->role !== 1 && $user->customer_id === null, 422, 'A customer account is required to configure an AI provider.');
+
+        $provider = $this->providerService->createProvider($data);
 
         return (new AIProviderResource($provider))
             ->response()
@@ -43,7 +51,7 @@ class AIProviderController extends Controller
      */
     public function show(string $id): AIProviderResource
     {
-        $provider = AIProvider::findOrFail($id);
+        $provider = $this->readableProviders()->findOrFail($id);
 
         return new AIProviderResource($provider);
     }
@@ -53,7 +61,7 @@ class AIProviderController extends Controller
      */
     public function update(UpdateProviderRequest $request, string $id): AIProviderResource
     {
-        $provider = AIProvider::findOrFail($id);
+        $provider = $this->writableProviders()->findOrFail($id);
         $updated = $this->providerService->updateProvider($provider, $request->validated());
 
         return new AIProviderResource($updated);
@@ -64,7 +72,7 @@ class AIProviderController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
-        $provider = AIProvider::findOrFail($id);
+        $provider = $this->writableProviders()->findOrFail($id);
 
         if ($provider->is_default) {
             return response()->json([
@@ -84,7 +92,7 @@ class AIProviderController extends Controller
      */
     public function testConnection(TestConnectionRequest $request, string $id): JsonResponse
     {
-        $provider = AIProvider::findOrFail($id);
+        $provider = $this->writableProviders()->findOrFail($id);
         $apiKey = $request->input('api_key') ?: $provider->api_key;
         $model = $request->input('model') ?: $provider->default_model;
 
@@ -113,7 +121,7 @@ class AIProviderController extends Controller
      */
     public function refreshCredits(string $id): JsonResponse
     {
-        $provider = AIProvider::findOrFail($id);
+        $provider = $this->writableProviders()->findOrFail($id);
 
         if (empty($provider->api_key)) {
             return response()->json([
@@ -147,23 +155,23 @@ class AIProviderController extends Controller
 
             // Write an AIRequestLog entry so token/cost metrics are immediately visible
             // on the dashboard without needing a full article generation.
-            \App\Modules\ContentGeneration\Models\AIRequestLog::create([
-                'provider'          => $provider->provider_key,
-                'provider_id'       => $provider->id,
-                'customer_id'       => null,
-                'model'             => $provider->default_model,
-                'prompt_tokens'     => $result['prompt_tokens']     ?? 0,
+            AIRequestLog::create([
+                'provider' => $provider->provider_key,
+                'provider_id' => $provider->id,
+                'customer_id' => $provider->customer_id,
+                'model' => $provider->default_model,
+                'prompt_tokens' => $result['prompt_tokens'] ?? 0,
                 'completion_tokens' => $result['completion_tokens'] ?? 0,
-                'total_tokens'      => $result['total_tokens']      ?? 0,
-                'estimated_cost'    => $result['estimated_cost']    ?? 0,
+                'total_tokens' => $result['total_tokens'] ?? 0,
+                'estimated_cost' => $result['estimated_cost'] ?? 0,
                 'execution_time_ms' => 0,
-                'status'            => 'success',
+                'status' => 'success',
             ]);
 
             $provider->refresh();
 
             return response()->json([
-                'message'  => 'Credits refreshed successfully.',
+                'message' => 'Credits refreshed successfully.',
                 'provider' => new AIProviderResource($provider),
             ]);
 
@@ -172,7 +180,7 @@ class AIProviderController extends Controller
             $provider->refresh();
 
             return response()->json([
-                'message'  => 'Could not refresh credits: '.$e->getMessage(),
+                'message' => 'Could not refresh credits: '.$e->getMessage(),
                 'provider' => new AIProviderResource($provider),
             ], 502);
         }
@@ -183,11 +191,27 @@ class AIProviderController extends Controller
      */
     public function setDefault(string $id): JsonResponse
     {
-        $provider = AIProvider::findOrFail($id);
+        $provider = $this->writableProviders()->findOrFail($id);
         $this->providerService->setDefault($provider);
 
         return response()->json([
             'message' => "{$provider->name} is now the default AI provider.",
         ]);
+    }
+
+    private function readableProviders(): Builder
+    {
+        $user = auth()->user();
+
+        return AIProvider::query()
+            ->when((int) $user->role !== 1, fn (Builder $query) => $query->availableToCustomer($user->customer_id));
+    }
+
+    private function writableProviders(): Builder
+    {
+        $user = auth()->user();
+
+        return AIProvider::query()
+            ->when((int) $user->role !== 1, fn (Builder $query) => $query->ownedBy($user->customer_id));
     }
 }

@@ -114,20 +114,31 @@ class ClaudeDriver implements AIProviderClientInterface
                 $text = $data['content'][0]['text'] ?? '';
             }
             $usage = $data['usage'] ?? [];
-            $promptTokens = $usage['input_tokens'] ?? 0;
+            $uncachedTokens = (int) ($usage['input_tokens'] ?? 0);
+            $cacheReadTokens = (int) ($usage['cache_read_input_tokens'] ?? 0);
+            $cacheCreation = (int) ($usage['cache_creation_input_tokens'] ?? 0);
+            $cacheCreation1h = (int) ($usage['cache_creation']['ephemeral_1h_input_tokens'] ?? 0);
+            $cacheCreation5m = (int) ($usage['cache_creation']['ephemeral_5m_input_tokens'] ?? max(0, $cacheCreation - $cacheCreation1h));
+            $promptTokens = $uncachedTokens + $cacheReadTokens + $cacheCreation;
             $completionTokens = $usage['output_tokens'] ?? 0;
             $totalTokens = $promptTokens + $completionTokens;
 
-            // Claude Pricing estimation per 1,000 tokens
-            if (str_contains($model, 'haiku')) {
-                $promptRate     = 0.0008; // $0.80 / 1M input
-                $completionRate = 0.0040; // $4.00 / 1M output
-            } else {
-                // Sonnet / Opus
-                $promptRate     = 0.0030; // $3.00 / 1M input
-                $completionRate = 0.0150; // $15.00 / 1M output
-            }
-            $cost = (($promptTokens / 1000.0) * $promptRate) + (($completionTokens / 1000.0) * $completionRate);
+            // ponytail: unknown Claude IDs use Sonnet rates; use a versioned catalog if arbitrary models are enabled.
+            [$promptRate, $completionRate] = match (true) {
+                str_contains($model, 'fable-5') => [0.01000, 0.05000],
+                str_contains($model, 'sonnet-5') => [0.00200, 0.01000],
+                str_contains($model, 'opus-5'), preg_match('/opus-4-[567]/', $model) === 1 => [0.00500, 0.02500],
+                str_contains($model, 'opus-4'), str_contains($model, 'opus-3') => [0.01500, 0.07500],
+                str_contains($model, 'haiku-4-5') => [0.00100, 0.00500],
+                str_contains($model, '3-5-haiku') => [0.00080, 0.00400],
+                str_contains($model, '3-haiku') => [0.00025, 0.00125],
+                default => [0.00300, 0.01500],
+            };
+            $cost = (($uncachedTokens / 1000.0) * $promptRate)
+                + (($cacheCreation5m / 1000.0) * $promptRate * 1.25)
+                + (($cacheCreation1h / 1000.0) * $promptRate * 2)
+                + (($cacheReadTokens / 1000.0) * $promptRate * 0.1)
+                + (($completionTokens / 1000.0) * $completionRate);
 
 
             $limit     = $response->header('anthropic-ratelimit-tokens-limit') ?: ($response->header('anthropic-ratelimit-requests-limit') ?: null);

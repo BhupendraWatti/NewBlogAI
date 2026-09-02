@@ -62,6 +62,12 @@ class GoogleGeminiDriver implements AIProviderClientInterface
                 ],
             ];
 
+            // Gemini 2.5 Flash thinks by default; keep routine publishing calls cheap
+            // unless a caller deliberately opts into a thinking budget.
+            if (str_contains($m, '2.5-flash') && ! array_key_exists('thinking_budget', $opts)) {
+                $opts['thinking_budget'] = 0;
+            }
+
             if (array_key_exists('thinking_budget', $opts) && $opts['thinking_budget'] !== null) {
                 $payload['generationConfig']['thinkingConfig'] = [
                     'thinkingBudget' => (int) $opts['thinking_budget'],
@@ -202,17 +208,18 @@ class GoogleGeminiDriver implements AIProviderClientInterface
 
                 $usage = $data['usageMetadata'] ?? [];
                 $promptTokens = $usage['promptTokenCount'] ?? 0;
-                $completionTokens = $usage['candidatesTokenCount'] ?? 0;
+                $completionTokens = ($usage['candidatesTokenCount'] ?? 0) + ($usage['thoughtsTokenCount'] ?? 0);
                 $totalTokens = $usage['totalTokenCount'] ?? 0;
 
-                if (str_contains($model, 'pro')) {
-                    $promptRate     = 0.00125;  // $1.25 / 1M input
-                    $completionRate = 0.00500;  // $5.00 / 1M output
-                } else {
-                    // gemini-2.5-flash / gemini-1.5-flash
-                    $promptRate     = 0.000075; // $0.075 / 1M input
-                    $completionRate = 0.000300; // $0.300 / 1M output
-                }
+                // ponytail: legacy Gemini IDs retain legacy rates; use a versioned catalog if arbitrary models are enabled.
+                [$promptRate, $completionRate] = match (true) {
+                    str_contains($model, '2.5-flash-lite') => [0.00010, 0.00040],
+                    str_contains($model, '2.5-flash') => [0.00030, 0.00250],
+                    str_contains($model, '2.5-pro') && $promptTokens > 200000 => [0.00250, 0.01500],
+                    str_contains($model, '2.5-pro') => [0.00125, 0.01000],
+                    str_contains($model, 'pro') => [0.00125, 0.00500],
+                    default => [0.000075, 0.000300],
+                };
                 $cost = (($promptTokens / 1000.0) * $promptRate) + (($completionTokens / 1000.0) * $completionRate);
 
 

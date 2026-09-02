@@ -99,24 +99,24 @@ class OpenAIDriver implements AIProviderClientInterface
             $completionTokens = $usage['completion_tokens'] ?? 0;
             $totalTokens = $usage['total_tokens'] ?? 0;
 
-            // Accurate OpenAI Pricing estimation (per 1,000 tokens)
-            if (str_contains($model, 'gpt-4o-mini')) {
-                $promptRate     = 0.00015;  // $0.15 / 1M input
-                $completionRate = 0.00060;  // $0.60 / 1M output
-            } elseif (str_contains($model, 'gpt-4o')) {
-                $promptRate     = 0.00250;  // $2.50 / 1M input
-                $completionRate = 0.01000;  // $10.00 / 1M output
-            } elseif (str_contains($model, 'o3-mini') || str_contains($model, 'o1-mini')) {
-                $promptRate     = 0.00110;  // $1.10 / 1M input
-                $completionRate = 0.00440;  // $4.40 / 1M output
-            } elseif (str_contains($model, 'gpt-4')) {
-                $promptRate     = 0.01000;  // $10.00 / 1M input
-                $completionRate = 0.03000;  // $30.00 / 1M output
-            } else {
-                $promptRate     = 0.00050;  // gpt-3.5-turbo default ($0.50 / 1M)
-                $completionRate = 0.00150;  // $1.50 / 1M
-            }
-            $cost = (($promptTokens / 1000.0) * $promptRate) + (($completionTokens / 1000.0) * $completionRate);
+            // ponytail: static rates cover configured model families; use a versioned catalog if arbitrary models are enabled.
+            [$promptRate, $cachedRate, $completionRate] = match (true) {
+                str_contains($model, 'gpt-5.6-terra') => [0.00200, 0.00020, 0.01200],
+                str_contains($model, 'gpt-5.6-luna') => [0.00020, 0.00002, 0.00120],
+                str_contains($model, 'gpt-5.6-sol'), $model === 'gpt-5.6' => [0.00400, 0.00040, 0.02000],
+                str_contains($model, 'gpt-5.4') => [0.00250, 0.00025, 0.01500],
+                str_contains($model, 'gpt-4o-mini') => [0.00015, 0.000075, 0.00060],
+                str_contains($model, 'gpt-4o') => [0.00250, 0.00125, 0.01000],
+                str_contains($model, 'o3-mini'), str_contains($model, 'o1-mini') => [0.00110, 0.00055, 0.00440],
+                str_contains($model, 'gpt-4') => [0.01000, 0.00500, 0.03000],
+                default => [0.00050, 0.00025, 0.00150],
+            };
+            $cachedTokens = min($promptTokens, (int) ($usage['prompt_tokens_details']['cached_tokens'] ?? 0));
+            $cacheWriteTokens = min($promptTokens - $cachedTokens, (int) ($usage['prompt_tokens_details']['cache_write_tokens'] ?? 0));
+            $cost = ((($promptTokens - $cachedTokens - $cacheWriteTokens) / 1000.0) * $promptRate)
+                + (($cachedTokens / 1000.0) * $cachedRate)
+                + (($cacheWriteTokens / 1000.0) * $promptRate * 1.25)
+                + (($completionTokens / 1000.0) * $completionRate);
 
 
             $limit     = $response->header('x-ratelimit-limit-tokens') ?: ($response->header('x-ratelimit-limit-requests') ?: null);

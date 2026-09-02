@@ -64,23 +64,6 @@ class LLMCandidateRefinementService
     private const REFINEMENT_MAX_TOKENS = 2048;
 
     /**
-     * Provider preference order for refinement (cheap + fast models first).
-     * Only providers that are enabled and have an API key are actually used.
-     */
-    private const PREFERRED_PROVIDERS = ['groq', 'openai', 'claude', 'openrouter'];
-
-    /**
-     * Preferred model per provider for the refinement task.
-     * Falls back to the provider's configured default_model when null.
-     */
-    private const PROVIDER_MODELS = [
-        'groq' => 'llama-3.1-8b-instant',
-        'openai' => 'gpt-4o-mini',
-        'claude' => 'claude-haiku-4-5',
-        'openrouter' => null,
-    ];
-
-    /**
      * JSON Schema for the structured output response.
      *
      * Passed as json_schema to generate() so every driver enforces the shape
@@ -151,6 +134,7 @@ class LLMCandidateRefinementService
         string $category,
         ?string $country = null,
         ?string $state = null,
+        ?string $customerId = null,
     ): array {
         $passthrough = [
             'candidates' => $rawCandidates,
@@ -169,7 +153,7 @@ class LLMCandidateRefinementService
         }
 
         try {
-            [$provider, $model] = $this->resolveProvider($preferredProvider);
+            [$provider, $model] = $this->resolveProvider($preferredProvider, $customerId);
 
             if ($provider === null) {
                 Log::warning('LLMCandidateRefinementService: no usable provider found, skipping refinement.');
@@ -246,35 +230,22 @@ class LLMCandidateRefinementService
      *
      * @return array{0: AIProvider|null, 1: string|null}
      */
-    private function resolveProvider(AIProvider $preferredProvider): array
+    private function resolveProvider(AIProvider $preferredProvider, ?string $customerId): array
     {
-        foreach (self::PREFERRED_PROVIDERS as $key) {
-            $provider = AIProvider::where('provider_key', $key)
-                ->where('is_enabled', true)
-                ->whereNotNull('api_key')
-                ->get()
-                ->first(fn ($p) => ! empty($p->api_key));
+        $provider = AIProvider::availableToCustomer($customerId)
+            ->where('provider_key', '!=', 'gemini')
+            ->where('is_enabled', true)
+            ->whereNotNull('api_key')
+            ->get()
+            ->sortBy(fn (AIProvider $provider) => [
+                $customerId !== null && $provider->customer_id === null ? 1 : 0,
+                $provider->priority,
+                $provider->id,
+            ])
+            ->first(fn (AIProvider $provider) => ! empty($provider->api_key)
+                && (! $provider->reset_at || $provider->reset_at->isPast()));
 
-            if ($provider) {
-                // Skip if currently rate-limited (reset window still in the future)
-                if ($provider->reset_at && $provider->reset_at->isFuture()) {
-                    continue;
-                }
-                $model = self::PROVIDER_MODELS[$key] ?? $provider->default_model;
-
-                return [$provider, $model];
-            }
-        }
-
-        if (
-            strtolower($preferredProvider->provider_key) !== 'gemini'
-            && $preferredProvider->is_enabled
-            && ! empty($preferredProvider->api_key)
-        ) {
-            return [$preferredProvider, $preferredProvider->default_model];
-        }
-
-        return [null, null];
+        return [$provider, $provider?->default_model];
     }
 
     /**
@@ -297,7 +268,7 @@ class LLMCandidateRefinementService
         // Dynamic state balance rule: avoid hard-dropping state candidates when focused on that state
         $stateBalanceRule = $state
             ? "Stories are specifically targeted to {$state}. Diversify across different cities and districts within {$state}."
-            : "Apply the same logic for geo_state with a maximum of 4.";
+            : 'Apply the same logic for geo_state with a maximum of 4.';
 
         // Tag each candidate with its index so we can map results back
         $indexed = array_map(

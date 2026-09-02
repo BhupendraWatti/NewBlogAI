@@ -213,7 +213,8 @@ class PromptEngineImprovementTest extends TestCase
         $compiled = $this->promptEngine->compileDynamicInstructions($context);
 
         $this->assertStringContainsString("Language: Write the complete article in fr (code 'fr').", $compiled);
-        $this->assertStringContainsString('Translate every visible heading, label, bullet, caption, and disclosure', $compiled);
+        $this->assertStringContainsString('Translate every visible heading, label, bullet, and caption', $compiled);
+        $this->assertStringNotContainsString('disclosure', strtolower($compiled));
         $this->assertStringContainsString('Style Guide: Write in short paragraphs.', $compiled);
         $this->assertStringContainsString('Tone: Write with a professional and technical tone.', $compiled);
         $this->assertStringContainsString('Additional Guidelines: Add code examples where possible.', $compiled);
@@ -226,6 +227,7 @@ class PromptEngineImprovementTest extends TestCase
         $this->assertStringContainsString('Keep structure proportional to the verified evidence', $default);
         $this->assertStringContainsString('every visible heading and label', $default);
         $this->assertStringNotContainsString("Include a 'Key Takeaways'", $default);
+        $this->assertStringNotContainsString('Disclosure:', $this->promptEngine->compileSystemPrompt());
         $this->assertStringNotContainsString('followed by supporting sections', $default);
 
         $custom = $this->promptEngine->compileOutputInstructions([

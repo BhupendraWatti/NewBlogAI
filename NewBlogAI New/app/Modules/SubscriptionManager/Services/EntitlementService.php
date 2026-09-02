@@ -284,7 +284,8 @@ class EntitlementService
         // Check that at least one enabled provider with a valid API key is in
         // the plan's allowed list. We deliberately avoid caching — this query
         // is cheap and we want the freshest state at trigger time.
-        $enabledKeys = \App\Modules\AIProviderManager\Models\AIProvider::where('is_enabled', true)
+        $enabledKeys = \App\Modules\AIProviderManager\Models\AIProvider::availableToCustomer($site->customer_id)
+            ->where('is_enabled', true)
             ->whereNotNull('api_key')
             ->pluck('provider_key')
             ->map('strtolower')
