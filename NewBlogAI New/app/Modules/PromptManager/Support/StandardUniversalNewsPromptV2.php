@@ -27,7 +27,7 @@ Available source domains: {{sources}}
 
 PRIMARY EVIDENCE
 
-{{research_context}}
+Use the complete verified evidence in the Research Context section above. It is intentionally provided only once.
 
 REPORTING RULES
 
@@ -50,7 +50,7 @@ REPORTING RULES
 
 8. Write the entire visible article in {{language}}, including the headline, headings, labels, bullets, and captions. Do not mix English structural labels into non-English copy.
 
-9. Attribute important claims to the supplied evidence. Use direct quotations only when exact wording appears in that evidence; otherwise paraphrase accurately.
+9. Write from scratch using only the key facts. Do not translate or paraphrase the source sentence by sentence. Choose a new lead, reorganize facts by journalistic importance, group related details differently, change the paragraph flow, and use original sentence construction. Preserve exact wording only for clearly attributed direct quotations that appear in the evidence.
 
 10. If evidence is sparse, a short accurate report is the correct result. Mention that further details are unavailable at most once and only when it helps readers understand a material gap.
 

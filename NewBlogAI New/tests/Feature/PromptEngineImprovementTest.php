@@ -11,6 +11,7 @@ use App\Modules\ContentPipeline\DTOs\PipelineContext;
 use App\Modules\ContentPipeline\DTOs\SourceDTO;
 use App\Modules\ContentPipeline\Models\ContentPipeline;
 use App\Modules\ContentPipeline\Models\PipelineRun;
+use App\Modules\ContentPipeline\Services\ArticleStructureNormalizer;
 use App\Modules\ContentPipeline\Services\ContentGeneratorService;
 use App\Modules\ContentPipeline\Services\PromptEngine;
 use App\Modules\ContentPipeline\Services\SourceCollectionService;
@@ -134,7 +135,8 @@ class PromptEngineImprovementTest extends TestCase
 
         // Custom system prompt override
         $custom = $this->promptEngine->compileSystemPrompt(['persona' => 'You are a minimalist tech writer.']);
-        $this->assertEquals('You are a minimalist tech writer.', $custom);
+        $this->assertStringStartsWith('You are a minimalist tech writer.', $custom);
+        $this->assertStringContainsString('Never translate sentence by sentence', $custom);
     }
 
     public function test_compile_research_context_renders_details_and_clusters(): void
@@ -207,6 +209,25 @@ class PromptEngineImprovementTest extends TestCase
             'Write about Laravel 12 Features for https://laravel-news.com in en under category Development.',
             $compiled
         );
+    }
+
+    public function test_full_prompt_includes_source_body_once_and_requires_original_structure(): void
+    {
+        $context = new PipelineContext($this->run, $this->pipeline);
+        $sourceBody = 'UNIQUE VERIFIED SOURCE BODY 7319';
+        $context->metadata['scraped_article_body'] = $sourceBody;
+
+        $compiled = $this->promptEngine->buildFullPrompt(
+            $context,
+            'Evidence placeholder: {{research_context}}',
+            ['research_context' => $sourceBody],
+        );
+
+        $this->assertSame(1, substr_count($compiled, $sourceBody));
+        $this->assertStringContainsString('intentionally provided only once', $compiled);
+        $this->assertStringContainsString('Draft from a blank page', $compiled);
+        $this->assertStringContainsString('change the paragraph flow', $compiled);
+        $this->assertStringContainsString('Never translate sentence by sentence', $compiled);
     }
 
     public function test_compile_dynamic_instructions_based_on_context(): void
@@ -324,7 +345,7 @@ class PromptEngineImprovementTest extends TestCase
             $providers,
             $this->promptEngine,
             $collector,
-            app(\App\Modules\ContentPipeline\Services\ArticleStructureNormalizer::class),
+            app(ArticleStructureNormalizer::class),
         );
 
         $withoutEvidence = new PipelineContext($this->run, $this->pipeline);

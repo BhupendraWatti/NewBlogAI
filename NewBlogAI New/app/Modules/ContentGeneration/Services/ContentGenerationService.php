@@ -22,6 +22,7 @@ use App\Modules\ContentPipeline\Contracts\TopicResolverInterface;
 use App\Modules\ContentPipeline\Contracts\TranslationInterface;
 use App\Modules\ContentPipeline\DTOs\PipelineContext;
 use App\Modules\ContentPipeline\Exceptions\DuplicateNewsException;
+use App\Modules\ContentPipeline\Exceptions\SourceEvidenceException;
 use App\Modules\ContentPipeline\Models\PipelineRun;
 use App\Modules\ContentPipeline\Services\DuplicateDetectionService;
 use App\Modules\ContentPipeline\Support\PipelineErrorFormatter;
@@ -316,6 +317,10 @@ class ContentGenerationService
                 } catch (DuplicateNewsException $e) {
                     // Rethrow immediately to abort the failover loop (no point retrying other providers for duplicates)
                     throw $e;
+                } catch (SourceEvidenceException $e) {
+                    // Source access happens before the AI call and is shared by
+                    // every provider. Do not blame, disable, or retry providers.
+                    throw $e;
                 } catch (\Exception $e) {
                     $errorMsg = $e->getMessage();
                     $allErrors[$providerKey][] = "attempt {$attempt}: {$errorMsg}";
@@ -505,6 +510,13 @@ class ContentGenerationService
             ])
             ->then(function (PipelineContext $context) {
                 if ($context->hasErrors()) {
+                    if (! empty($context->errors['source_evidence'])) {
+                        throw new SourceEvidenceException(
+                            'Source verification failed before the AI provider was called; the API key and quota were not involved: '
+                            .implode(', ', $context->errors['source_evidence'])
+                        );
+                    }
+
                     $allErrors = array_merge(...array_values($context->errors));
                     throw new \RuntimeException('Pipeline execution failed: '.implode(', ', $allErrors));
                 }

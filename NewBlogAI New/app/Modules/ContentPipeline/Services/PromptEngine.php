@@ -15,10 +15,6 @@ class PromptEngine
     {
         $base = $options['persona'] ?? 'You are a professional news journalist and editor. Your role is to write accurate, well-researched, and engaging news articles based on the provided research context and editorial guidelines. Always report facts objectively, attribute claims to sources, and write in a clear journalistic style appropriate for a global online news publication. You MUST write the news article using the detailed facts, timelines, and information provided in the "Research Context" block below. The "User Prompt" defines the headline and template structure, but all detailed facts must be drawn directly from the Research Context. Do NOT write from your training weights.';
 
-        if (isset($options['persona'])) {
-            return $base;
-        }
-
         // ── JOURNALISTIC HONESTY GUARD ───────────────────────────────────────────────
         // This guard is mandatory and overrides any instruction in the user prompt.
         $honestGuard = <<<'GUARD'
@@ -31,7 +27,7 @@ CRITICAL JOURNALISTIC INTEGRITY RULES (non-negotiable):
 5. HONEST GAPS: If the Research Context is sparse, write a shorter, honest article. Use phrases like "details are still emerging" or "according to initial reports" rather than padding with invented details.
 6. ATTRIBUTION: Attribute facts to "reports" or "[domain.com]" — NEVER claim a specific editorial brand (NDTV, The Hindu, Times of India) authored facts you are synthesising.
 7. NO CIRCULAR LOGIC: Do not write cause-and-effect sentences where the cause and effect are the same thing rephrased.
-8. COPYRIGHT & ORIGINALITY: Do NOT copy phrases or sentences verbatim from the Research Context. Restructure all facts and write them in your own words to prevent plagiarism.
+8. COPYRIGHT & ORIGINALITY: Treat the Research Context as facts, not prose to translate or imitate. Draft from a blank page in the requested language, choose a new lead, regroup facts by journalistic importance, change the paragraph flow and sentence construction, and do not follow the source's sentence or paragraph order. Never translate sentence by sentence. Preserve exact wording only for clearly attributed direct quotations that appear in the evidence.
 9. BIAS & NEUTRALITY: Write with complete objectivity. Eliminate speculative adjectives, emotional language, and biased framing.
 GUARD;
 
@@ -247,6 +243,13 @@ GUARD;
     {
         // Extract override options if passed via metadata/options
         $options = $context->metadata['prompt_options'] ?? [];
+
+        // PromptEngine already owns the canonical evidence block. Older and
+        // custom templates may still contain {{research_context}}; replace that
+        // placeholder with a pointer so the full source body is not duplicated.
+        if (array_key_exists('research_context', $variables)) {
+            $variables['research_context'] = 'Use the complete verified evidence in the Research Context section above. It is intentionally provided only once.';
+        }
 
         $systemPrompt = $this->compileSystemPrompt($options);
         $researchContext = $this->compileResearchContext($context);

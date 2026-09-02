@@ -10,6 +10,24 @@ use Tests\TestCase;
 
 class SourceCollectionArticleScrapeTest extends TestCase
 {
+    public function test_scraper_fetches_vertex_grounding_redirect_urls(): void
+    {
+        $url = 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/test-token';
+
+        Http::fake([
+            $url => Http::response(
+                '<html><body><p>This verified publisher report contains enough factual article text to anchor content generation safely.</p></body></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        $body = app(SourceCollectionService::class)->scrapeArticleBody($url);
+
+        $this->assertStringContainsString('verified publisher report', $body);
+        Http::assertSent(fn ($request) => $request->url() === $url);
+    }
+
     public function test_scraper_falls_back_to_json_ld_article_body(): void
     {
         Http::fake([

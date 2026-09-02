@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\Key;
 use App\Models\User;
 use App\Modules\AIProviderManager\Models\AIProvider;
 use App\Modules\CustomerManager\Models\Customer;
@@ -10,8 +9,6 @@ use App\Modules\PromptManager\Models\Prompt;
 use App\Modules\PromptManager\Support\StandardUniversalNewsPromptV2;
 use App\Modules\SiteManager\Models\Site;
 use App\Modules\SubscriptionManager\Models\Plan;
-use App\Modules\SubscriptionManager\Models\Subscription;
-use App\Modules\TopicManager\Models\Topic;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -45,7 +42,7 @@ class DatabaseSeeder extends Seeder
                 'customer_id' => $customer->id,
             ]
         );
-        if (!$user->customer_id) {
+        if (! $user->customer_id) {
             $user->update(['customer_id' => $customer->id]);
         }
 
@@ -70,7 +67,6 @@ class DatabaseSeeder extends Seeder
             'analytics_access' => true,   // Enables per-site analytics dashboard
             'priority_support' => true,   // Enables priority support badge
         ]);
-
 
         // Seed AI Providers
         AIProvider::create([
@@ -126,7 +122,7 @@ class DatabaseSeeder extends Seeder
         $prompt1 = Prompt::create([
             'name' => 'Standard Universal Article Generator',
             'prompt' => StandardUniversalNewsPromptV2::TEXT,
-            'version' => 'v2.1',
+            'version' => 'v2.2',
             'status' => 'active',
         ]);
     }
