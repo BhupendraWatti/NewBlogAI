@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Route;
 $workspaces = [
     'dashboard', 'customers', 'plans', 'fleet', 'sites', 'prompts', 'topics',
     'pipeline', 'scheduler', 'providers', 'media', 'seo', 'analytics',
-    'notifications', 'roles', 'billing', 'settings', 'audit', 'design',
+    'notifications', 'roles', 'billing', 'settings', 'master-settings', 'audit', 'design',
 ];
 
 Route::get('/login', function () {

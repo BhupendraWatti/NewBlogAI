@@ -695,6 +695,9 @@
         if (node === 'settings' && window.fetchSystemSettings) {
             window.fetchSystemSettings();
         }
+        if (node === 'master-settings' && window.fetchMasterOptions) {
+            window.fetchMasterOptions();
+        }
 
         // Highlight Active Sidebar Menu Option
         document.querySelectorAll('#sidebar-menu button').forEach(btn => {
@@ -4495,6 +4498,18 @@
                 }
             }
 
+            // 3. Fetch Master Options (Topics, Countries, States)
+            try {
+                const masterRes = await apiFetch('/api/v1/master-options/grouped');
+                if (masterRes.ok) {
+                    const masterResult = await masterRes.json();
+                    window.masterGroupedOptions = masterResult.data || masterResult;
+                    populateMasterDropdowns(window.masterGroupedOptions);
+                }
+            } catch (mErr) {
+                console.warn("Could not load master options:", mErr);
+            }
+
             // Initial validation check
             validatePipelineForm();
 
@@ -4504,6 +4519,81 @@
             console.error("Error populating pipeline selections:", err);
         }
     };
+
+    function populateMasterDropdowns(grouped) {
+        if (!grouped) return;
+
+        // Topics / Categories Dropdown
+        const catSelect = document.getElementById('gen-category');
+        if (catSelect) {
+            const currentCat = catSelect.value;
+            catSelect.innerHTML = '<option value="">— Select News Topic / Category —</option>';
+            (grouped.topics || []).forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.name;
+                opt.textContent = t.name;
+                catSelect.appendChild(opt);
+            });
+            if (currentCat && [...catSelect.options].some(o => o.value === currentCat)) {
+                catSelect.value = currentCat;
+            }
+        }
+
+        // Countries Dropdown
+        const countrySelect = document.getElementById('gen-country');
+        if (countrySelect) {
+            const currentCountry = countrySelect.value;
+            countrySelect.innerHTML = '<option value="">— Select Country (or Global) —</option>';
+            (grouped.countries || []).forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.name;
+                opt.dataset.id = c.id;
+                opt.dataset.code = c.code || '';
+                opt.textContent = c.code ? `${c.name} (${c.code})` : c.name;
+                countrySelect.appendChild(opt);
+            });
+            if (currentCountry && [...countrySelect.options].some(o => o.value === currentCountry)) {
+                countrySelect.value = currentCountry;
+            }
+        }
+
+        // States Dropdown
+        renderPipelineStates();
+    }
+
+    window.handlePipelineCountryChange = function () {
+        renderPipelineStates();
+        validatePipelineForm();
+    };
+
+    function renderPipelineStates() {
+        const stateSelect = document.getElementById('gen-state');
+        const countrySelect = document.getElementById('gen-country');
+        if (!stateSelect || !window.masterGroupedOptions) return;
+
+        const selectedOption = countrySelect?.selectedOptions?.[0];
+        const selectedCountryId = selectedOption?.dataset?.id ? parseInt(selectedOption.dataset.id) : null;
+        const currentState = stateSelect.value;
+
+        stateSelect.innerHTML = '<option value="">— All States / Regions —</option>';
+
+        const allStates = window.masterGroupedOptions.states || [];
+        const filteredStates = selectedCountryId
+            ? allStates.filter(s => s.parent_id === selectedCountryId)
+            : allStates;
+
+        filteredStates.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.name;
+            const parentLabel = s.parent?.code ? ` (${s.parent.code})` : '';
+            opt.textContent = `${s.name}${parentLabel}`;
+            stateSelect.appendChild(opt);
+        });
+
+        if (currentState && [...stateSelect.options].some(o => o.value === currentState)) {
+            stateSelect.value = currentState;
+        }
+    }
 
     window.fetchRecentRuns = async function () {
         const tbody = document.getElementById('pipeline-runs-body');
@@ -4613,6 +4703,7 @@
         const provider = document.getElementById('gen-provider')?.value;
         const category = document.getElementById('gen-category')?.value;
         const country = document.getElementById('gen-country')?.value;
+        const state = document.getElementById('gen-state')?.value;
         const promptId = document.getElementById('gen-prompt')?.value;
         const lang = document.getElementById('gen-language')?.value;
         const btn = document.getElementById('discover-btn');
@@ -4628,6 +4719,7 @@
                 site_id: parseInt(siteId),
                 news_category: category,
                 target_country: country || null,
+                target_state: state || null,
                 prompt_id: parseInt(promptId),
                 ai_provider_id: parseInt(provider),
                 language: lang || 'en',
@@ -5644,6 +5736,330 @@
             }
         );
     };
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // Setting Master Node (Topics, Countries, States CRUD)
+    // ═════════════════════════════════════════════════════════════════════════
+    window.currentMasterTab = 'topic';
+    window.masterOptionsList = [];
+    window.allMasterCountries = [];
+
+    window.switchMasterTab = function (tab) {
+        window.currentMasterTab = tab;
+
+        // Sub-tabs styling
+        ['topic', 'country', 'state'].forEach(t => {
+            const btn = document.getElementById('master-tab-' + t);
+            if (btn) {
+                if (t === tab) {
+                    btn.classList.add('bg-white/5', 'text-accent', 'font-semibold');
+                    btn.classList.remove('text-muted');
+                } else {
+                    btn.classList.remove('bg-white/5', 'text-accent', 'font-semibold');
+                    btn.classList.add('text-muted');
+                }
+            }
+        });
+
+        // Show/hide country filter for states
+        const countryFilterContainer = document.getElementById('master-country-filter-container');
+        const parentHeader = document.querySelector('.master-col-parent');
+        if (tab === 'state') {
+            countryFilterContainer?.classList.remove('hidden');
+            parentHeader?.classList.remove('hidden');
+        } else {
+            countryFilterContainer?.classList.add('hidden');
+            parentHeader?.classList.add('hidden');
+        }
+
+        fetchMasterOptions();
+    };
+
+    window.fetchMasterOptions = async function () {
+        const tbody = document.getElementById('master-table-body');
+        const countBadge = document.getElementById('master-count-badge');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-muted"><span class="inline-block w-4 h-4 mr-2 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>Loading options...</td></tr>';
+        }
+
+        try {
+            const res = await apiFetch(`/api/v1/master-options?type=${window.currentMasterTab}&all=1`);
+            if (!res.ok) throw new Error('Failed to load master options');
+            const json = await res.json();
+            window.masterOptionsList = json.data || [];
+
+            if (window.currentMasterTab === 'state' || window.allMasterCountries.length === 0) {
+                const cRes = await apiFetch('/api/v1/master-options?type=country&all=1');
+                if (cRes.ok) {
+                    const cJson = await cRes.json();
+                    window.allMasterCountries = cJson.data || [];
+                    populateMasterFilterCountrySelect();
+                }
+            }
+
+            filterMasterOptionsTable();
+        } catch (err) {
+            console.error('Error fetching master options:', err);
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-rose-500 font-mono">Error: ${err.message}</td></tr>`;
+            }
+        }
+    };
+
+    function populateMasterFilterCountrySelect() {
+        const sel = document.getElementById('master-filter-country');
+        if (!sel) return;
+        const currentVal = sel.value;
+        sel.innerHTML = '<option value="">All Countries</option>';
+        window.allMasterCountries.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = `${c.name} (${c.code || ''})`;
+            sel.appendChild(opt);
+        });
+        sel.value = currentVal;
+    }
+
+    window.filterMasterOptionsTable = function () {
+        const query = document.getElementById('master-search-input')?.value?.toLowerCase().trim() || '';
+        const countryFilter = document.getElementById('master-filter-country')?.value;
+        const tbody = document.getElementById('master-table-body');
+        const emptyState = document.getElementById('master-empty-state');
+        const countBadge = document.getElementById('master-count-badge');
+        if (!tbody) return;
+
+        let filtered = window.masterOptionsList || [];
+
+        if (query) {
+            filtered = filtered.filter(item =>
+                (item.name && item.name.toLowerCase().includes(query)) ||
+                (item.code && item.code.toLowerCase().includes(query))
+            );
+        }
+
+        if (window.currentMasterTab === 'state' && countryFilter) {
+            filtered = filtered.filter(item => item.parent_id === parseInt(countryFilter));
+        }
+
+        if (countBadge) {
+            countBadge.textContent = `Showing ${filtered.length} of ${window.masterOptionsList.length} options`;
+        }
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = '';
+            emptyState?.classList.remove('hidden');
+            emptyState?.classList.add('flex');
+            return;
+        }
+
+        emptyState?.classList.add('hidden');
+        emptyState?.classList.remove('flex');
+        tbody.innerHTML = '';
+
+        const isStateTab = window.currentMasterTab === 'state';
+
+        filtered.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-surface/40 transition border-b border-border/50';
+
+            const statusBadge = item.is_active
+                ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Active</span>'
+                : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-500/10 text-zinc-400 border border-zinc-500/20"><span class="w-1.5 h-1.5 rounded-full bg-zinc-400"></span> Inactive</span>';
+
+            const parentTd = isStateTab
+                ? `<td class="p-3.5 text-muted">${item.parent ? `${escapeHtml(item.parent.name)} (${escapeHtml(item.parent.code || '')})` : '—'}</td>`
+                : '<td class="p-3.5 hidden master-col-parent"></td>';
+
+            tr.innerHTML = `
+                <td class="p-3.5 pl-5 font-semibold text-text flex items-center gap-2">
+                    <span class="material-symbols-outlined text-muted text-base">
+                        ${item.type === 'country' ? 'public' : item.type === 'state' ? 'location_city' : 'category'}
+                    </span>
+                    ${escapeHtml(item.name)}
+                </td>
+                <td class="p-3.5 text-muted font-mono">${escapeHtml(item.code || '—')}</td>
+                ${parentTd}
+                <td class="p-3.5 text-muted font-mono">${item.sort_order ?? 0}</td>
+                <td class="p-3.5">${statusBadge}</td>
+                <td class="p-3.5 text-right pr-5 whitespace-nowrap">
+                    <div class="flex items-center justify-end gap-2">
+                        <button onclick="toggleMasterOptionActive(${item.id}, ${item.is_active ? 'true' : 'false'})" title="${item.is_active ? 'Deactivate' : 'Activate'}" class="p-1 rounded-lg text-muted hover:text-text hover:bg-white/5 transition">
+                            <span class="material-symbols-outlined text-sm">${item.is_active ? 'toggle_on' : 'toggle_off'}</span>
+                        </button>
+                        <button onclick="openMasterOptionModal(${item.id})" title="Edit Option" class="p-1 rounded-lg text-muted hover:text-accent hover:bg-white/5 transition">
+                            <span class="material-symbols-outlined text-sm">edit</span>
+                        </button>
+                        <button onclick="deleteMasterOption(${item.id}, '${escapeJsString(item.name)}')" title="Delete Option" class="p-1 rounded-lg text-muted hover:text-rose-400 hover:bg-white/5 transition">
+                            <span class="material-symbols-outlined text-sm">delete</span>
+                        </button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    };
+
+    window.openMasterOptionModal = async function (id = null) {
+        const modal = document.getElementById('master-option-modal');
+        const form = document.getElementById('master-option-form');
+        const titleEl = document.getElementById('master-modal-title');
+        const typeSelect = document.getElementById('master-form-type');
+        const parentSelect = document.getElementById('master-form-parent');
+
+        if (!modal || !form) return;
+
+        form.reset();
+        document.getElementById('master-option-id').value = id || '';
+
+        // Populate parent countries
+        if (window.allMasterCountries.length === 0) {
+            const cRes = await apiFetch('/api/v1/master-options?type=country&all=1');
+            if (cRes.ok) {
+                const cJson = await cRes.json();
+                window.allMasterCountries = cJson.data || [];
+            }
+        }
+        if (parentSelect) {
+            parentSelect.innerHTML = '<option value="">— Select Parent Country —</option>';
+            window.allMasterCountries.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = `${c.name} (${c.code || ''})`;
+                parentSelect.appendChild(opt);
+            });
+        }
+
+        if (id) {
+            titleEl.textContent = 'Edit Master Option';
+            const opt = window.masterOptionsList.find(o => o.id === id);
+            if (opt) {
+                typeSelect.value = opt.type;
+                document.getElementById('master-form-name').value = opt.name || '';
+                document.getElementById('master-form-code').value = opt.code || '';
+                document.getElementById('master-form-order').value = opt.sort_order ?? 0;
+                document.getElementById('master-form-active').checked = !!opt.is_active;
+                if (parentSelect && opt.parent_id) parentSelect.value = opt.parent_id;
+            }
+        } else {
+            titleEl.textContent = 'Add Master Option';
+            typeSelect.value = window.currentMasterTab || 'topic';
+            document.getElementById('master-form-active').checked = true;
+            document.getElementById('master-form-order').value = 0;
+        }
+
+        handleMasterTypeChange();
+        modal.classList.remove('hidden');
+    };
+
+    window.closeMasterOptionModal = function () {
+        document.getElementById('master-option-modal')?.classList.add('hidden');
+    };
+
+    window.handleMasterTypeChange = function () {
+        const type = document.getElementById('master-form-type')?.value;
+        const parentContainer = document.getElementById('master-form-parent-container');
+        const parentSelect = document.getElementById('master-form-parent');
+        if (type === 'state') {
+            parentContainer?.classList.remove('hidden');
+            if (parentSelect) parentSelect.required = true;
+        } else {
+            parentContainer?.classList.add('hidden');
+            if (parentSelect) parentSelect.required = false;
+        }
+    };
+
+    window.saveMasterOption = async function (e) {
+        e.preventDefault();
+        const id = document.getElementById('master-option-id')?.value;
+        const type = document.getElementById('master-form-type')?.value;
+        const name = document.getElementById('master-form-name')?.value?.trim();
+        const code = document.getElementById('master-form-code')?.value?.trim() || null;
+        const parent_id = type === 'state' ? parseInt(document.getElementById('master-form-parent')?.value) || null : null;
+        const sort_order = parseInt(document.getElementById('master-form-order')?.value) || 0;
+        const is_active = document.getElementById('master-form-active')?.checked ? true : false;
+        const saveBtn = document.getElementById('master-save-btn');
+
+        if (!name) {
+            showError('Validation Error', 'Option name is required.');
+            return;
+        }
+
+        if (type === 'state' && !parent_id) {
+            showError('Validation Error', 'Please select a parent country for the state.');
+            return;
+        }
+
+        const payload = { type, name, code, parent_id, sort_order, is_active };
+        const url = id ? `/api/v1/master-options/${id}` : '/api/v1/master-options';
+        const method = id ? 'PUT' : 'POST';
+
+        await apiRequest(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }, {
+            submitBtn: saveBtn,
+            successTitle: 'Option Saved',
+            successMessage: `Option "${name}" saved successfully.`,
+            defaultErrorMessage: 'Could not save master option.',
+            onSuccess: async () => {
+                closeMasterOptionModal();
+                await fetchMasterOptions();
+                // Refresh generator dropdowns in real time
+                if (window.populatePipelineSelections) {
+                    await window.populatePipelineSelections();
+                }
+            }
+        });
+    };
+
+    window.deleteMasterOption = async function (id, name) {
+        showConfirmation(
+            'Delete Master Option',
+            `Are you sure you want to delete "${name}"? This will remove it from Content Generator dropdowns.`,
+            async () => {
+                await apiRequest(`/api/v1/master-options/${id}`, { method: 'DELETE' }, {
+                    successTitle: 'Option Deleted',
+                    successMessage: 'Option removed successfully.',
+                    defaultErrorMessage: 'Failed to delete master option.',
+                    onSuccess: async () => {
+                        await fetchMasterOptions();
+                        if (window.populatePipelineSelections) {
+                            await window.populatePipelineSelections();
+                        }
+                    }
+                });
+            }
+        );
+    };
+
+    window.toggleMasterOptionActive = async function (id, currentStatus) {
+        await apiRequest(`/api/v1/master-options/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_active: !currentStatus })
+        }, {
+            defaultErrorMessage: 'Failed to update option status.',
+            onSuccess: async () => {
+                await fetchMasterOptions();
+                if (window.populatePipelineSelections) {
+                    await window.populatePipelineSelections();
+                }
+            }
+        });
+    };
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function escapeJsString(str) {
+        if (!str) return '';
+        return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+    }
 
     // Client-side protections to prevent casual inspection and layout modifications
     document.addEventListener('contextmenu', function (e) {

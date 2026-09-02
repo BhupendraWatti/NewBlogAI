@@ -93,6 +93,23 @@ class ResearchService implements ResearchServiceInterface
             'top ' . $subject . ' headlines',
         ];
 
+        // Check if MasterOption metadata defines custom search query templates for this topic
+        try {
+            $catLower = strtolower(trim($category));
+            $option = \App\Modules\SystemSettings\Models\MasterOption::ofType('topic')
+                ->where(function ($q) use ($category, $catLower) {
+                    $q->whereRaw('LOWER(name) = ?', [$catLower])
+                      ->orWhere('code', $catLower);
+                })
+                ->first();
+
+            if ($option && ! empty($option->metadata['queries']) && is_array($option->metadata['queries'])) {
+                return array_merge($baseTemplates, $option->metadata['queries']);
+            }
+        } catch (\Throwable) {
+            // Fall through safely
+        }
+
         // Category-specific news query extensions
         $categoryTemplates = match (strtolower($category)) {
             'global'        => [
@@ -146,8 +163,9 @@ class ResearchService implements ResearchServiceInterface
                 'arts and culture events today',
             ],
             default => [
-                'latest news headlines today',
-                'top stories breaking news ' . $today,
+                "latest {$category} updates and developments " . $today,
+                "top {$category} news stories today",
+                "breaking {$category} headlines " . date('Y'),
             ],
         };
 

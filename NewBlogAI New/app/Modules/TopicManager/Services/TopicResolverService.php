@@ -35,9 +35,13 @@ class TopicResolverService implements TopicResolverInterface
             // Resolve language: use pipeline language field, default to 'en'
             $language = $pipeline->language ?: 'en';
 
-            // Determine locale and region from language code
-            $locale = $this->determineLocale($language);
-            $region = $this->determineRegion($locale);
+            $country = $pipeline->target_country ?? null;
+            $state = $pipeline->target_state ?? null;
+            $locationStr = $state && $country ? "{$state}, {$country}" : ($state ?: $country);
+
+            // Determine locale and region from language code and target country
+            $locale = $this->determineLocale($language, $country);
+            $region = $this->determineRegion($locale, $country);
 
             // Derive a human-readable search subject from the category
             // (used as the "topic" keyword in research queries and prompts)
@@ -50,6 +54,9 @@ class TopicResolverService implements TopicResolverInterface
             $context->metadata['resolved_topic_name']     = $resolvedSubject;
             $context->metadata['resolved_topic_category'] = ucfirst($category);
             $context->metadata['news_category']           = $category;
+            $context->metadata['target_country']          = $country;
+            $context->metadata['target_state']            = $state;
+            $context->metadata['target_location']         = $locationStr;
             $context->metadata['language']                = $language;
             $context->metadata['locale']                  = $locale;
             $context->metadata['region']                  = $region;
@@ -57,6 +64,8 @@ class TopicResolverService implements TopicResolverInterface
             Log::info('CategoryResolverService: Category resolved successfully.', [
                 'news_category'    => $category,
                 'resolved_subject' => $resolvedSubject,
+                'target_country'   => $country,
+                'target_state'     => $state,
                 'language'         => $language,
                 'locale'           => $locale,
                 'region'           => $region,
@@ -77,7 +86,25 @@ class TopicResolverService implements TopicResolverInterface
      */
     protected function categoryToSearchSubject(string $category): string
     {
-        return match ($category) {
+        $catLower = strtolower(trim($category));
+
+        // Check if MasterOption has a custom search subject in metadata
+        try {
+            $option = \App\Modules\SystemSettings\Models\MasterOption::ofType('topic')
+                ->where(function ($q) use ($category, $catLower) {
+                    $q->whereRaw('LOWER(name) = ?', [$catLower])
+                      ->orWhere('code', $catLower);
+                })
+                ->first();
+
+            if ($option && ! empty($option->metadata['search_subject'])) {
+                return (string) $option->metadata['search_subject'];
+            }
+        } catch (\Throwable) {
+            // Fall through safely
+        }
+
+        return match ($catLower) {
             'global'        => 'global news headlines today',
             'trending'      => 'trending news stories today',
             'local'         => 'local community news today',
@@ -95,12 +122,20 @@ class TopicResolverService implements TopicResolverInterface
     /**
      * Normalize a language code into a valid BCP-47 locale string.
      */
-    protected function determineLocale(string $language): string
+    protected function determineLocale(string $language, ?string $country = null): string
     {
         $lang = strtolower(str_replace('_', '-', $language));
 
         if (str_contains($lang, '-')) {
             return $lang;
+        }
+
+        // If English is selected with India as target country, return Indian English en-IN
+        if ($lang === 'en' && $country) {
+            $c = strtolower(trim($country));
+            if ($c === 'india' || $c === 'in') {
+                return 'en-IN';
+            }
         }
 
         $map = [
@@ -120,10 +155,17 @@ class TopicResolverService implements TopicResolverInterface
     }
 
     /**
-     * Determine region code from a locale string.
+     * Determine region code from a locale string and optional target country.
      */
-    protected function determineRegion(string $locale): string
+    protected function determineRegion(string $locale, ?string $country = null): string
     {
+        if ($country) {
+            $c = strtolower(trim($country));
+            if ($c === 'india' || $c === 'in') {
+                return 'IN';
+            }
+        }
+
         if (str_contains($locale, '-')) {
             [, $region] = explode('-', $locale, 2);
 

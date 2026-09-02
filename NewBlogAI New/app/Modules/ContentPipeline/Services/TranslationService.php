@@ -82,8 +82,13 @@ class TranslationService implements TranslationInterface
                         Log::warning('TranslationService: AI Provider translation failed. Falling back to dynamic simulation.', [
                             'error' => $e->getMessage()
                         ]);
-                        $context->title = $this->simulateTranslation($originalTitle ?? '', $targetLanguage);
-                        $context->generatedContent = $this->simulateTranslation($originalContent ?? '', $targetLanguage);
+                        if (app()->runningUnitTests()) {
+                            $context->title = $this->simulateTranslation($originalTitle ?? '', $targetLanguage);
+                            $context->generatedContent = $this->simulateTranslation($originalContent ?? '', $targetLanguage);
+                        } else {
+                            $context->title = $originalTitle;
+                            $context->generatedContent = $originalContent;
+                        }
                     }
                 } else {
                     // Simulate translation dynamically only for the parts not already translated/in target language

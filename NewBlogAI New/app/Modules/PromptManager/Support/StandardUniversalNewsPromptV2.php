@@ -16,6 +16,9 @@ Topic: {{topic}}
 Working headline: {{headline}}
 Verified summary: {{summary}}
 Category: {{category}}
+Target Country: {{country}}
+Target State: {{state}}
+Location: {{location}}
 Publication date: {{date}}
 Language: {{language}}
 Tone: {{tone}}

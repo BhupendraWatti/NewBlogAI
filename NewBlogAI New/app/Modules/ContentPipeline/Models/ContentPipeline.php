@@ -17,6 +17,7 @@ class ContentPipeline extends Model
         'site_id',
         'news_category',
         'target_country',
+        'target_state',
         'prompt_id',
         'ai_provider_id',
         'language',

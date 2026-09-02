@@ -46,18 +46,46 @@
                                     <p class="text-[10px] text-muted">Configure providers in <button onclick="switchWorkspace('providers')" class="text-accent underline">AI Providers</button>.</p>
                                 </div>
 
-                                <!-- News Topic -->
+                                <!-- News Topic Dropdown -->
                                 <div class="space-y-1">
-                                    <label class="block text-[10px] font-mono text-muted uppercase tracking-widest" for="gen-category">News Topic / Category</label>
-                                    <input type="text" id="gen-category" placeholder="e.g. Indian Startups, Politics, Cricket" class="w-full bg-background border border-border text-text text-xs rounded-xl py-2.5 px-3 focus:outline-none focus:border-accent">
+                                    <div class="flex items-center justify-between">
+                                        <label class="block text-[10px] font-mono text-muted uppercase tracking-widest" for="gen-category">News Topic / Category</label>
+                                        <button type="button" onclick="switchWorkspace('master-settings')" class="text-[10px] text-accent hover:underline flex items-center gap-0.5">
+                                            <span class="material-symbols-outlined text-[11px]">tune</span> Manage
+                                        </button>
+                                    </div>
+                                    <select id="gen-category" class="w-full bg-background border border-border text-text text-xs rounded-xl py-2 px-3 focus:outline-none focus:border-accent">
+                                        <option value="">— Select News Topic —</option>
+                                    </select>
                                     <p class="text-[10px] text-muted">AI will find 9 real trending stories on this topic.</p>
                                 </div>
 
-                                <!-- Target Country -->
+                                <!-- Target Country Dropdown -->
                                 <div class="space-y-1">
-                                    <label class="block text-[10px] font-mono text-muted uppercase tracking-widest" for="gen-country">Target Country</label>
-                                    <input type="text" id="gen-country" placeholder="e.g. India, United States" class="w-full bg-background border border-border text-text text-xs rounded-xl py-2.5 px-3 focus:outline-none focus:border-accent">
+                                    <div class="flex items-center justify-between">
+                                        <label class="block text-[10px] font-mono text-muted uppercase tracking-widest" for="gen-country">Target Country</label>
+                                        <button type="button" onclick="switchWorkspace('master-settings')" class="text-[10px] text-accent hover:underline flex items-center gap-0.5">
+                                            <span class="material-symbols-outlined text-[11px]">tune</span> Manage
+                                        </button>
+                                    </div>
+                                    <select id="gen-country" onchange="handlePipelineCountryChange()" class="w-full bg-background border border-border text-text text-xs rounded-xl py-2 px-3 focus:outline-none focus:border-accent">
+                                        <option value="">— Select Country (or Global) —</option>
+                                    </select>
                                     <p class="text-[10px] text-muted">Filter news to this country/region.</p>
+                                </div>
+
+                                <!-- Target State Dropdown -->
+                                <div class="space-y-1" id="gen-state-container">
+                                    <div class="flex items-center justify-between">
+                                        <label class="block text-[10px] font-mono text-muted uppercase tracking-widest" for="gen-state">Target State / Region</label>
+                                        <button type="button" onclick="switchWorkspace('master-settings')" class="text-[10px] text-accent hover:underline flex items-center gap-0.5">
+                                            <span class="material-symbols-outlined text-[11px]">tune</span> Manage
+                                        </button>
+                                    </div>
+                                    <select id="gen-state" class="w-full bg-background border border-border text-text text-xs rounded-xl py-2 px-3 focus:outline-none focus:border-accent">
+                                        <option value="">— All States / Regions —</option>
+                                    </select>
+                                    <p class="text-[10px] text-muted">Granular state targeting (filtered by selected country).</p>
                                 </div>
 
                                 <!-- Prompt Template -->

@@ -323,21 +323,51 @@ class SourceCollectionService implements SourceCollectorInterface
         } else {
             // Check text clues
             $text = strtolower(($title ?? '') . ' ' . ($snippet ?? '') . ' ' . ($publisher ?? ''));
-            if (str_contains($text, 'united kingdom') || str_contains($text, 'london') || str_contains($text, ' bbc')) {
-                $region = 'GB';
-                $locale = 'en-GB';
-            } elseif (str_contains($text, 'germany') || str_contains($text, 'berlin')) {
-                $region = 'DE';
-                $locale = 'de-DE';
-            } elseif (str_contains($text, 'india') || str_contains($text, 'delhi') || str_contains($text, 'mumbai')) {
-                $region = 'IN';
-                $locale = 'en-IN';
-            } elseif (str_contains($text, 'canada') || str_contains($text, 'toronto')) {
-                $region = 'CA';
-                $locale = 'en-CA';
-            } elseif (str_contains($text, 'australia') || str_contains($text, 'sydney')) {
-                $region = 'AU';
-                $locale = 'en-AU';
+
+            // Check dynamic master countries first
+            try {
+                $countries = \Illuminate\Support\Facades\Cache::remember('master_country_options_map', 300, function () {
+                    return \App\Modules\SystemSettings\Models\MasterOption::ofType('country')
+                        ->active()
+                        ->get(['name', 'code'])
+                        ->toArray();
+                });
+
+                foreach ($countries as $c) {
+                    $cName = strtolower(trim((string) ($c['name'] ?? '')));
+                    $cCode = strtoupper(trim((string) ($c['code'] ?? '')));
+                    if ($cName !== '' && str_contains($text, $cName)) {
+                        $region = $cCode ?: 'US';
+                        $locale = match ($cCode) {
+                            'DE' => 'de-DE',
+                            'JP' => 'ja-JP',
+                            'FR' => 'fr-FR',
+                            default => $cCode ? 'en-'.$cCode : 'en-US',
+                        };
+                        break;
+                    }
+                }
+            } catch (\Throwable) {
+                // Fall through on error
+            }
+
+            if ($region === 'US') {
+                if (str_contains($text, 'united kingdom') || str_contains($text, 'london') || str_contains($text, ' bbc')) {
+                    $region = 'GB';
+                    $locale = 'en-GB';
+                } elseif (str_contains($text, 'germany') || str_contains($text, 'berlin')) {
+                    $region = 'DE';
+                    $locale = 'de-DE';
+                } elseif (str_contains($text, 'india') || str_contains($text, 'delhi') || str_contains($text, 'mumbai')) {
+                    $region = 'IN';
+                    $locale = 'en-IN';
+                } elseif (str_contains($text, 'canada') || str_contains($text, 'toronto')) {
+                    $region = 'CA';
+                    $locale = 'en-CA';
+                } elseif (str_contains($text, 'australia') || str_contains($text, 'sydney')) {
+                    $region = 'AU';
+                    $locale = 'en-AU';
+                }
             }
         }
 

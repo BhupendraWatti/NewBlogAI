@@ -16,6 +16,8 @@ class PipelineResource extends JsonResource
             'id'              => $this->id,
             'site_id'         => $this->site_id,
             'news_category'   => $this->news_category,
+            'target_country'  => $this->target_country,
+            'target_state'    => $this->target_state,
             'prompt_id'       => $this->prompt_id,
             'ai_provider_id'  => $this->ai_provider_id,
             'language'        => $this->language,

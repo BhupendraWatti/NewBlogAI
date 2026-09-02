@@ -17,6 +17,7 @@ class StorePipelineRequest extends FormRequest
             'site_id'         => ['required', 'integer', 'exists:sites,id'],
             'news_category'   => ['required', 'string', 'max:255'],
             'target_country'  => ['sometimes', 'nullable', 'string', 'max:255'],
+            'target_state'    => ['sometimes', 'nullable', 'string', 'max:255'],
             'prompt_id'       => ['required', 'integer', 'exists:prompts,id'],
             'ai_provider_id'  => ['required', 'integer', 'exists:ai_providers,id'],
             'language'        => ['sometimes', 'string', 'max:10'],

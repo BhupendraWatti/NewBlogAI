@@ -36,6 +36,7 @@
                 @include('partials.workspaces.roles')
                 @include('partials.workspaces.billing')
                 @include('partials.workspaces.settings')
+                @include('partials.workspaces.master-settings')
                 @include('partials.workspaces.audit')
                 @include('partials.workspaces.design')
                 @include('partials.workspaces.creation-wizard')

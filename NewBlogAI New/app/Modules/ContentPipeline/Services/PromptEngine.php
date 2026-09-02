@@ -180,6 +180,14 @@ GUARD;
             $instructions[] = "Tone: Write with a {$tone} tone.";
         }
 
+        // Geographic targeting context
+        $targetCountry = $context->pipeline?->target_country ?? $context->metadata['target_country'] ?? null;
+        $targetState = $context->pipeline?->target_state ?? $context->metadata['target_state'] ?? null;
+        if ($targetState || $targetCountry) {
+            $location = $targetState && $targetCountry ? "{$targetState}, {$targetCountry}" : ($targetState ?: $targetCountry);
+            $instructions[] = "Target Region: This article is targeted for {$location}. Ensure regional relevance, local context, and geographic accuracy are accurately reflected.";
+        }
+
         // ── Temporal Framing Guardrail ────────────────────────────────────────
         // Populated by ChronologicalContextParser. For follow-up/background
         // stories this contains mandatory framing rules that prevent the AI

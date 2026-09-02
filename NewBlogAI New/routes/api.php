@@ -19,6 +19,7 @@ use App\Modules\SiteManager\Controllers\WPPluginAPIController;
 use App\Modules\SubscriptionManager\Controllers\PlanController;
 use App\Modules\SubscriptionManager\Controllers\SubscriptionController;
 use App\Modules\SubscriptionManager\Controllers\InvoiceController;
+use App\Modules\SystemSettings\Controllers\MasterOptionController;
 use App\Modules\SystemSettings\Controllers\SystemSettingsController;
 use App\Modules\TopicManager\Controllers\TopicController;
 use Illuminate\Http\Request;
@@ -37,6 +38,12 @@ Route::prefix('v1')->group(function () {
             Route::get('auth/me', [AuthController::class, 'me']);
             Route::put('auth/profile', [AuthController::class, 'updateProfile']);
             Route::put('auth/password', [AuthController::class, 'changePassword']);
+        });
+
+        // Master Options / Setting Master Routes
+        Route::middleware('auth')->group(function () {
+            Route::get('master-options/grouped', [MasterOptionController::class, 'grouped']);
+            Route::apiResource('master-options', MasterOptionController::class);
         });
 
         // System Settings Routes (SuperAdmin/Admin only)

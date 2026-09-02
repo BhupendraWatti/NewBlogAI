@@ -17,7 +17,7 @@
 
         <!-- Navigation Links - scrollable, fills remaining height -->
         <div class="flex-1 overflow-y-auto custom-scrollbar mt-8 min-h-0">
-            <nav class="space-y-4" id="sidebar-menu">
+            <nav class="space-y-4 pb-8" id="sidebar-menu">
                 
                 <!-- Dashboard (Non-collapsible main item) -->
                 <div class="px-1">
@@ -151,6 +151,10 @@
                         <button onclick="switchWorkspace('settings')" data-node="settings" class="w-full flex items-center gap-3 text-left px-3 py-2 rounded-xl font-medium text-sm transition-all duration-200 text-muted hover:text-text hover:bg-white/5">
                             <span class="material-symbols-outlined text-lg">settings</span>
                             System Settings
+                        </button>
+                        <button onclick="switchWorkspace('master-settings')" data-node="master-settings" class="w-full flex items-center gap-3 text-left px-3 py-2 rounded-xl font-medium text-sm transition-all duration-200 text-muted hover:text-text hover:bg-white/5">
+                            <span class="material-symbols-outlined text-lg">tune</span>
+                            Setting Master
                         </button>
                     </div>
                 </details>

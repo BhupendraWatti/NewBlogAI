@@ -32,23 +32,23 @@ class AppServiceProvider extends ServiceProvider
         };
         $this->app->bind(PaymentGatewayInterface::class, $gatewayClass);
 
-        // Content Pipeline Interface Bindings with Concrete Services
-        $this->app->bind(
+        // Content Pipeline Interface Bindings with Concrete Services (Singletons for performance & memory efficiency)
+        $this->app->singleton(
             \App\Modules\ContentPipeline\Contracts\TopicResolverInterface::class,
             \App\Modules\TopicManager\Services\TopicResolverService::class
         );
 
-        $this->app->bind(
+        $this->app->singleton(
             \App\Modules\ContentPipeline\Contracts\ResearchServiceInterface::class,
             \App\Modules\ContentPipeline\Services\ResearchService::class
         );
 
-        $this->app->bind(
+        $this->app->singleton(
             \App\Modules\ContentPipeline\Contracts\SourceCollectorInterface::class,
             \App\Modules\ContentPipeline\Services\SourceCollectionService::class
         );
 
-        $this->app->bind(
+        $this->app->singleton(
             \App\Modules\ContentPipeline\Contracts\FactExtractorInterface::class,
             \App\Modules\ContentPipeline\Services\FactExtractionService::class
         );
@@ -56,37 +56,37 @@ class AppServiceProvider extends ServiceProvider
         // Chronological Context Parser — inserted between FactExtraction and ContentGenerator.
         // Decouples HTML publish time from root event time and injects a temporal
         // framing guardrail into the AI writer prompt for follow-up stories.
-        $this->app->bind(
+        $this->app->singleton(
             \App\Modules\ContentPipeline\Contracts\ChronologicalContextParserInterface::class,
             \App\Modules\ContentPipeline\Services\ChronologicalContextParser::class
         );
 
-        $this->app->bind(
+        $this->app->singleton(
             \App\Modules\ContentPipeline\Contracts\ContentGeneratorInterface::class,
             \App\Modules\ContentPipeline\Services\ContentGeneratorService::class
         );
 
-        $this->app->bind(
+        $this->app->singleton(
             \App\Modules\ContentPipeline\Contracts\TranslationInterface::class,
             \App\Modules\ContentPipeline\Services\TranslationService::class
         );
 
-        $this->app->bind(
+        $this->app->singleton(
             \App\Modules\ContentPipeline\Contracts\FactAuditorInterface::class,
             \App\Modules\ContentPipeline\Services\FactAuditService::class
         );
 
-        $this->app->bind(
+        $this->app->singleton(
             \App\Modules\ContentPipeline\Contracts\SEOServiceInterface::class,
             \App\Modules\ContentPipeline\Services\SEOService::class
         );
 
-        $this->app->bind(
+        $this->app->singleton(
             \App\Modules\ContentPipeline\Contracts\MediaPreparatorInterface::class,
             \App\Modules\MediaManager\Services\MediaPreparationService::class
         );
 
-        $this->app->bind(
+        $this->app->singleton(
             \App\Modules\ContentPipeline\Contracts\PublishingQueueInterface::class,
             \App\Modules\Publishing\Services\PublishingQueueService::class
         );

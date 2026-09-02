@@ -12,6 +12,7 @@ use App\Modules\ContentPipeline\Models\PipelineRun;
 use App\Modules\ContentPipeline\Support\DiscoveryRunTelemetry;
 use App\Modules\ContentPipeline\Support\PipelineErrorFormatter;
 use App\Modules\SubscriptionManager\Services\EntitlementService;
+use App\Modules\SystemSettings\Models\MasterOption;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -180,6 +181,7 @@ class NewsDiscoveryService
 
             $site->loadMissing('customer');
             $country = $pipeline->target_country ?: ($site->customer?->country ?? null);
+            $state = $pipeline->target_state ?? null;
             $category = $pipeline->news_category ?? 'global';
             $language = $pipeline->language ?: 'en';
 
@@ -191,6 +193,7 @@ class NewsDiscoveryService
                 $language,
                 $telemetry,
                 $country,
+                $state,
             );
 
             // ── Persist candidates ───────────────────────────────────────────
@@ -315,6 +318,7 @@ class NewsDiscoveryService
         string $language,
         DiscoveryRunTelemetry $telemetry,
         ?string $country = null,
+        ?string $state = null,
     ): array {
         $allErrors = [];
 
@@ -338,6 +342,7 @@ class NewsDiscoveryService
                         $language,
                         $telemetry,
                         $country,
+                        $state,
                     );
 
                     Log::info('NewsDiscoveryService: Provider succeeded.', [
@@ -424,6 +429,7 @@ class NewsDiscoveryService
         string $language,
         DiscoveryRunTelemetry $telemetry,
         ?string $country = null,
+        ?string $state = null,
     ): array {
         $excludedTitles = [];
         $unique = [];
@@ -441,6 +447,7 @@ class NewsDiscoveryService
                 $needed,
                 array_merge($excludedTitles, array_column($unique, 'title')),
                 $country,
+                $state,
             );
 
             $driver = $this->providerService->getDriver($provider->provider_key);
@@ -531,7 +538,7 @@ class NewsDiscoveryService
             // same-event stories, drops gossip/trash, enforces geographic balance, and
             // fills in missing geo fields in one pass. Fail-open: on any LLM error,
             // $parsed is returned unchanged.
-            $refinementResult = $this->llmRefiner->refine($parsed, $provider, $category, $country);
+            $refinementResult = $this->llmRefiner->refine($parsed, $provider, $category, $country, $state);
             $parsed = $refinementResult['candidates'];
 
             if (($refinementResult['provider'] ?? null) !== null) {
@@ -591,7 +598,7 @@ class NewsDiscoveryService
         ];
     }
 
-    protected function buildDiscoveryPrompt(string $category, string $language, int $count, array $excludedTitles, ?string $country = null): string
+    protected function buildDiscoveryPrompt(string $category, string $language, int $count, array $excludedTitles, ?string $country = null, ?string $state = null): string
     {
         $today = now()->format('F j, Y');
         $todayIso = now()->format('Y-m-d');
@@ -604,32 +611,48 @@ class NewsDiscoveryService
                 .implode("\n- ", array_slice($excludedTitles, 0, 40));
         }
 
-        $predefined = ['global', 'trending', 'local', 'technology', 'business', 'politics', 'sports', 'health', 'science', 'entertainment'];
-        $isCustomTopic = ! in_array(strtolower($category), $predefined, true);
+        try {
+            $masterTopics = MasterOption::ofType('topic')->active()->pluck('name')->map(fn ($n) => strtolower(trim((string) $n)))->all();
+        } catch (\Throwable) {
+            $masterTopics = [];
+        }
+
+        $predefined = array_unique(array_merge(
+            ['global', 'trending', 'local', 'technology', 'business', 'politics', 'sports', 'health', 'science', 'entertainment'],
+            $masterTopics
+        ));
+        $isCustomTopic = ! in_array(strtolower(trim($category)), $predefined, true);
 
         $topicConstraint = $isCustomTopic
             ? " focusing specifically on the topic or keyword '{$category}'"
             : " from the '{$category}' category";
 
+        $locationStr = $state && $country ? "{$state}, {$country}" : ($state ?: $country);
+
         // regionContext must only append the COUNTRY/REGION clause — never repeat the topic keyword,
         // because $topicConstraint already contains it for custom topics.
-        $regionContext = $country
+        $regionContext = $locationStr
             ? ($isCustomTopic
-                ? " occurring in or relevant to {$country}"
-                : " focusing specifically on national news events relevant to or occurring in {$country}")
+                ? " occurring in or relevant to {$locationStr}"
+                : " focusing specifically on news events relevant to or occurring in {$locationStr}")
             : '';
 
-        // Custom topics can be a city/state name. Requiring different cities
-        // for a query such as "Ujjain" contradicts the topic constraint and
-        // guarantees a downstream geo-quota shortfall.
+        // Dynamic geo guidance tailored to state/country selection
         $geoInstruction = $isCustomTopic
             ? "- If '{$category}' names a city or state, multiple stories MAY share that location. Diversify by event and subject instead of inventing other locations."
-            : ($country
-                ? "- If the region is {$country}: spread stories across different states/regions — do NOT cluster multiple stories in the same city."
-                : '- Spread stories across different cities and regions globally.');
+            : ($state
+                ? "- Stories should focus on the state/region of {$state}" . ($country ? " in {$country}." : ".") . " Spread coverage across different cities within this state/region."
+                : ($country
+                    ? "- If the region is {$country}: spread stories across different states/regions — do NOT cluster multiple stories in the same city."
+                    : '- Spread stories across different cities and regions globally.'));
         $geoDiversityRules = $isCustomTopic
             ? '- Keep every story directly relevant to the requested topic. For a place-specific topic, same-city stories are valid when they cover distinct events.'
-            : "- Each story MUST come from a DIFFERENT city wherever possible. Do NOT return multiple stories from the same city.\n- Spread coverage across different states/regions. Maximum 2 stories per state/region.";
+            : ($state
+                ? "- Focus on news occurring in or directly affecting {$state}.\n- Spread coverage across different cities or districts within {$state}."
+                : "- Each story MUST come from a DIFFERENT city wherever possible. Do NOT return multiple stories from the same city.\n- Spread coverage across different states/regions. Maximum 2 stories per state/region.");
+
+        $geoCityExample = $state ? "e.g. \"City in {$state}\"" : ($country ? "e.g. \"City in {$country}\"" : 'e.g. "Primary City"');
+        $geoStateExample = $state ? "e.g. \"{$state}\"" : ($country ? "e.g. \"State/Province in {$country}\"" : 'e.g. "State/Province name"');
 
         // Embed explicit date range operators so Gemini Search grounding
         // anchors its retrieval to the last 48 hours rather than returning
@@ -659,8 +682,8 @@ Do NOT return news older than 48 hours. Prioritize breaking news and trending ev
 GEOGRAPHIC DIVERSITY RULES (strictly enforced):
 {$geoDiversityRules}
 {$geoInstruction}
-- "geo_city": the primary city where the event occurred (e.g. "Mumbai"). Use null if the story is national/international with no single city focus.
-- "geo_state": the state or region of the event (e.g. "Maharashtra"). Use null if national/international.
+- "geo_city": the primary city where the event occurred ({$geoCityExample}). Use null if the story is national/international with no single city focus.
+- "geo_state": the state or region of the event ({$geoStateExample}). Use null if national/international.
 
 QUALITY RULES (strictly enforced):
 - Do NOT include viral social media gossip, TikTok/Reel rumours, or sensational gossip about local officials.

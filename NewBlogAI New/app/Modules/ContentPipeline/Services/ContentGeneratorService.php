@@ -45,7 +45,7 @@ class ContentGeneratorService implements ContentGeneratorInterface
                     'prompt_id' => $promptTemplate->id,
                     'prompt_name' => $promptTemplate->name,
                 ]);
-                $promptText = 'Write a comprehensive news article about {{category}} covering the latest developments. Include relevant facts, quotes from sources, and analysis. Target audience: general readers interested in {{category}} news.';
+                $promptText = \App\Modules\PromptManager\Support\StandardUniversalNewsPromptV2::TEXT;
             }
 
             // 1. Resolve variables from category context (no topic model needed)
@@ -58,7 +58,7 @@ class ContentGeneratorService implements ContentGeneratorInterface
             $language = $context->metadata['language'] ?? ($pipeline->language ?: 'en');
             $website = $site->domain_url;
 
-            // Dynamically resolve journalistic tone based on category
+            // Dynamically resolve journalistic tone based on metadata or category
             $toneMap = [
                 'global' => 'Neutral and authoritative — facts-first, globally balanced reporting',
                 'trending' => 'Confident and timely — highlights why the story matters right now',
@@ -71,7 +71,27 @@ class ContentGeneratorService implements ContentGeneratorInterface
                 'science' => 'Curious and methodical — research-backed scientific explanations',
                 'entertainment' => 'Engaging and vivid — cultural and entertainment storytelling',
             ];
-            $tone = $toneMap[$category] ?? 'Neutral and professional news reporting';
+            // Check if MasterOption metadata defines a custom tone for this topic
+            $masterTone = null;
+            try {
+                $topicOption = \App\Modules\SystemSettings\Models\MasterOption::ofType('topic')
+                    ->where(function ($q) use ($category) {
+                        $q->whereRaw('LOWER(name) = ?', [strtolower(trim($category))])
+                          ->orWhere('code', strtolower(trim($category)));
+                    })
+                    ->first();
+
+                if ($topicOption && ! empty($topicOption->metadata['tone'])) {
+                    $masterTone = (string) $topicOption->metadata['tone'];
+                }
+            } catch (\Throwable) {
+                // Fall through safely
+            }
+
+            $tone = $context->metadata['tone']
+                ?? $context->metadata['tone_instruction']
+                ?? $masterTone
+                ?? ($toneMap[$category] ?? ucfirst($category).' journalistic news reporting');
 
             // Resolve focus keywords from extracted facts
             $facts = $context->metadata['extracted_facts'] ?? $context->researchData['extracted_facts'] ?? [];
@@ -82,9 +102,19 @@ class ContentGeneratorService implements ContentGeneratorInterface
             }
             $keywords = implode(', ', array_slice($keywordsList, 0, 5));
 
+            $targetCountry = $context->pipeline?->target_country ?? $context->metadata['target_country'] ?? null;
+            $targetState = $context->pipeline?->target_state ?? $context->metadata['target_state'] ?? null;
+            $locationStr = $targetState && $targetCountry ? "{$targetState}, {$targetCountry}" : ($targetState ?: ($targetCountry ?: 'Global'));
+
             $variables = [
                 'topic' => $categoryLabel,
                 'category' => $categoryLabel,
+                'country' => $targetCountry ?: 'Global',
+                'Country' => $targetCountry ?: 'Global',
+                'state' => $targetState ?: 'All States / National',
+                'State' => $targetState ?: 'All States / National',
+                'location' => $locationStr,
+                'Location' => $locationStr,
                 'language' => $language,
                 'website' => $website,
                 'tone' => $tone,
@@ -101,6 +131,23 @@ class ContentGeneratorService implements ContentGeneratorInterface
                 $variables['headline'] = $selectedNews['title'];
                 $variables['topic'] = $selectedNews['title'];
                 $variables['summary'] = (string) ($selectedNews['summary'] ?? '');
+
+                // Dynamic geo data from candidate
+                $geoCity = $selectedNews['geo_city'] ?? null;
+                $geoState = $selectedNews['geo_state'] ?? $targetState;
+                if ($geoState) {
+                    $variables['state'] = $geoState;
+                    $variables['State'] = $geoState;
+                }
+                if ($geoCity) {
+                    $variables['city'] = $geoCity;
+                    $variables['City'] = $geoCity;
+                }
+                if ($geoCity || $geoState || $targetCountry) {
+                    $locParts = array_filter([$geoCity, $geoState, $targetCountry]);
+                    $variables['location'] = implode(', ', $locParts);
+                    $variables['Location'] = $variables['location'];
+                }
 
                 // ── ATTRIBUTION FIX ───────────────────────────────────────────
                 // Pass only domain names (not editorial brand names like NDTV/The Hindu)

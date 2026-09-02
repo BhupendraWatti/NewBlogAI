@@ -150,6 +150,7 @@ class LLMCandidateRefinementService
         AIProvider $preferredProvider,
         string $category,
         ?string $country = null,
+        ?string $state = null,
     ): array {
         $passthrough = [
             'candidates' => $rawCandidates,
@@ -176,7 +177,7 @@ class LLMCandidateRefinementService
                 return $passthrough;
             }
 
-            $prompt = $this->buildRefinementPrompt($rawCandidates, $category, $country);
+            $prompt = $this->buildRefinementPrompt($rawCandidates, $category, $country, $state);
             $driver = $this->providerService->getDriver($provider->provider_key);
 
             $result = $driver->generate(
@@ -286,10 +287,17 @@ class LLMCandidateRefinementService
     private function buildRefinementPrompt(
         array $candidates,
         string $category,
-        ?string $country
+        ?string $country,
+        ?string $state = null
     ): string {
         $today = now()->format('F j, Y');
-        $regionContext = $country ? " Coverage region: {$country}." : '';
+        $location = $state && $country ? "{$state}, {$country}" : ($state ?: $country);
+        $regionContext = $location ? " Coverage region: {$location}." : '';
+
+        // Dynamic state balance rule: avoid hard-dropping state candidates when focused on that state
+        $stateBalanceRule = $state
+            ? "Stories are specifically targeted to {$state}. Diversify across different cities and districts within {$state}."
+            : "Apply the same logic for geo_state with a maximum of 4.";
 
         // Tag each candidate with its index so we can map results back
         $indexed = array_map(
@@ -317,7 +325,7 @@ Set "keep": false and provide a clear "drop_reason" for any candidate that is:
 - Purely speculative or opinion pieces with no factual news event
 
 RULE 3 - GEOGRAPHIC BALANCE
-If more than 2 candidates share the same geo_city value, mark the lowest-scoring extras (by freshness_score) as "keep": false with "drop_reason": "geo_city quota exceeded". Apply the same logic for geo_state with a maximum of 4. Candidates with null geo_city/geo_state are exempt from this rule (they are treated as national/international stories).
+If more than 2 candidates share the same geo_city value, mark the lowest-scoring extras (by freshness_score) as "keep": false with "drop_reason": "geo_city quota exceeded". {$stateBalanceRule} Candidates with null geo_city/geo_state are exempt from this rule (they are treated as national/international stories).
 
 RULE 4 - GEO NORMALISATION
 For every kept candidate: if geo_city or geo_state is null but can be confidently inferred from the title or summary, fill it in. If uncertain, leave it null.
