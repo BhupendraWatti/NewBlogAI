@@ -722,8 +722,8 @@ class SourceCollectionService implements SourceCollectorInterface
      */
     public function scrapeArticleBody(string $url): string
     {
-        // Skip non-HTTP URLs and Vertex redirect URLs (they never return HTML)
-        if (! str_starts_with($url, 'http') || str_contains($url, 'vertexaisearch.cloud.google.com')) {
+        // Skip non-HTTP URLs
+        if (! str_starts_with($url, 'http')) {
             return '';
         }
 
