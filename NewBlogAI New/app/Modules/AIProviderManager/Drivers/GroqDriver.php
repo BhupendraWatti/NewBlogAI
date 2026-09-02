@@ -10,7 +10,7 @@ class GroqDriver implements AIProviderClientInterface
 {
     public function testConnection(string $apiKey, ?string $model = null): bool
     {
-        $model = $model ?: 'llama-3.3-70b-versatile';
+        $model = $this->resolveModel($model);
 
         try {
             $response = Http::withToken($apiKey)
@@ -39,7 +39,7 @@ class GroqDriver implements AIProviderClientInterface
 
     public function generate(string $apiKey, string $prompt, ?string $model = null, array $options = []): array
     {
-        $model = $model ?: 'llama-3.3-70b-versatile';
+        $model = $this->resolveModel($model);
         $timeout = $options['timeout'] ?? 120;
 
         return $this->executeWithRetryAndLog($apiKey, $prompt, $model, $options, function ($key, $p, $m, $opts) use ($timeout) {
@@ -183,6 +183,15 @@ class GroqDriver implements AIProviderClientInterface
             throw $lastException;
         }
         throw new \RuntimeException("Groq generation failed after max retries.");
+    }
+
+    private function resolveModel(?string $model): string
+    {
+        if (empty($model) || $model === 'llama-3.3-70b-versatile' || $model === 'llama-3.1-70b-versatile') {
+            return 'openai/gpt-oss-120b';
+        }
+
+        return $model;
     }
 
     public function getConfig(): array
