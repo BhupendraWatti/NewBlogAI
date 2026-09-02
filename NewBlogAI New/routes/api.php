@@ -179,6 +179,7 @@ Route::prefix('v1')->group(function () {
                 Route::post('customers/{id}/subscription/pause', [SubscriptionController::class, 'pause']);
                 Route::post('customers/{id}/subscription/resume', [SubscriptionController::class, 'resume']);
                 Route::post('customers/{id}/subscription/cancel', [SubscriptionController::class, 'cancel']);
+                Route::post('customers/{id}/subscription/renew', [SubscriptionController::class, 'renew']);
                 Route::get('customers/{id}/subscription/history', [SubscriptionController::class, 'history']);
             });
         });

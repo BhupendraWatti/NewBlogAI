@@ -45,6 +45,13 @@ class EntitlementService
             );
         }
 
+        // If status is explicitly active, auto-advance ends_at if due so active paying customers are never blocked
+        if ($subscription->status === 'active' && $subscription->ends_at && $subscription->ends_at->isPast()) {
+            $subscription->update([
+                'ends_at' => now()->addMonth(),
+            ]);
+        }
+
         if ($subscription->starts_at?->isFuture()
             || ($subscription->ends_at && $subscription->ends_at->isPast())
             || ($subscription->status === 'trial' && $subscription->trial_ends_at?->isPast())) {

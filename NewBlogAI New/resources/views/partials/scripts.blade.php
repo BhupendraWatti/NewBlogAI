@@ -1112,9 +1112,12 @@
                     // No subscription at all — offer Assign Plan
                     subscriptionAction = `<button onclick="assignSubscription('${customer.id}', '${(customer.company_name || '').replace(/'/g, "\\'")}')" class="text-accent hover:underline mr-3 text-xs font-semibold">Assign Plan</button>`;
                 } else if (customer.subscription_status === 'active' || customer.subscription_status === 'trial') {
-                    subscriptionAction = `<button onclick="changePlanSubscription('${customer.id}', ${customer.plan_id || 0})" class="text-secondary hover:underline mr-3 text-xs">Change Plan</button>`;
+                    subscriptionAction = `
+                        <button onclick="renewSubscription('${customer.id}', '${(customer.company_name || '').replace(/'/g, "\\'")}')" class="text-emerald-400 hover:underline mr-3 text-xs font-semibold">Renew</button>
+                        <button onclick="changePlanSubscription('${customer.id}', ${customer.plan_id || 0})" class="text-secondary hover:underline mr-3 text-xs">Change Plan</button>
+                    `;
                 } else {
-                    subscriptionAction = `<button onclick="assignSubscription('${customer.id}', '${(customer.company_name || '').replace(/'/g, "\\'")}')" class="text-warning hover:underline mr-3 text-xs">Resubscribe</button>`;
+                    subscriptionAction = `<button onclick="renewSubscription('${customer.id}', '${(customer.company_name || '').replace(/'/g, "\\'")}')" class="text-warning hover:underline mr-3 text-xs font-semibold">Resubscribe</button>`;
                 }
 
                 tr.innerHTML = `
@@ -2564,6 +2567,7 @@
                     let actionsHtml = '';
                     if (sub.status === 'active' || sub.status === 'trial') {
                         actionsHtml += `
+                                <button onclick="renewSubscription('${sub.customer_id}', '${(clientName || '').replace(/'/g, "\\'")}')" class="text-success text-emerald-400 font-semibold hover:underline mr-3">Renew</button>
                                 <button onclick="changePlanSubscription('${sub.customer_id}', ${sub.plan_id})" class="text-accent hover:underline mr-3">Change Plan</button>
                                 <button onclick="pauseSubscription('${sub.customer_id}')" class="text-warning hover:underline mr-3">Pause</button>
                                 <button onclick="cancelSubscription('${sub.customer_id}')" class="text-danger text-rose-500 hover:underline mr-3">Cancel</button>
@@ -2575,7 +2579,8 @@
                             `;
                     } else {
                         actionsHtml += `
-                                <button onclick="changePlanSubscription('${sub.customer_id}', ${sub.plan_id})" class="text-accent hover:underline mr-3">Resubscribe</button>
+                                <button onclick="renewSubscription('${sub.customer_id}', '${(clientName || '').replace(/'/g, "\\'")}')" class="text-success text-emerald-400 font-semibold hover:underline mr-3">Renew / Resubscribe</button>
+                                <button onclick="changePlanSubscription('${sub.customer_id}', ${sub.plan_id})" class="text-accent hover:underline mr-3">Change Plan</button>
                             `;
                     }
                     actionsHtml += `<button onclick="syncClientBilling(${sub.id}, this)" class="text-secondary hover:underline">Sync Gateway</button>`;
@@ -2618,6 +2623,28 @@
     };
 
     // Subscription Management Controls
+    window.renewSubscription = async function (customerId, customerName) {
+        showConfirmation(
+            "Renew Subscription",
+            `Extend the subscription for ${customerName || 'this customer'} by 1 billing cycle?`,
+            async () => {
+                await apiRequest(`/api/v1/customers/${customerId}/subscription/renew`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                }, {
+                    successTitle: "Subscription Renewed",
+                    successMessage: "Customer subscription has been extended successfully.",
+                    defaultErrorMessage: "Could not renew subscription.",
+                    onSuccess: async () => {
+                        if (typeof fetchBillingLedger === 'function') await fetchBillingLedger();
+                        if (typeof fetchCustomers === 'function') await fetchCustomers();
+                    }
+                });
+            }
+        );
+    };
+
     window.pauseSubscription = async function (customerId) {
         showConfirmation(
             "Pause Subscription",

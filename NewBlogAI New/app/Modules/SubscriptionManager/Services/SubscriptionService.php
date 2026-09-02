@@ -306,6 +306,77 @@ class SubscriptionService
     }
 
     /**
+     * Renew an active or expired subscription for another billing period.
+     */
+    public function renew(Subscription $subscription, ?string $period = null): Subscription
+    {
+        $billingPeriod = $period ?: $subscription->billing_period ?: 'monthly';
+        $now = now();
+        $baseDate = ($subscription->ends_at && $subscription->ends_at->isFuture()) ? $subscription->ends_at->copy() : $now->copy();
+        $newEndsAt = $billingPeriod === 'yearly' ? $baseDate->addYear() : $baseDate->addMonth();
+
+        $plan = $subscription->plan;
+        $price = $billingPeriod === 'yearly' ? (float) ($plan->yearly_price ?? 0) : (float) ($plan->monthly_price ?? 0);
+
+        return DB::transaction(function () use ($subscription, $billingPeriod, $now, $newEndsAt, $plan, $price) {
+            $subscription->update([
+                'status' => 'active',
+                'billing_period' => $billingPeriod,
+                'starts_at' => $subscription->starts_at ?: $now,
+                'ends_at' => $newEndsAt,
+                'trial_ends_at' => null,
+                'paused_at' => null,
+                'cancelled_at' => null,
+                'limits' => $plan ? $plan->toArray() : $subscription->limits,
+            ]);
+
+            // Create Invoice
+            $invoiceNumber = 'INV-' . $now->format('Ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
+            $invoice = Invoice::create([
+                'customer_id' => $subscription->customer_id,
+                'subscription_id' => $subscription->id,
+                'invoice_number' => $invoiceNumber,
+                'subtotal' => $price,
+                'discount' => 0.00,
+                'total' => $price,
+                'currency' => 'INR',
+                'status' => 'paid',
+                'due_at' => $now,
+                'paid_at' => $now,
+                'billing_reason' => 'subscription_cycle',
+            ]);
+
+            Transaction::create([
+                'customer_id' => $subscription->customer_id,
+                'invoice_id' => $invoice->id,
+                'gateway' => config('services.payment_gateway', 'stub'),
+                'gateway_transaction_id' => 'tx_renew_' . uniqid(),
+                'amount' => $price,
+                'currency' => 'INR',
+                'type' => 'charge',
+                'status' => 'succeeded',
+            ]);
+
+            SubscriptionHistory::create([
+                'customer_id' => $subscription->customer_id,
+                'plan_id' => $subscription->plan_id,
+                'event_type' => 'renewed',
+                'billing_period' => $billingPeriod,
+                'amount_paid' => $price,
+            ]);
+
+            CustomerActivity::create([
+                'customer_id' => $subscription->customer_id,
+                'event_type' => 'subscription_renewed',
+                'description' => "Renewed subscription for {$billingPeriod} period until {$newEndsAt->toDateString()}.",
+                'properties' => ['plan_id' => $subscription->plan_id, 'price' => $price],
+            ]);
+
+            return $subscription;
+        });
+    }
+
+    /**
      * Pause a subscription.
      */
     public function pause(Subscription $subscription): void

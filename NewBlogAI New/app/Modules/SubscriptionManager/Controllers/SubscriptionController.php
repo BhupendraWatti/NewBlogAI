@@ -172,6 +172,24 @@ class SubscriptionController extends Controller
     }
 
     /**
+     * Renew subscription.
+     */
+    public function renew(Request $request, string $customerId): SubscriptionResource
+    {
+        Gate::authorize('manageSubscriptions', Subscription::class);
+
+        $subscription = Subscription::where('customer_id', $customerId)->first();
+        if (! $subscription) {
+            throw new ModelNotFoundException('Subscription not found.');
+        }
+
+        $period = $request->input('billing_period');
+        $renewed = $this->service->renew($subscription, $period);
+
+        return new SubscriptionResource($renewed->load('plan'));
+    }
+
+    /**
      * View subscription change history logs.
      */
     public function history(string $customerId): AnonymousResourceCollection
