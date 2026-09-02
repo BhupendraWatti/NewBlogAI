@@ -32,7 +32,7 @@ class ArticleStructureNormalizerTest extends TestCase
 *Disclosure: This report was synthesized with AI assistance and is undergoing human verification.*
 MD;
 
-        $normalized = (new ArticleStructureNormalizer)->normalize($markdown, 'hi', true);
+        $normalized = (new ArticleStructureNormalizer)->normalize($markdown);
 
         $this->assertStringNotContainsString('## ', $normalized);
         $this->assertStringNotContainsString('Key Takeaways', $normalized);
@@ -47,7 +47,7 @@ MD;
         $body = implode(' ', array_fill(0, 220, 'verified fact'));
         $markdown = "# Detailed report\n\n## First development\n\n{$body}\n\n## Official response\n\n{$body}";
 
-        $normalized = (new ArticleStructureNormalizer)->normalize($markdown, 'en', false);
+        $normalized = (new ArticleStructureNormalizer)->normalize($markdown);
 
         $this->assertStringContainsString('## First development', $normalized);
         $this->assertStringContainsString('## Official response', $normalized);

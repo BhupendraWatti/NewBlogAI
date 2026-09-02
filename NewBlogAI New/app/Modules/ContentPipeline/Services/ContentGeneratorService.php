@@ -129,6 +129,7 @@ class ContentGeneratorService implements ContentGeneratorInterface
             // news candidate when present. Adds headline/summary/sources
             // variables for prompt templates; legacy runs are unaffected.
             $selectedNews = $context->metadata['selected_news'] ?? null;
+            $sourceUrls = [];
             if (is_array($selectedNews) && ! empty($selectedNews['title'])) {
                 $variables['headline'] = $selectedNews['title'];
                 $variables['topic'] = $selectedNews['title'];
@@ -170,36 +171,6 @@ class ContentGeneratorService implements ContentGeneratorInterface
                     $variables['Keywords'] = $variables['keywords'];
                 }
 
-                // ── REAL ARTICLE BODY SCRAPING ────────────────────────────────
-                // Fetch actual paragraph text from up to 2 source URLs so the AI
-                // writes from reported facts, not imagination.
-                $scrapedParts = [];
-                $scraped = 0;
-                foreach ($sourceUrls as $srcUrl) {
-                    if ($scraped >= 2) {
-                        break;
-                    }
-                    $body = $this->sourceCollector->scrapeArticleBody($srcUrl);
-                    if (! empty($body)) {
-                        $domain = preg_replace('/^www\./', '', strtolower(parse_url($srcUrl, PHP_URL_HOST) ?? 'source'));
-                        $scrapedParts[] = "[Source: {$domain}]\n".$body;
-                        $scraped++;
-                    }
-                }
-
-                $scrapedBody = implode("\n\n---\n\n", $scrapedParts);
-                $context->metadata['scraped_article_body'] = $scrapedBody;
-                $context->metadata['evidence_mode'] = $scrapedBody === '' ? 'summary_only' : 'detailed';
-                $variables['research_context'] = $scrapedBody
-                    ?: 'No article body could be retrieved from the source URLs. Write only what is verifiable from the headline and summary above. Do NOT invent facts, quotes, or statistics.';
-
-                Log::info('ContentGeneratorService: article body scraping complete.', [
-                    'candidate_title' => mb_substr($selectedNews['title'], 0, 80),
-                    'urls_attempted' => count($sourceUrls),
-                    'urls_scraped' => $scraped,
-                    'body_chars' => strlen($scrapedBody),
-                ]);
-
             } elseif (! empty($context->sources)) {
                 // Dynamic automated newsroom mode: use the discovered sources
                 $topSource = $context->sources[0];
@@ -229,16 +200,6 @@ class ContentGeneratorService implements ContentGeneratorInterface
                     $variables['Keywords'] = $variables['keywords'];
                 }
 
-                // Scraped body from context (already set by SourceCollectorService)
-                $scrapedBody = trim($context->metadata['scraped_article_body'] ?? '');
-                $variables['research_context'] = $scrapedBody
-                    ?: 'No article body could be retrieved from the source URLs. Write only what is verifiable from the headline and summary above. Do NOT invent facts, quotes, or statistics.';
-
-                Log::info('ContentGeneratorService: dynamic automated research context parsed.', [
-                    'top_source_title' => mb_substr($topSource->title ?? '', 0, 80),
-                    'urls_discovered' => count($context->sources),
-                    'body_chars' => strlen($scrapedBody),
-                ]);
             } else {
                 // Preserve legacy/manual generation, but downgrade it to
                 // timeless background content. Without evidence it must not
@@ -250,6 +211,38 @@ class ContentGeneratorService implements ContentGeneratorInterface
                 $context->metadata['scraped_article_body'] = '';
                 $context->metadata['story_type'] = 'background';
                 $context->metadata['dynamic_instructions'] = 'BACKGROUND ONLY — do not present any claim as current news and do not infer mutable facts from model memory.';
+            }
+
+            if ((is_array($selectedNews) || $context->sources !== []) && $sourceUrls === []) {
+                $context->addError('source_evidence', 'Detailed article generation stopped because the news item has no source URL.');
+
+                return $context;
+            }
+
+            if ($sourceUrls !== []) {
+                $scrapedParts = [];
+                foreach (array_slice($sourceUrls, 0, 2) as $srcUrl) {
+                    if ($body = $this->sourceCollector->scrapeArticleBody($srcUrl)) {
+                        $domain = preg_replace('/^www\./', '', strtolower(parse_url($srcUrl, PHP_URL_HOST) ?? 'source'));
+                        $scrapedParts[] = "[Source: {$domain}]\n".$body;
+                    }
+                }
+
+                $scrapedBody = implode("\n\n---\n\n", $scrapedParts);
+                if ($scrapedBody === '') {
+                    $context->addError('source_evidence', 'Detailed article generation stopped because no source article body could be retrieved. Verify the source URL and retry.');
+
+                    return $context;
+                }
+
+                $context->metadata['scraped_article_body'] = $scrapedBody;
+                $variables['research_context'] = $scrapedBody;
+
+                Log::info('ContentGeneratorService: article body scraping complete.', [
+                    'urls_attempted' => min(2, count($sourceUrls)),
+                    'urls_scraped' => count($scrapedParts),
+                    'body_chars' => strlen($scrapedBody),
+                ]);
             }
 
             // 2. Modular prompt compilation
@@ -281,11 +274,14 @@ class ContentGeneratorService implements ContentGeneratorInterface
 
             // 5. Structure results into context
             $context->generatedContent = $result['text'];
-            $context->generatedContent = $this->structureNormalizer->normalize(
-                (string) $context->generatedContent,
-                $language,
-                ($context->metadata['evidence_mode'] ?? null) === 'summary_only',
-            );
+            $context->generatedContent = $this->structureNormalizer->normalize((string) $context->generatedContent);
+
+            $wordCount = count(array_filter(preg_split('/\s+/u', strip_tags((string) $context->generatedContent)) ?: []));
+            if ($sourceUrls !== [] && $wordCount < 200) {
+                $context->addError('content_generator', "AI returned {$wordCount} words; detailed news requires at least 200.");
+
+                return $context;
+            }
 
             // Title: Category News — Date  (news-appropriate format)
             $title = "{$categoryLabel} News: ".now()->format('F j, Y');

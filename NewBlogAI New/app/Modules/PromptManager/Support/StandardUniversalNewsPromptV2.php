@@ -38,7 +38,7 @@ REPORTING RULES
 3. Preserve useful specificity from the evidence, including exact location or landmark, occurrence time, identified people and ages, medical status, official response, investigation status, traffic impact, and public contact information. Omit unsupported fields instead of filling gaps from model memory.
 
 4. Keep depth proportional to evidence:
-   - If only a headline and short summary are available, write a compact brief in continuous paragraphs.
+   - Do not write current news from a headline or short summary alone; a source article body is required.
    - Use subheadings only when there are genuinely distinct developments supported by enough facts for a substantial section.
    - Never create a heading for one short paragraph.
 

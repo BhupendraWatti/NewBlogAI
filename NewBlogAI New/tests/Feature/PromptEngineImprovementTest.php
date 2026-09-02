@@ -30,6 +30,8 @@ final class PromptCapturingFakeDriver implements AIProviderClientInterface
     /** @var array<int, string> */
     public array $prompts = [];
 
+    public function __construct(public ?string $responseText = null) {}
+
     public function testConnection(string $apiKey, ?string $model = null): bool
     {
         return true;
@@ -46,7 +48,12 @@ final class PromptCapturingFakeDriver implements AIProviderClientInterface
         $this->prompt = $prompt;
         $this->prompts[] = $prompt;
 
-        return ['text' => '# Verified report', 'prompt_tokens' => 1, 'completion_tokens' => 1, 'total_tokens' => 2];
+        return [
+            'text' => $this->responseText ?? "# Verified report\n\n".implode(' ', array_fill(0, 200, 'fact')),
+            'prompt_tokens' => 1,
+            'completion_tokens' => 1,
+            'total_tokens' => 2,
+        ];
     }
 }
 
@@ -224,7 +231,7 @@ class PromptEngineImprovementTest extends TestCase
     {
         $default = $this->promptEngine->compileOutputInstructions();
         $this->assertStringContainsString('Format the news article using clean, readable Markdown.', $default);
-        $this->assertStringContainsString('Keep structure proportional to the verified evidence', $default);
+        $this->assertStringContainsString('detailed report of at least 200 words', $default);
         $this->assertStringContainsString('every visible heading and label', $default);
         $this->assertStringNotContainsString("Include a 'Key Takeaways'", $default);
         $this->assertStringNotContainsString('Disclosure:', $this->promptEngine->compileSystemPrompt());
@@ -236,11 +243,10 @@ class PromptEngineImprovementTest extends TestCase
         $this->assertStringContainsString('Include a brief conclusion.', $custom);
     }
 
-    public function test_summary_only_generation_requests_a_compact_non_repetitive_report(): void
+    public function test_generation_stops_before_calling_ai_when_source_body_is_unavailable(): void
     {
         $driver = new PromptCapturingFakeDriver;
         $providers = Mockery::mock(AIProviderService::class);
-        $providers->shouldReceive('getDriver')->andReturn($driver);
         $collector = Mockery::mock(SourceCollectionService::class);
         $collector->shouldReceive('scrapeArticleBody')->andReturn('');
         $generator = app()->makeWith(ContentGeneratorService::class, [
@@ -256,9 +262,32 @@ class PromptEngineImprovementTest extends TestCase
         ];
         $generator->handle($context);
 
-        $this->assertStringContainsString('SUMMARY-ONLY EVIDENCE MODE', $driver->prompt);
-        $this->assertStringContainsString('Do not use H2 headings', $driver->prompt);
-        $this->assertStringContainsString('Do not add a recap, summary bullets, or Key Takeaways', $driver->prompt);
+        $this->assertSame(0, $driver->calls);
+        $this->assertTrue($context->hasErrors());
+        $this->assertEmpty($context->generatedContent);
+    }
+
+    public function test_generation_rejects_an_article_under_200_words(): void
+    {
+        $driver = new PromptCapturingFakeDriver('# Too short');
+        $providers = Mockery::mock(AIProviderService::class);
+        $providers->shouldReceive('getDriver')->andReturn($driver);
+        $collector = Mockery::mock(SourceCollectionService::class);
+        $collector->shouldReceive('scrapeArticleBody')->andReturn('A complete verified source article body.');
+        $generator = app()->makeWith(ContentGeneratorService::class, [
+            'providerService' => $providers,
+            'sourceCollector' => $collector,
+        ]);
+
+        $context = new PipelineContext($this->run, $this->pipeline);
+        $context->metadata['selected_news'] = [
+            'title' => 'Verified report',
+            'summary' => 'Verified summary.',
+            'source_references' => [['name' => 'Example', 'url' => 'https://example.com/report']],
+        ];
+        $generator->handle($context);
+
+        $this->assertTrue($context->hasErrors());
     }
 
     public function test_build_full_prompt_combines_all_sections(): void

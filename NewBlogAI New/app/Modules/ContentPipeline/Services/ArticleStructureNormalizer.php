@@ -10,7 +10,7 @@ namespace App\Modules\ContentPipeline\Services;
  */
 final class ArticleStructureNormalizer
 {
-    public function normalize(string $markdown, string $language = 'en', bool $summaryOnly = false): string
+    public function normalize(string $markdown): string
     {
         $markdown = trim($markdown);
         if ($markdown === '') {
@@ -34,7 +34,7 @@ final class ArticleStructureNormalizer
         ) ?? $markdown;
 
         $wordCount = count(array_filter(preg_split('/\s+/u', strip_tags($markdown)) ?: []));
-        $isBrief = $summaryOnly || $wordCount < 350;
+        $isBrief = $wordCount < 350;
 
         if ($isBrief) {
             // Preserve section prose but remove headings that fragment a brief.

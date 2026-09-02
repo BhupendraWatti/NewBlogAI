@@ -89,9 +89,7 @@ GUARD;
             $researchContext .= $scrapedBody."\n";
             $researchContext .= "--- END OF ARTICLE BODY TEXT ---\n";
         } else {
-            $researchContext .= "\n[NOTE: No article body text could be retrieved from the source URLs. ";
-            $researchContext .= 'Write ONLY what is verifiable from the headline and summary. ';
-            $researchContext .= "Do NOT invent facts, quotes, statistics, or milestones.]\n";
+            $researchContext .= "\n[NOTE: No source article body is available. Do not write current news from a headline or summary alone.]\n";
         }
 
         // Add topic clusters/regions
@@ -229,15 +227,11 @@ GUARD;
     /**
      * Formats final markdown instructions.
      */
-    public function compileOutputInstructions(array $options = [], ?PipelineContext $context = null): string
+    public function compileOutputInstructions(array $options = []): string
     {
-        $instructions = $options['instructions'] ?? 'Format the news article using clean, readable Markdown. Keep structure proportional to the verified evidence. Use one accurate # headline and a concise lead, then advance the reporting with new facts in each paragraph. Use ## headings only when the evidence supports genuinely distinct, substantial sections; do not create a heading for a single short paragraph. Do not add a Key Takeaways, recap, summary, conclusion, or bullet list that repeats the article. Avoid repeating facts from the headline or lead. Use bold sparingly—never bold full paragraphs or routine facts. Write every visible heading and label in the requested article language. Do not output HTML tags or markdown code fences. Output only the raw Markdown article.';
+        $instructions = $options['instructions'] ?? 'Format the news article using clean, readable Markdown. Produce a detailed report of at least 200 words by using every distinct verified fact in the supplied article bodies. Never reach the minimum through repetition, speculation, or invented background. Use one accurate # headline and a concise lead, then advance the reporting with new facts in each paragraph. Use ## headings only when the evidence supports genuinely distinct, substantial sections; do not create a heading for a single short paragraph. Do not add a Key Takeaways, recap, summary, conclusion, or bullet list that repeats the article. Avoid repeating facts from the headline or lead. Use bold sparingly—never bold full paragraphs or routine facts. Write every visible heading and label in the requested article language. Do not output HTML tags or markdown code fences. Output only the raw Markdown article.';
 
         $instructions .= "\nEvidence boundary: use only the supplied source text. Never invent names, dates, quotations, locations, statistics, or office titles. Current Date: ".now()->format('F j, Y').'. Verify every current officeholder and title from the supplied evidence; omit any current designation the evidence does not establish.';
-
-        if (($context?->metadata['evidence_mode'] ?? null) === 'summary_only') {
-            $instructions .= "\nSUMMARY-ONLY EVIDENCE MODE: The source body could not be retrieved. Produce a compact brief using only the verified headline and summary. Do not use H2 headings. Do not use bullet points. Do not add a recap, summary bullets, or Key Takeaways. Do not repeat the same fact in different wording. Explicitly say that further details are unavailable only when needed for clarity.";
-        }
 
         if (isset($options['additional_output_instructions'])) {
             $instructions .= ' '.$options['additional_output_instructions'];
@@ -259,7 +253,7 @@ GUARD;
         $contextInjection = $this->compileContextInjection($context);
         $userPrompt = $this->compileUserPrompt($userTemplate, $variables);
         $dynamicInstructions = $this->compileDynamicInstructions($context);
-        $outputInstructions = $this->compileOutputInstructions($options, $context);
+        $outputInstructions = $this->compileOutputInstructions($options);
 
         return implode("\n\n", [
             "System Prompt:\n".$systemPrompt,
