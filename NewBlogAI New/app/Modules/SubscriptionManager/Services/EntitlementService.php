@@ -164,14 +164,21 @@ class EntitlementService
             );
         }
 
-        // 6. Validates API key limits: check if total API keys used by customer is under limit (api_keys_allowed)
+        // 6. Validates API key limits: check if total API keys used by customer strictly exceeds allowed limit
         $apiKeyLimit = (int) ($limits['api_keys_allowed'] ?? 0);
         $userIds = \App\Models\User::where('customer_id', $site->customer_id)->pluck('id');
         $apiKeyUsage = \App\Models\Key::whereIn('user_id', $userIds)
             ->whereNull('revoked_at')
             ->count();
         
-        $this->assertBelowLimit('api_keys_allowed', $apiKeyUsage, $apiKeyLimit);
+        if ($apiKeyLimit > 0 && $apiKeyUsage > $apiKeyLimit) {
+            throw new EntitlementDeniedException(
+                "The subscription limit for api_keys_allowed has been reached.",
+                'api_keys_allowed',
+                $apiKeyLimit,
+                $apiKeyUsage,
+            );
+        }
 
         // 7. Validates Feature Access: checks if feature flags (like localization, advanced_seo, media_preparation) are enabled
         $requestedFeatures = $contextData['requested_features'] ?? [];
